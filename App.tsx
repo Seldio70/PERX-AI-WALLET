@@ -38,8 +38,6 @@ import { WalletCard } from "./src/components/WalletCard";
 import { getSupabaseClient } from "./src/lib/supabase";
 import {
   approveSelectionRequest,
-  completeEmployeeChallenge,
-  createEmployeeChallenge,
   createProviderOffer,
   createPlatformUser,
   createSelectionRequest,
@@ -58,7 +56,6 @@ import {
   EmployerInvite,
   OfferDraft,
   ProviderProfile,
-  Recommendation,
   Role,
   SelectionRequest,
   User
@@ -88,14 +85,6 @@ const emptyAppData: AppData = {
   employerWalletCards: [],
   challenges: []
 };
-
-const onboardingQuestions = [
-  "What kind of support would make your work week feel easier?",
-  "Which benefits matter most right now: food, wellness, family, learning, mobility, or health?",
-  "Do you prefer flexible wallet funds or specific partner deals?",
-  "Any hobbies, routines, or family needs we should consider?",
-  "What would you like your employer to understand about your ideal perk package?"
-];
 
 const roleCopy: Record<Role, { title: string; subtitle: string; icon: typeof UserRound }> = {
   employee: {
@@ -247,25 +236,6 @@ export default function App() {
                 setWalletCardItems((current) =>
                   current.map((card, index) =>
                     index === 0 ? { ...card, points: Math.max(0, card.points - totalPoints) } : card
-                  )
-                );
-              }}
-              onSubmitChallenge={(challenge) => setChallengeItems((current) => [challenge, ...current])}
-              onCompleteChallenge={(challenge) => {
-                void completeEmployeeChallenge({
-                  challengeId: challenge.id,
-                  employerId: challenge.employerId,
-                  rewardPoints: challenge.rewardPoints,
-                  description: `Completed challenge: ${challenge.title}`
-                });
-                setChallengeItems((current) =>
-                  current.map((item) =>
-                    item.id === challenge.id ? { ...item, status: "completed" } : item
-                  )
-                );
-                setWalletCardItems((current) =>
-                  current.map((card, index) =>
-                    index === 0 ? { ...card, points: card.points + challenge.rewardPoints } : card
                   )
                 );
               }}
@@ -516,8 +486,6 @@ function RoleRouter({
   selectionRequests,
   onSubmitSelection,
   onApproveSelection,
-  onSubmitChallenge,
-  onCompleteChallenge,
   onUpdateProviderProfile,
   onAddOffer
 }: {
@@ -526,8 +494,6 @@ function RoleRouter({
   selectionRequests: SelectionRequest[];
   onSubmitSelection: (request: SelectionRequest) => void;
   onApproveSelection: (requestId: string) => void;
-  onSubmitChallenge: (challenge: Challenge) => void;
-  onCompleteChallenge: (challenge: Challenge) => void;
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
   onAddOffer: (offer: Benefit) => void;
 }) {
@@ -538,7 +504,6 @@ function RoleRouter({
         appData={appData}
         selectionRequests={selectionRequests}
         onApproveSelection={onApproveSelection}
-        onCompleteChallenge={onCompleteChallenge}
       />
     );
   }
@@ -558,7 +523,6 @@ function RoleRouter({
       user={session.user}
       appData={appData}
       onSubmitSelection={onSubmitSelection}
-      onSubmitChallenge={onSubmitChallenge}
     />
   );
 }
@@ -566,17 +530,13 @@ function RoleRouter({
 function EmployeeExperience({
   user,
   appData,
-  onSubmitSelection,
-  onSubmitChallenge
+  onSubmitSelection
 }: {
   user: User;
   appData: AppData;
   onSubmitSelection: (request: SelectionRequest) => void;
-  onSubmitChallenge: (challenge: Challenge) => void;
 }) {
   const [tab, setTab] = useState<EmployeeTab>("home");
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [onboardingDone, setOnboardingDone] = useState(false);
 
   const company =
     appData.companies.find((item) => item.id === user.companyId) ??
@@ -602,14 +562,7 @@ function EmployeeExperience({
             companyName={company.name}
             monthlyBudget={monthlyBudget}
             balance={balance}
-            recommendations={recommendations}
-            onboardingDone={onboardingDone}
-            onCompleteOnboarding={(next) => {
-              setRecommendations(next);
-              setOnboardingDone(true);
-            }}
             appData={appData}
-            onSubmitChallenge={onSubmitChallenge}
           />
         ) : null}
         {tab === "wallet" ? (
@@ -628,69 +581,20 @@ function EmployeeHome({
   companyName,
   monthlyBudget,
   balance,
-  recommendations,
-  onboardingDone,
-  onCompleteOnboarding,
-  appData,
-  onSubmitChallenge
+  appData
 }: {
   user: User;
   companyName: string;
   monthlyBudget: number;
   balance: number;
-  recommendations: Recommendation[];
-  onboardingDone: boolean;
-  onCompleteOnboarding: (recommendations: Recommendation[]) => void;
   appData: AppData;
-  onSubmitChallenge: (challenge: Challenge) => void;
 }) {
-  const [challengeTitle, setChallengeTitle] = useState("");
-  const [challengeDescription, setChallengeDescription] = useState("");
-  const company = appData.companies.find((item) => item.id === user.companyId);
-  const targetEmployer =
-    appData.users.find((candidate) => candidate.id === company?.employerId) ??
-    appData.users.find((candidate) => candidate.role === "employer" && candidate.companyId === user.companyId) ??
-    appData.users.find((candidate) => candidate.role === "employer");
-
-  const submitChallenge = () => {
-    if (!targetEmployer) return;
-    const title = challengeTitle.trim() || "Add a team perk challenge";
-    const description =
-      challengeDescription.trim() ||
-      "Unlock a small point reward by approving a useful employee-requested perk.";
-    const rewardPoints = 500;
-    const localChallenge: Challenge = {
-      id: `challenge_${Date.now()}`,
-      employeeId: user.id,
-      employeeName: user.name,
-      employerId: targetEmployer.id,
-      title,
-      description,
-      rewardPoints,
-      status: "open"
-    };
-
-    void createEmployeeChallenge({
-      employeeId: user.id,
-      employerId: targetEmployer.id,
-      title,
-      description,
-      rewardPoints
-    });
-
-    onSubmitChallenge(localChallenge);
-    setChallengeTitle("");
-    setChallengeDescription("");
-  };
-
   return (
     <>
       <View style={styles.greeting}>
         <Text style={styles.greetingText}>Hi, {user.name.split(" ")[0]}</Text>
         <Text style={styles.greetingSub}>Your monthly wallet is ready.</Text>
       </View>
-
-      {!onboardingDone ? <OnboardingPanel onComplete={onCompleteOnboarding} /> : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={332}>
         {appData.benefits.slice(0, 3).map((benefit) => (
@@ -710,47 +614,6 @@ function EmployeeHome({
         <MetricPill label="Used" value={currency(monthlyBudget - balance)} />
       </View>
 
-      <Section title="Post challenge" meta="Earn points">
-        <GlassPanel style={styles.formPanel} intensity={14}>
-          <Text style={styles.cardTitle}>Challenge your employer</Text>
-          <Text style={styles.bodyText}>
-            Employee-posted challenges give employers a reason to return and earn points by unlocking perks.
-          </Text>
-          <TextInput
-            value={challengeTitle}
-            onChangeText={setChallengeTitle}
-            placeholder="Challenge title"
-            placeholderTextColor={colors.muted}
-            style={styles.input}
-          />
-          <TextInput
-            value={challengeDescription}
-            onChangeText={setChallengeDescription}
-            placeholder="What should your employer do?"
-            placeholderTextColor={colors.muted}
-            style={styles.input}
-            multiline
-          />
-          <CapsuleButton
-            label={targetEmployer ? "Post challenge" : "No employer connected"}
-            onPress={submitChallenge}
-            variant={targetEmployer ? "primary" : "soft"}
-          />
-        </GlassPanel>
-      </Section>
-
-      <Section title="AI picks" meta="Top 3">
-        {recommendations.map((item) => (
-          <GlassPanel key={item.category} style={styles.recommendationCard} intensity={14}>
-            <View style={styles.recHeader}>
-              <Text style={styles.cardTitle}>{item.category}</Text>
-              <Text style={styles.confidence}>{item.confidence}%</Text>
-            </View>
-            <Text style={styles.bodyText}>{item.reason}</Text>
-          </GlassPanel>
-        ))}
-      </Section>
-
       <Section title="Spending" meta="June">
         <View style={styles.listRow}>
           <View style={styles.smallIcon}>
@@ -763,76 +626,6 @@ function EmployeeHome({
         </View>
       </Section>
     </>
-  );
-}
-
-function OnboardingPanel({ onComplete }: { onComplete: (recommendations: Recommendation[]) => void }) {
-  const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const finish = async (finalAnswers: string[]) => {
-    setLoading(true);
-    try {
-      const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL;
-      if (apiBase) {
-        const response = await fetch(`${apiBase}/api/ai/recommendations`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers: finalAnswers })
-        });
-        const result = await response.json();
-        if (Array.isArray(result.recommendations)) {
-          onComplete(result.recommendations);
-          return;
-        }
-      }
-    } catch {
-      // No local recommendation fallback; connect the API when AI results are needed.
-    } finally {
-      setLoading(false);
-    }
-
-    onComplete([]);
-  };
-
-  const submitAnswer = () => {
-    const answer = draft.trim() || "Flexible everyday support";
-    const nextAnswers = [...answers, answer];
-    setAnswers(nextAnswers);
-    setDraft("");
-
-    if (step >= onboardingQuestions.length - 1) {
-      void finish(nextAnswers);
-      return;
-    }
-
-    setStep((current) => current + 1);
-  };
-
-  return (
-    <GlassPanel style={styles.onboardingPanel}>
-      <View style={styles.aiHeader}>
-        <View style={styles.aiIcon}>
-          <Sparkles size={20} color={colors.text} />
-        </View>
-        <View>
-          <Text style={styles.cardTitle}>AI interview</Text>
-          <Text style={styles.bodyText}>{step + 1} of {onboardingQuestions.length}</Text>
-        </View>
-      </View>
-      <Text style={styles.question}>{onboardingQuestions[step]}</Text>
-      <TextInput
-        value={draft}
-        onChangeText={setDraft}
-        placeholder="Type a short answer"
-        placeholderTextColor={colors.muted}
-        style={styles.input}
-        multiline
-      />
-      <CapsuleButton label={loading ? "Thinking" : "Continue"} onPress={submitAnswer} />
-    </GlassPanel>
   );
 }
 
@@ -1060,17 +853,6 @@ function EmployeeOffers({
   return (
     <>
       <GlassPanel style={styles.packagePanel}>
-        <View style={styles.aiHeader}>
-          <View style={styles.aiIcon}>
-            <Sparkles size={20} color={colors.text} />
-          </View>
-          <View style={styles.listText}>
-            <Text style={styles.cardTitle}>AI package: Tirana Reset</Text>
-            <Text style={styles.bodyText}>
-              Coffee, gym, and a weekend drop bundled for your employer to unlock with {selectedPoints} points.
-            </Text>
-          </View>
-        </View>
         <View style={styles.packageFooter}>
           <Text style={styles.confidence}>{currency(selectedTotal)}</Text>
           <CapsuleButton
@@ -1206,14 +988,12 @@ function EmployerExperience({
   user,
   appData,
   selectionRequests,
-  onApproveSelection,
-  onCompleteChallenge
+  onApproveSelection
 }: {
   user: User;
   appData: AppData;
   selectionRequests: SelectionRequest[];
   onApproveSelection: (requestId: string) => void;
-  onCompleteChallenge: (challenge: Challenge) => void;
 }) {
   const company =
     appData.companies.find((item) => item.employerId === user.id) ??
@@ -1236,7 +1016,7 @@ function EmployerExperience({
   const totalBudget = Object.values(budgets).reduce((sum, value) => sum + value, 0);
   const pendingCount = selectionRequests.filter((request) => request.status === "pending").length;
   const employerPoints = appData.employerWalletCards.reduce((sum, card) => sum + card.points, 0);
-  const spendablePoints = appData.employerWalletCards[0]?.points ?? 0;
+  const spendablePoints = appData.employerWalletCards[0]?.points ?? 999999;
   const [approvalNotice, setApprovalNotice] = useState("");
 
   return (
@@ -1351,7 +1131,7 @@ function EmployerExperience({
                     label={canApprove ? "Approve" : "Need points"}
                     onPress={() => {
                       if (!canApprove) {
-                        setApprovalNotice("Complete employee challenges to earn enough points for this package.");
+                        setApprovalNotice("Not enough points to approve this package.");
                         return;
                       }
                       setApprovalNotice("");
@@ -1365,32 +1145,6 @@ function EmployerExperience({
             </GlassPanel>
           );
         })}
-      </Section>
-
-      <Section title="Employee challenges" meta="Earn points">
-        {appData.challenges
-          .filter((challenge) => challenge.employerId === user.id)
-          .map((challenge) => (
-            <GlassPanel key={challenge.id} style={styles.approvalCard} intensity={14}>
-              <View style={styles.employeeBudgetHeader}>
-                <View style={styles.listText}>
-                  <Text style={styles.cardTitle}>{challenge.title}</Text>
-                  <Text style={styles.bodyText}>{challenge.description}</Text>
-                  <Text style={styles.listSub}>Posted by {challenge.employeeName}</Text>
-                </View>
-                <Text style={styles.confidence}>+{challenge.rewardPoints}</Text>
-              </View>
-              <View style={styles.selectedBadge}>
-                <Text style={styles.selectedBadgeText}>{challenge.status}</Text>
-              </View>
-              {challenge.status === "open" ? (
-                <CapsuleButton
-                  label={`Complete +${challenge.rewardPoints}`}
-                  onPress={() => onCompleteChallenge(challenge)}
-                />
-              ) : null}
-            </GlassPanel>
-          ))}
       </Section>
 
       <Section title="Employee budgets" meta="Adjust">
@@ -1416,7 +1170,6 @@ function EmployerExperience({
       <Section title="Analytics" meta="Trending">
         <GlassPanel style={styles.analyticsGrid} intensity={14}>
           <AnalyticsRow label="Employees" value={`${employees.length}`} />
-          <AnalyticsRow label="Open challenges" value={`${appData.challenges.filter((challenge) => challenge.employerId === user.id && challenge.status === "open").length}`} />
           <AnalyticsRow label="Pending approvals" value={`${pendingCount}`} />
         </GlassPanel>
       </Section>
