@@ -1,6 +1,5 @@
 import { StatusBar } from "expo-status-bar";
 import {
-  Bell,
   Building2,
   Check,
   ChevronRight,
@@ -35,6 +34,7 @@ import { CapsuleButton } from "./src/components/CapsuleButton";
 import { GlassPanel } from "./src/components/GlassPanel";
 import { MetricPill } from "./src/components/MetricPill";
 import { WalletCard } from "./src/components/WalletCard";
+import { currency, market } from "./src/lib/format";
 import { getSupabaseClient } from "./src/lib/supabase";
 import {
   approveSelectionRequest,
@@ -67,13 +67,6 @@ type Session = {
 };
 
 type AppData = PerxLiveData;
-
-const market = {
-  country: "Albania",
-  city: "Tirana",
-  currency: "ALL",
-  locale: "sq-AL"
-};
 
 const emptyAppData: AppData = {
   companies: [],
@@ -116,12 +109,18 @@ const benefitCategoryOptions: BenefitCategory[] = [
 
 const allocationCategories: BenefitCategory[] = ["Food", "Fitness", "Family", "Learning"];
 
+const emptyAllocation: Record<BenefitCategory, number> = {
+  Food: 0,
+  Fitness: 0,
+  Family: 0,
+  Learning: 0,
+  Health: 0,
+  Mobility: 0,
+  Wellness: 0
+};
+
 function createSessionToken(role: Role) {
   return `perx.session.${role}.${Date.now()}`;
-}
-
-function currency(value: number) {
-  return `${Math.round(value).toLocaleString(market.locale)} ${market.currency}`;
 }
 
 export default function App() {
@@ -547,8 +546,10 @@ function EmployeeExperience({
       monthlyBudgetPerEmployee: 0
     };
   const monthlyBudget = company.monthlyBudgetPerEmployee + (user.yearsEmployed ?? 0) * 500;
-  const spent = 0;
-  const balance = monthlyBudget - spent;
+  const spent = appData.selectionRequests
+    .filter((request) => request.employeeId === user.id && request.status === "approved")
+    .reduce((sum, request) => sum + request.total, 0);
+  const balance = Math.max(0, monthlyBudget - spent);
 
   return (
     <View style={styles.roleShell}>
@@ -568,7 +569,7 @@ function EmployeeExperience({
         {tab === "wallet" ? (
           <EmployeeWallet user={user} companyName={company.name} balance={balance} appData={appData} />
         ) : null}
-        {tab === "allocate" ? <BudgetAllocation user={user} monthlyBudget={monthlyBudget} appData={appData} /> : null}
+        {tab === "allocate" ? <BudgetAllocation monthlyBudget={monthlyBudget} /> : null}
         {tab === "alerts" ? <EmployeeOffers user={user} appData={appData} onSubmitSelection={onSubmitSelection} /> : null}
       </ScrollView>
       <BottomNav active={tab} onChange={setTab} />
@@ -706,22 +707,8 @@ function EmployeeWallet({
   );
 }
 
-function BudgetAllocation({ user, monthlyBudget, appData }: { user: User; monthlyBudget: number; appData: AppData }) {
-  const startingValues = useMemo(() => {
-    const values: Record<BenefitCategory, number> = {
-      Food: 0,
-      Fitness: 0,
-      Family: 0,
-      Learning: 0,
-      Health: 0,
-      Mobility: 0,
-      Wellness: 0
-    };
-
-    return values;
-  }, []);
-
-  const [values, setValues] = useState(startingValues);
+function BudgetAllocation({ monthlyBudget }: { monthlyBudget: number }) {
+  const [values, setValues] = useState<Record<BenefitCategory, number>>(emptyAllocation);
   const total = allocationCategories.reduce((sum, category) => sum + values[category], 0);
   const remaining = Math.max(0, monthlyBudget - total);
 
@@ -766,8 +753,7 @@ function EmployeeOffers({
   appData: AppData;
   onSubmitSelection: (request: SelectionRequest) => void;
 }) {
-  const smartPackageIds: string[] = [];
-  const [selectedIds, setSelectedIds] = useState<string[]>(smartPackageIds);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedProviderNames, setSelectedProviderNames] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const marketplaceBenefits = appData.benefits;
@@ -1003,17 +989,24 @@ function EmployerExperience({
       employerId: user.id,
       monthlyBudgetPerEmployee: 0
     };
-  const employees = appData.users.filter((item) => item.role === "employee" && item.companyId === company.id);
-  const [budgets, setBudgets] = useState(
-    Object.fromEntries(
-      employees.map((employee) => [
-        employee.id,
-        company.monthlyBudgetPerEmployee + (employee.yearsEmployed ?? 0) * 500
-      ])
-    ) as Record<string, number>
+  const employees = useMemo(
+    () => appData.users.filter((item) => item.role === "employee" && item.companyId === company.id),
+    [appData.users, company.id]
   );
+  const [budgets, setBudgets] = useState<Record<string, number>>({});
 
-  const totalBudget = Object.values(budgets).reduce((sum, value) => sum + value, 0);
+  useEffect(() => {
+    setBudgets((current) => {
+      const next: Record<string, number> = {};
+      for (const employee of employees) {
+        next[employee.id] =
+          current[employee.id] ??
+          company.monthlyBudgetPerEmployee + (employee.yearsEmployed ?? 0) * 500;
+      }
+      return next;
+    });
+  }, [employees, company.monthlyBudgetPerEmployee]);
+
   const pendingCount = selectionRequests.filter((request) => request.status === "pending").length;
   const employerPoints = appData.employerWalletCards.reduce((sum, card) => sum + card.points, 0);
   const spendablePoints = appData.employerWalletCards[0]?.points ?? 999999;
@@ -1155,11 +1148,11 @@ function EmployerExperience({
                 <Text style={styles.listTitle}>{employee.name}</Text>
                 <Text style={styles.listSub}>{employee.yearsEmployed} years employed</Text>
               </View>
-              <Text style={styles.confidence}>{currency(budgets[employee.id])}</Text>
+              <Text style={styles.confidence}>{currency(budgets[employee.id] ?? 0)}</Text>
             </View>
             <AllocationSlider
               category="Health"
-              value={budgets[employee.id]}
+              value={budgets[employee.id] ?? 0}
               max={15000}
               onChange={(value) => setBudgets((current) => ({ ...current, [employee.id]: value }))}
             />
@@ -1731,23 +1724,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700"
   },
-  onboardingPanel: {
-    padding: 18,
-    gap: 14
-  },
-  aiHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12
-  },
-  aiIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.capsule,
-    backgroundColor: colors.accentDeep,
-    alignItems: "center",
-    justifyContent: "center"
-  },
   cardTitle: {
     color: colors.text,
     fontSize: 16,
@@ -1757,12 +1733,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     lineHeight: 19
-  },
-  question: {
-    color: colors.text,
-    fontSize: 20,
-    lineHeight: 27,
-    fontWeight: "800"
   },
   input: {
     minHeight: 48,
@@ -1801,15 +1771,6 @@ const styles = StyleSheet.create({
   },
   categoryChipTextActive: {
     color: colors.text
-  },
-  recommendationCard: {
-    padding: 16
-  },
-  recHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6
   },
   confidence: {
     color: colors.text,
@@ -1985,15 +1946,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12
   },
-  adminActionPanel: {
-    padding: 16,
-    gap: 14
-  },
-  adminAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12
-  },
   employeeBudgetCard: {
     padding: 14,
     gap: 12
@@ -2032,14 +1984,6 @@ const styles = StyleSheet.create({
     height: 66,
     borderRadius: radius.capsule,
     backgroundColor: colors.text
-  },
-  logoMark: {
-    width: 58,
-    height: 58,
-    borderRadius: radius.capsule,
-    backgroundColor: colors.text,
-    alignItems: "center",
-    justifyContent: "center"
   },
   formPanel: {
     padding: 16,
