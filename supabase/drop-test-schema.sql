@@ -1,0 +1,12 @@
+drop table if exists public.redemptions;
+drop table if exists public.selection_items;
+drop table if exists public.selection_requests;
+drop table if exists public.challenges;
+drop table if exists public.employer_wallet_cards;
+drop table if exists public.points_ledger;
+drop table if exists public.employer_invites;
+drop table if exists public.benefits;
+drop table if exists public.provider_profiles;
+alter table if exists public.companies drop constraint if exists companies_employer_id_fkey;
+drop table if exists public.users;
+drop table if exists public.companies;

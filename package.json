@@ -1,0 +1,45 @@
+{
+  "name": "perx-ai-wallet",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "server": "ts-node-dev --respawn --transpile-only server/index.ts",
+    "setup:accounts": "node scripts/setup-clean-accounts.js",
+    "verify:supabase": "node scripts/verify-supabase.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~3.2.3",
+    "@expo/vector-icons": "^14.0.4",
+    "@opentelemetry/api": "^1.9.1",
+    "@react-native-community/slider": "4.5.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "expo": "~51.0.28",
+    "expo-blur": "~13.0.2",
+    "expo-linear-gradient": "~13.0.2",
+    "expo-status-bar": "~1.12.1",
+    "express": "^4.19.2",
+    "lucide-react-native": "^0.468.0",
+    "openai": "^4.67.3",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-native": "0.74.5",
+    "react-native-qrcode-svg": "^6.3.2",
+    "react-native-safe-area-context": "4.10.5",
+    "react-native-svg": "15.2.0",
+    "react-native-web": "~0.19.10"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/react": "~18.2.79",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "~5.3.3"
+  }
+}

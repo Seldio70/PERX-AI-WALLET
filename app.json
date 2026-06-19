@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "PerX AI Wallet",
+    "slug": "perx-ai-wallet",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#050816"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "local-perx-ai-wallet"
+      }
+    }
+  }
+}
