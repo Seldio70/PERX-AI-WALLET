@@ -1,5 +1,6 @@
 import Slider from "@react-native-community/slider";
 import { StyleSheet, Text, View } from "react-native";
+import { currency } from "../lib/format";
 import { colors, radius } from "../theme";
 import { BenefitCategory } from "../types";
 
@@ -15,7 +16,7 @@ export function AllocationSlider({ category, value, max, onChange }: Props) {
     <View style={styles.row}>
       <View style={styles.header}>
         <Text style={styles.category}>{category}</Text>
-        <Text style={styles.amount}>${Math.round(value)}</Text>
+        <Text style={styles.amount}>{currency(value)}</Text>
       </View>
       <Slider
         minimumValue={0}

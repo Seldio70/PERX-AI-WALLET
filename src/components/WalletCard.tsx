@@ -1,8 +1,9 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Nfc, QrCode } from "lucide-react-native";
 import { useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 import { Benefit, User } from "../types";
+import { currency } from "../lib/format";
 import { colors, radius, shadow } from "../theme";
 
 type Props = {
@@ -17,15 +18,17 @@ export function WalletCard({ user, companyName, balance, benefit }: Props) {
   const glow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 1800, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 1800, useNativeDriver: true })
+      ])
+    );
     Animated.parallel([
       Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 7 }),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glow, { toValue: 1, duration: 1800, useNativeDriver: true }),
-          Animated.timing(glow, { toValue: 0, duration: 1800, useNativeDriver: true })
-        ])
-      )
+      loop
     ]).start();
+    return () => loop.stop();
   }, [glow, scale]);
 
   const opacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.28] });
@@ -53,7 +56,7 @@ export function WalletCard({ user, companyName, balance, benefit }: Props) {
           </View>
         </View>
         <View style={styles.middle}>
-          <Text style={styles.balance}>${balance.toFixed(0)}</Text>
+          <Text style={styles.balance}>{currency(balance)}</Text>
           <Text style={styles.balanceLabel}>available this month</Text>
         </View>
         <View style={styles.bottomRow}>

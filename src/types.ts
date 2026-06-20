@@ -56,28 +56,6 @@ export type ProviderProfile = {
   isApproved: boolean;
 };
 
-export type Allocation = {
-  id: string;
-  userId: string;
-  benefitId: string;
-  amountAllocated: number;
-};
-
-export type Transaction = {
-  id: string;
-  userId: string;
-  benefitId: string;
-  amount: number;
-  qrCode: string;
-  redeemedAt: string;
-};
-
-export type Recommendation = {
-  category: BenefitCategory;
-  confidence: number;
-  reason: string;
-};
-
 export type OfferDraft = {
   title: string;
   description: string;
