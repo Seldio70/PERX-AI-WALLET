@@ -16,13 +16,6 @@ export function validateProviderProfileDraft(profile: ProviderProfileDraft): str
   if (!profile.businessName.trim()) return "Enter your business name.";
   if (!profile.description.trim()) return "Add a short business description.";
   if (!profile.city.trim()) return "Enter your city.";
-  if (
-    !profile.logoUrl.trim() ||
-    profile.logoUrl === DEFAULT_PROVIDER_LOGO ||
-    isLocalImageUri(profile.logoUrl)
-  ) {
-    return "Upload a logo for your business.";
-  }
   return null;
 }
 

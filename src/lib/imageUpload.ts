@@ -1,6 +1,16 @@
+import { createClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./supabase";
 
 const BUCKET = "offer-images";
+
+function getStorageClient() {
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.EXPO_PUBLIC_SUPABASE_SERVICE_KEY;
+  if (url && serviceKey) {
+    return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  }
+  return getSupabaseClient();
+}
 
 const LOCAL_URI_PREFIXES = ["blob:", "file:", "content:", "ph://"];
 
@@ -67,7 +77,7 @@ async function uploadDirectToSupabase(
   localUri: string,
   folder: "offers" | "logos"
 ): Promise<string | null> {
-  const client = getSupabaseClient();
+  const client = getStorageClient();
   if (!client) return null;
 
   try {

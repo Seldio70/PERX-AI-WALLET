@@ -716,12 +716,9 @@ export function BusinessExperience({
     let logoUrl = next.logoUrl.trim();
     if (logoUrl && isLocalImageUri(logoUrl)) {
       const uploaded = await ensurePublicImageUrl(logoUrl, "logos");
-      if (!uploaded || isLocalImageUri(uploaded)) {
-        Alert.alert("Upload failed", "The logo could not be uploaded. Try picking the image again.");
-        return;
-      }
-      logoUrl = uploaded;
+      logoUrl = (!uploaded || isLocalImageUri(uploaded)) ? DEFAULT_PROVIDER_LOGO : uploaded;
     }
+    if (!logoUrl) logoUrl = DEFAULT_PROVIDER_LOGO;
 
     const localProfile: ProviderProfile = {
       id: existingProfile?.id ?? `provider_${Date.now()}`,
@@ -1170,7 +1167,7 @@ function BusinessProfileTab({
     <>
       <GlassPanel style={styles.profileHeroCard} intensity={34}>
         <Pressable style={styles.profileHeroLogoWrap} onPress={onEdit}>
-          <Image source={{ uri: profile.logoUrl }} style={styles.profileHeroLogo} />
+          <Image source={{ uri: profile.logoUrl || DEFAULT_PROVIDER_LOGO }} style={styles.profileHeroLogo} />
           <View style={styles.profileHeroLogoEdit}>
             <Camera size={14} color={colors.onPrimary} />
           </View>
@@ -1337,12 +1334,9 @@ function ProfileEditModal({
       let logoUrl = draft.logoUrl;
       if (logoUrl && isLocalImageUri(logoUrl)) {
         const uploaded = await ensurePublicImageUrl(logoUrl, "logos");
-        if (!uploaded || isLocalImageUri(uploaded)) {
-          Alert.alert("Upload failed", "The logo could not be uploaded. Try picking the image again.");
-          return;
-        }
-        logoUrl = uploaded;
+        logoUrl = (!uploaded || isLocalImageUri(uploaded)) ? DEFAULT_PROVIDER_LOGO : uploaded;
       }
+      if (!logoUrl) logoUrl = DEFAULT_PROVIDER_LOGO;
       await onSubmit({ ...draft, logoUrl });
       if (mode === "edit") onClose();
     } finally {
@@ -1380,7 +1374,7 @@ function ProfileEditModal({
             )}
           </View>
           <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <Text style={styles.modalFieldLabel}>Logo *</Text>
+            <Text style={styles.modalFieldLabel}>Logo (optional)</Text>
             <Pressable onPress={handlePickLogo} disabled={uploadingLogo} style={styles.imagePicker}>
               {draft.logoUrl ? (
                 <Image source={{ uri: draft.logoUrl }} style={styles.imagePickerPreview} />
