@@ -1,3 +1,4 @@
+drop table if exists public.employer_enabled_benefits;
 drop table if exists public.redemptions;
 drop table if exists public.selection_items;
 drop table if exists public.selection_requests;
@@ -209,6 +210,16 @@ create index redemptions_provider_status_idx
 create index redemptions_employer_created_idx
   on public.redemptions (employer_id, created_at desc);
 
+create table public.employer_enabled_benefits (
+  employer_id uuid not null references public.users(id) on delete cascade,
+  benefit_id uuid not null references public.benefits(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (employer_id, benefit_id)
+);
+
+create index employer_enabled_benefits_employer_idx
+  on public.employer_enabled_benefits (employer_id);
+
 alter table public.companies enable row level security;
 alter table public.users enable row level security;
 alter table public.provider_profiles enable row level security;
@@ -220,6 +231,7 @@ alter table public.employer_wallet_cards enable row level security;
 alter table public.points_ledger enable row level security;
 alter table public.challenges enable row level security;
 alter table public.redemptions enable row level security;
+alter table public.employer_enabled_benefits enable row level security;
 
 create policy "demo read companies" on public.companies for select using (true);
 create policy "demo read users" on public.users for select using (true);
@@ -232,6 +244,7 @@ create policy "demo read wallet cards" on public.employer_wallet_cards for selec
 create policy "demo read points ledger" on public.points_ledger for select using (true);
 create policy "demo read challenges" on public.challenges for select using (true);
 create policy "demo read redemptions" on public.redemptions for select using (true);
+create policy "demo read employer enabled benefits" on public.employer_enabled_benefits for select using (true);
 
 create policy "demo insert companies" on public.companies for insert with check (true);
 create policy "demo insert users" on public.users for insert with check (true);
@@ -244,6 +257,7 @@ create policy "demo insert wallet cards" on public.employer_wallet_cards for ins
 create policy "demo insert points ledger" on public.points_ledger for insert with check (true);
 create policy "demo insert challenges" on public.challenges for insert with check (true);
 create policy "demo insert redemptions" on public.redemptions for insert with check (true);
+create policy "demo insert employer enabled benefits" on public.employer_enabled_benefits for insert with check (true);
 
 create policy "demo update users" on public.users for update using (true) with check (true);
 create policy "demo update provider profiles" on public.provider_profiles for update using (true) with check (true);
@@ -252,3 +266,4 @@ create policy "demo update selection requests" on public.selection_requests for 
 create policy "demo update wallet cards" on public.employer_wallet_cards for update using (true) with check (true);
 create policy "demo update challenges" on public.challenges for update using (true) with check (true);
 create policy "demo update redemptions" on public.redemptions for update using (true) with check (true);
+create policy "demo delete employer enabled benefits" on public.employer_enabled_benefits for delete using (true);

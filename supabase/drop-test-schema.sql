@@ -1,3 +1,4 @@
+drop table if exists public.employer_enabled_benefits;
 drop table if exists public.redemptions;
 drop table if exists public.selection_items;
 drop table if exists public.selection_requests;

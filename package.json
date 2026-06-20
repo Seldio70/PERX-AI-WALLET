@@ -11,6 +11,7 @@
     "server": "ts-node-dev --respawn --transpile-only server/index.ts",
     "postinstall": "node scripts/patch-react-native-startup.js",
     "setup:accounts": "node scripts/setup-clean-accounts.js",
+    "setup:storage": "node scripts/setup-storage.js",
     "verify:supabase": "node scripts/verify-supabase.js",
     "typecheck": "tsc --noEmit"
   },

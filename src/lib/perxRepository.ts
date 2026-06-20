@@ -1,4 +1,5 @@
 import { Benefit, Challenge, Company, EmployerInvite, EmployerWalletCard, ProviderProfile, SelectionRequest, User } from "../types";
+import { isLocalImageUri } from "./imageUpload";
 import { getSupabaseClient } from "./supabase";
 
 type DbUser = {
@@ -104,13 +105,14 @@ function numberFromDb(value: number | string | null | undefined) {
 }
 
 function mapProviderProfile(row: DbProviderProfile): ProviderProfile {
+  const logoFallback =
+    "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=300&q=80";
   return {
     id: row.id,
     userId: row.user_id,
     businessName: row.business_name,
     logoUrl:
-      row.logo_url ??
-      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=300&q=80",
+      row.logo_url && !isLocalImageUri(row.logo_url) ? row.logo_url : logoFallback,
     description: row.description ?? "",
     category: row.category,
     city: row.city ?? "Tirana",
@@ -146,6 +148,8 @@ function mapCompany(row: DbCompany): Company {
 }
 
 function mapBenefit(row: DbBenefit): Benefit {
+  const imageFallback =
+    "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80";
   return {
     id: row.id,
     businessId: row.business_id ?? "",
@@ -157,8 +161,7 @@ function mapBenefit(row: DbBenefit): Benefit {
     price: numberFromDb(row.price),
     pointsPrice: numberFromDb(row.points_price),
     imageUrl:
-      row.image_url ??
-      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80",
+      row.image_url && !isLocalImageUri(row.image_url) ? row.image_url : imageFallback,
     redemptionType: row.type === "nfc" ? "NFC" : "QR",
     category: row.category,
     validUntil: row.valid_until ?? "",
@@ -577,29 +580,6 @@ export async function createSelectionRequest(input: {
   const items = await client.from("selection_items").insert(itemRows);
   if (items.error) return null;
 
-  const walletResult = await client
-    .from("employer_wallet_cards")
-    .select("id,points")
-    .eq("employer_id", input.employerId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (!walletResult.error && walletResult.data) {
-    const currentPoints = Number(walletResult.data.points ?? 0);
-    await client
-      .from("employer_wallet_cards")
-      .update({ points: Math.max(0, currentPoints - totalPoints) })
-      .eq("id", walletResult.data.id);
-  }
-
-  await client.from("points_ledger").insert({
-    user_id: input.employerId,
-    source: "employee_redemption",
-    points_delta: -totalPoints,
-    description: `Employee redeemed perks (${totalPoints} points)`
-  });
-
   if (input.benefits.length) {
     await client.from("redemptions").insert(
       input.benefits.map((benefit) => ({
@@ -764,4 +744,75 @@ export async function completeEmployeeChallenge(input: {
   });
 
   return true;
+}
+
+type DbEmployerEnabledBenefit = {
+  employer_id: string;
+  benefit_id: string;
+};
+
+export async function fetchEmployerEnabledBenefits(): Promise<Record<string, string[]>> {
+  const client = getSupabaseClient();
+  if (!client) return {};
+
+  const result = await client.from("employer_enabled_benefits").select("employer_id,benefit_id");
+  if (result.error) {
+    console.warn(`Employer enabled benefits unavailable: ${result.error.message}`);
+    return {};
+  }
+
+  const grouped: Record<string, string[]> = {};
+  for (const row of (result.data ?? []) as DbEmployerEnabledBenefit[]) {
+    if (!grouped[row.employer_id]) grouped[row.employer_id] = [];
+    grouped[row.employer_id].push(row.benefit_id);
+  }
+  return grouped;
+}
+
+export async function setEmployerBenefitEnabled(
+  employerId: string,
+  benefitId: string,
+  enabled: boolean
+): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  if (enabled) {
+    const result = await client
+      .from("employer_enabled_benefits")
+      .upsert({ employer_id: employerId, benefit_id: benefitId }, { onConflict: "employer_id,benefit_id" });
+    return !result.error;
+  }
+
+  const result = await client
+    .from("employer_enabled_benefits")
+    .delete()
+    .eq("employer_id", employerId)
+    .eq("benefit_id", benefitId);
+  return !result.error;
+}
+
+export async function setEmployerBenefitsEnabled(
+  employerId: string,
+  benefitIds: string[],
+  selected: boolean
+): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+  if (!benefitIds.length) return true;
+
+  if (selected) {
+    const result = await client.from("employer_enabled_benefits").upsert(
+      benefitIds.map((benefitId) => ({ employer_id: employerId, benefit_id: benefitId })),
+      { onConflict: "employer_id,benefit_id" }
+    );
+    return !result.error;
+  }
+
+  const result = await client
+    .from("employer_enabled_benefits")
+    .delete()
+    .eq("employer_id", employerId)
+    .in("benefit_id", benefitIds);
+  return !result.error;
 }

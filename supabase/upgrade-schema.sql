@@ -55,6 +55,39 @@ create index if not exists redemptions_provider_status_idx
 create index if not exists redemptions_employer_created_idx
   on public.redemptions (employer_id, created_at desc);
 
+-- Offer image storage (also run npm run setup:storage for the bucket)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'offer-images',
+  'offer-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "offer images public read" on storage.objects;
+create policy "offer images public read"
+on storage.objects for select
+to public
+using (bucket_id = 'offer-images');
+
+drop policy if exists "offer images anon insert" on storage.objects;
+create policy "offer images anon insert"
+on storage.objects for insert
+to anon, authenticated
+with check (bucket_id = 'offer-images');
+
+drop policy if exists "offer images anon update" on storage.objects;
+create policy "offer images anon update"
+on storage.objects for update
+to anon, authenticated
+using (bucket_id = 'offer-images');
+
 do $$
 begin
   if not exists (
@@ -134,5 +167,50 @@ begin
   ) then
     alter table public.redemptions
       add constraint redemptions_points_spent_nonnegative check (points_spent >= 0) not valid;
+  end if;
+end $$;
+
+create table if not exists public.employer_enabled_benefits (
+  employer_id uuid not null references public.users(id) on delete cascade,
+  benefit_id uuid not null references public.benefits(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (employer_id, benefit_id)
+);
+
+create index if not exists employer_enabled_benefits_employer_idx
+  on public.employer_enabled_benefits (employer_id);
+
+alter table public.employer_enabled_benefits enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'employer_enabled_benefits'
+      and policyname = 'demo read employer enabled benefits'
+  ) then
+    create policy "demo read employer enabled benefits"
+      on public.employer_enabled_benefits for select using (true);
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'employer_enabled_benefits'
+      and policyname = 'demo insert employer enabled benefits'
+  ) then
+    create policy "demo insert employer enabled benefits"
+      on public.employer_enabled_benefits for insert with check (true);
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'employer_enabled_benefits'
+      and policyname = 'demo delete employer enabled benefits'
+  ) then
+    create policy "demo delete employer enabled benefits"
+      on public.employer_enabled_benefits for delete using (true);
   end if;
 end $$;

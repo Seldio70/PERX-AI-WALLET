@@ -2,6 +2,7 @@ import { BlurView } from "expo-blur";
 import { Nfc, X } from "lucide-react-native";
 import { useEffect, useRef } from "react";
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { canAffordPerk, perkPointsCost } from "../lib/perkPayment";
 import { Benefit, User } from "../types";
 import { colors } from "../theme";
 import { CapsuleButton } from "./CapsuleButton";
@@ -13,7 +14,7 @@ type Props = {
   benefit: Benefit | null;
   user: User;
   companyName: string;
-  balance: number;
+  pointsBalance: number;
   variant: number;
   accepted: boolean;
   celebrateKey: number;
@@ -26,7 +27,7 @@ export function WalletFocus({
   benefit,
   user,
   companyName,
-  balance,
+  pointsBalance,
   variant,
   accepted,
   celebrateKey,
@@ -49,6 +50,8 @@ export function WalletFocus({
 
   if (!benefit) return null;
 
+  const cost = perkPointsCost(benefit);
+  const affordable = canAffordPerk(pointsBalance, benefit);
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [60, 0] });
   const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] });
 
@@ -65,8 +68,8 @@ export function WalletFocus({
             <WalletCard
               user={user}
               companyName={companyName}
-              balance={balance}
               benefit={benefit}
+              pointsBalance={pointsBalance}
               variant={variant}
               selected
             />
@@ -75,6 +78,7 @@ export function WalletFocus({
               <Text style={styles.captionText} numberOfLines={2}>
                 {benefit.description}
               </Text>
+              <Text style={styles.captionCost}>{cost} pts to use this perk</Text>
             </View>
           </Animated.View>
         </View>
@@ -83,12 +87,19 @@ export function WalletFocus({
           <View style={styles.statusRow}>
             <View style={[styles.dot, accepted && styles.dotActive]} />
             <Text style={styles.statusText}>
-              {accepted ? "Payment accepted" : "Ready for the NFC reader"}
+              {accepted
+                ? "Perk paid · points deducted"
+                : affordable
+                  ? "Ready for the NFC reader"
+                  : `Need ${cost - pointsBalance} more points`}
             </Text>
           </View>
           <CapsuleButton
-            label={accepted ? "Tap again" : "Simulate NFC tap"}
+            label={
+              accepted ? "Pay again" : affordable ? "Simulate NFC tap & pay" : "Not enough points"
+            }
             onPress={onTap}
+            variant={affordable ? "primary" : "soft"}
             icon={<Nfc size={16} color={colors.onPrimary} />}
           />
         </View>
@@ -142,6 +153,12 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
+    textAlign: "center"
+  },
+  captionCost: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "700",
     textAlign: "center"
   },
   bottom: {

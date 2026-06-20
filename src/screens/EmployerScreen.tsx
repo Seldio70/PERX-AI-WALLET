@@ -1,40 +1,35 @@
 import {
   Calendar,
+  Check,
   ChevronRight,
   CircleDollarSign,
-  Gift,
   Mail,
   Send,
-  Shield,
   ShieldCheck,
-  Sparkles,
-  Star,
   Store,
   Trophy,
   UserPlus,
   Users,
   Wallet,
-  WalletCards,
   X
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { AllocationSlider } from "../components/AllocationSlider";
-import { AnalyticsRow } from "../components/AnalyticsRow";
 import { AppIcon } from "../components/AppIcon";
 import { BentoMetricCard } from "../components/BentoMetricCard";
 import { BottomNav, NavTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
-import { MetricPill } from "../components/MetricPill";
 import { Section } from "../components/Section";
 import { UserProfileScreen } from "../components/UserProfileScreen";
 import { currency, market } from "../lib/format";
+import { groupProvidersWithOffers } from "../lib/employerCatalog";
+import { employerSettlementStats } from "../lib/perkPayment";
 import {
   defaultRewardAutomations,
   formatDateLabel,
   generateInviteCode,
-  rewardKindLabel,
   yearsSince
 } from "../lib/rewardsDemo";
 import { PerxLiveData } from "../lib/perxRepository";
@@ -44,6 +39,7 @@ import {
   Benefit,
   Challenge,
   EmployeeInvite,
+  ProviderProfile,
   RewardAutomation,
   RewardEvent,
   SelectionRequest,
@@ -52,12 +48,12 @@ import {
 
 type AppData = PerxLiveData;
 
-type EmployerTab = "home" | "employees" | "challenges" | "activity" | "profile";
+type EmployerTab = "home" | "employees" | "catalog" | "activity" | "profile";
 
 const employerTabs: Array<NavTab<EmployerTab>> = [
   { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
   { id: "employees", label: "Team", icon: "account-group-outline", iconActive: "account-group" },
-  { id: "challenges", label: "Perks", icon: "trophy-outline", iconActive: "trophy" },
+  { id: "catalog", label: "Providers", icon: "store-outline", iconActive: "store" },
   { id: "activity", label: "Activity", icon: "chart-box-outline", iconActive: "chart-box" },
   { id: "profile", label: "Profile", icon: "account-circle-outline", iconActive: "account-circle" }
 ];
@@ -73,7 +69,10 @@ export function EmployerExperience({
   onCreateChallenge,
   onCompleteChallenge,
   onGrantReward,
-  onSendEmployeeInvite
+  onSendEmployeeInvite,
+  enabledBenefitIds = [],
+  onToggleBenefit,
+  onToggleProvider
 }: {
   user: User;
   appData: AppData;
@@ -92,6 +91,9 @@ export function EmployerExperience({
     note: string;
   }) => void;
   onSendEmployeeInvite?: (invite: EmployeeInvite) => void;
+  enabledBenefitIds?: string[];
+  onToggleBenefit?: (benefitId: string) => void;
+  onToggleProvider?: (benefitIds: string[], selected: boolean) => void;
 }) {
   const [tab, setTab] = useState<EmployerTab>("home");
   const company =
@@ -120,14 +122,30 @@ export function EmployerExperience({
     });
   }, [employees, company.monthlyBudgetPerEmployee]);
 
-  const employerPoints = appData.employerWalletCards.reduce((sum, card) => sum + card.points, 0);
-  const redemptionsCount = selectionRequests.length;
+  const redemptionsCount = selectionRequests.filter((request) => request.status === "approved").length;
+  const settlement = useMemo(
+    () => employerSettlementStats(user.id, selectionRequests),
+    [user.id, selectionRequests]
+  );
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
   const [challengeModalOpen, setChallengeModalOpen] = useState(false);
   const detailEmployee = employees.find((employee) => employee.id === detailEmployeeId) ?? null;
   const companyInvites = employeeInvites.filter((invite) => invite.companyId === company.id);
+  const pendingInvites = companyInvites.filter((invite) => invite.status === "sent").length;
+  const enabledPerksCount = enabledBenefitIds.length;
+  const openChallenges = appData.challenges.filter(
+    (challenge) => challenge.employerId === user.id && challenge.status === "open"
+  ).length;
+  const providerGroups = useMemo(
+    () => groupProvidersWithOffers(appData.providerProfiles, appData.benefits),
+    [appData.providerProfiles, appData.benefits]
+  );
+  const recentRedemptions = useMemo(
+    () => selectionRequests.slice(0, 3),
+    [selectionRequests]
+  );
 
   const statsFor = (employeeId: string): EmployeeStats => {
     const reqs = selectionRequests.filter((request) => request.employeeId === employeeId);
@@ -158,11 +176,8 @@ export function EmployerExperience({
           <>
       <View style={styles.adminHeader}>
         <View style={styles.adminHeaderCopy}>
-          <Text style={styles.greetingText}>Management</Text>
-          <Text style={styles.greetingSub}>Fund points, watch redemptions, manage employee access.</Text>
-        </View>
-        <View style={styles.searchPill}>
-          <AppIcon name="magnify" size={18} color={colors.soft} />
+          <Text style={styles.greetingText}>Hi, {user.name.split(" ")[0]}</Text>
+          <Text style={styles.greetingSub}>{company.name} · Team overview and activity.</Text>
         </View>
       </View>
 
@@ -170,89 +185,128 @@ export function EmployerExperience({
         <BentoMetricCard
           title="Employees"
           value={`${employees.length}`}
-          trend="Active"
-          accent={colors.secondary}
-          Icon={Shield}
+          trend="On your team"
+          accent={colors.primary}
+          Icon={Users}
         />
         <BentoMetricCard
           title="Redemptions"
           value={`${redemptionsCount}`}
-          trend="+live"
-          accent={colors.primary}
-          Icon={Users}
+          trend="Approved"
+          accent={colors.secondary}
+          Icon={CircleDollarSign}
         />
       </View>
 
-      <View style={styles.adminActionCard}>
-        <View style={styles.adminActionIcon}>
-          <UserPlus size={20} color={colors.onPrimary} />
-        </View>
-        <View style={styles.listText}>
-          <Text style={styles.adminActionTitle}>Invite employee</Text>
-          <Text style={styles.adminActionSub}>Provision new team access keys.</Text>
-        </View>
+      <View style={styles.bentoRow}>
+        <BentoMetricCard
+          title="Enabled perks"
+          value={`${enabledPerksCount}`}
+          trend={`${providerGroups.length} providers`}
+          accent={colors.tertiary}
+          Icon={Store}
+        />
+        <BentoMetricCard
+          title="Challenges"
+          value={`${openChallenges}`}
+          trend="Open now"
+          accent={colors.accent}
+          Icon={Trophy}
+        />
       </View>
 
-      <View style={styles.metricRow}>
-        <MetricPill label="Employees" value={`${employees.length}`} />
-        <MetricPill label="Points" value={`${employerPoints.toLocaleString(market.locale)}`} />
-        <MetricPill label="Redemptions" value={`${redemptionsCount}`} />
+      <View style={styles.bentoRow}>
+        <BentoMetricCard
+          title="Pts redeemed"
+          value={`${settlement.pointsRedeemed}`}
+          trend="By your team"
+          accent={colors.accent}
+          Icon={CircleDollarSign}
+        />
+        <BentoMetricCard
+          title="Paid out"
+          value={`${Math.round(settlement.paidToProviders).toLocaleString()} ALL`}
+          trend="To providers"
+          accent={colors.secondary}
+          Icon={Wallet}
+        />
       </View>
 
-      <Section title="Points wallet" meta="Cards">
-        {appData.employerWalletCards.length ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {appData.employerWalletCards.map((card) => (
-            <GlassPanel key={card.id} style={styles.pointsCard} intensity={16}>
-              <View style={[styles.pointsAccent, { backgroundColor: card.accent }]} />
-              <Text style={styles.cardTitle}>{card.title}</Text>
-              <Text style={styles.pointsValue}>{card.points.toLocaleString(market.locale)}</Text>
-              <Text style={styles.bodyText}>{card.description}</Text>
+      {!enabledPerksCount ? (
+        <GlassPanel style={styles.employerAlertCard} intensity={20}>
+          <View style={styles.employerAlertIcon}>
+            <Store size={18} color="#E65100" />
+          </View>
+          <View style={styles.listText}>
+            <Text style={styles.listTitle}>No perks visible yet</Text>
+            <Text style={styles.listSub}>
+              Select providers in the catalog so employees can browse perks.
+            </Text>
+          </View>
+          <Pressable onPress={() => setTab("catalog")}>
+            <ChevronRight size={18} color={colors.primary} />
+          </Pressable>
+        </GlassPanel>
+      ) : null}
+
+      <Section title="Quick actions">
+        <View style={styles.employerQuickRow}>
+          <Pressable onPress={() => setTab("catalog")} style={{ flex: 1, minWidth: 140 }}>
+            <GlassPanel style={styles.employerQuickCard} intensity={18}>
+              <Store size={18} color={colors.primary} />
+              <Text style={styles.listTitle}>Providers</Text>
+              <Text style={styles.listSub}>Manage perk catalog</Text>
             </GlassPanel>
-            ))}
-          </ScrollView>
+          </Pressable>
+          <Pressable onPress={() => setTab("employees")} style={{ flex: 1, minWidth: 140 }}>
+            <GlassPanel style={styles.employerQuickCard} intensity={18}>
+              <Users size={18} color={colors.secondary} />
+              <Text style={styles.listTitle}>Team</Text>
+              <Text style={styles.listSub}>
+                {pendingInvites ? `${pendingInvites} pending invites` : "View employees"}
+              </Text>
+            </GlassPanel>
+          </Pressable>
+          <Pressable onPress={() => setTab("activity")} style={{ flex: 1, minWidth: 140 }}>
+            <GlassPanel style={styles.employerQuickCard} intensity={18}>
+              <Trophy size={18} color={colors.accent} />
+              <Text style={styles.listTitle}>Activity</Text>
+              <Text style={styles.listSub}>Redemptions & challenges</Text>
+            </GlassPanel>
+          </Pressable>
+        </View>
+      </Section>
+
+      <Section title="Recent activity">
+        {recentRedemptions.length ? (
+          recentRedemptions.map((request) => {
+            const requestBenefits = request.benefitIds
+              .map((benefitId) => appData.benefits.find((benefit) => benefit.id === benefitId))
+              .filter(Boolean) as Benefit[];
+
+            return (
+              <GlassPanel key={request.id} style={styles.approvalCard} intensity={14}>
+                <View style={styles.employeeBudgetHeader}>
+                  <View style={styles.listText}>
+                    <Text style={styles.cardTitle}>{request.employeeName}</Text>
+                    <Text style={styles.bodyText}>
+                      {requestBenefits.map((benefit) => benefit.title).join(", ") || "Perk selection"}
+                    </Text>
+                  </View>
+                  <Text style={styles.confidence}>{currency(request.total)}</Text>
+                </View>
+                <Text style={styles.listSub}>{request.status === "approved" ? "Settled" : "Pending"}</Text>
+              </GlassPanel>
+            );
+          })
         ) : (
           <View style={styles.listRow}>
             <View style={styles.smallIcon}>
-              <WalletCards size={18} color={colors.text} />
+              <CircleDollarSign size={18} color={colors.text} />
             </View>
             <View style={styles.listText}>
-              <Text style={styles.listTitle}>No wallet cards yet</Text>
-              <Text style={styles.listSub}>Add wallet cards in Supabase to assign employer points.</Text>
-            </View>
-          </View>
-        )}
-      </Section>
-
-      <Section title="Perks for points" meta="Catalog">
-        {appData.benefits.length ? appData.benefits.map((benefit) => {
-          const canAfford = employerPoints >= benefit.pointsPrice;
-          return (
-            <GlassPanel key={benefit.id} style={styles.offerCard} intensity={14}>
-              <Image source={{ uri: benefit.imageUrl }} style={styles.offerImage} />
-              <View style={styles.offerTop}>
-                <View style={styles.listText}>
-                  <Text style={styles.listTitle}>{benefit.title}</Text>
-                  <Text style={styles.listSub}>{benefit.providerName} - {benefit.category}</Text>
-                </View>
-                <View style={styles.selectedBadge}>
-                  <Text style={styles.selectedBadgeText}>{benefit.pointsPrice} pts</Text>
-                </View>
-              </View>
-              <Text style={styles.bodyText}>{benefit.description}</Text>
-              <Text style={styles.listSub}>
-                {canAfford ? "Available with current wallet balance" : "Needs more points"}
-              </Text>
-            </GlassPanel>
-          );
-        }) : (
-          <View style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <Store size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>No perks yet</Text>
-              <Text style={styles.listSub}>Provider offers will appear after they are added.</Text>
+              <Text style={styles.listTitle}>No activity yet</Text>
+              <Text style={styles.listSub}>Employee redemptions will appear here.</Text>
             </View>
           </View>
         )}
@@ -262,76 +316,20 @@ export function EmployerExperience({
 
         {tab === "activity" ? (
           <>
-      <Section title="Recent redemptions" meta="Live">
-        {selectionRequests.length ? selectionRequests.map((request) => {
-          const requestBenefits = request.benefitIds
-            .map((benefitId) => appData.benefits.find((benefit) => benefit.id === benefitId))
-            .filter(Boolean) as Benefit[];
-          const providers = Array.from(new Set(requestBenefits.map((benefit) => benefit.providerName)));
-          const pointsCharged =
-            request.totalPoints || requestBenefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
+      <View style={[styles.adminHeader, styles.activityPageHeader]}>
+        <View style={styles.adminHeaderCopy}>
+          <Text style={styles.greetingText}>Activity</Text>
+          <Text style={styles.greetingSub}>Redemptions, challenges, and recognition settings.</Text>
+        </View>
+      </View>
 
-          return (
-            <GlassPanel key={request.id} style={styles.approvalCard} intensity={14}>
-              <View style={styles.employeeBudgetHeader}>
-                <View style={styles.listText}>
-                  <Text style={styles.cardTitle}>{request.employeeName}</Text>
-                  <Text style={styles.bodyText}>
-                    {requestBenefits.map((benefit) => benefit.title).join(", ")}
-                  </Text>
-                  <Text style={styles.listSub}>
-                    Routed to {providers.join(", ")}
-                  </Text>
-                </View>
-                <Text style={styles.confidence}>{currency(request.total)}</Text>
-              </View>
-              <Text style={styles.listSub}>
-                Points charged: {pointsCharged.toLocaleString(market.locale)}
-              </Text>
-              <View style={styles.packageFooter}>
-                <View style={styles.selectedBadge}>
-                  <Text style={styles.selectedBadgeText}>Settled</Text>
-                </View>
-              </View>
-            </GlassPanel>
-          );
-        }) : (
-          <View style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <CircleDollarSign size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>No redemptions yet</Text>
-              <Text style={styles.listSub}>Employee redemptions will land here automatically.</Text>
-            </View>
-          </View>
-        )}
-      </Section>
+      <RecentRedemptionsSection selectionRequests={selectionRequests} benefits={appData.benefits} />
 
-      <Section title="Analytics" meta="Trending">
-        <GlassPanel style={styles.analyticsGrid} intensity={14}>
-          <AnalyticsRow label="Employees" value={`${employees.length}`} />
-          <AnalyticsRow label="Redemptions" value={`${redemptionsCount}`} />
-        </GlassPanel>
-      </Section>
-
-      <Section title="More controls" meta="Added">
-        {[
-          ["Policy templates", "Create department-specific allowance rules."],
-          ["Budget forecasting", "Preview cost changes before bulk updates."],
-          ["Engagement nudges", "Auto-remind employees with unused budget."]
-        ].map(([title, text]) => (
-          <View key={title} style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <ShieldCheck size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>{title}</Text>
-              <Text style={styles.listSub}>{text}</Text>
-            </View>
-          </View>
-        ))}
-      </Section>
+      <ChallengesPage
+        challenges={appData.challenges.filter((challenge) => challenge.employerId === user.id)}
+        onOpenCreate={() => setChallengeModalOpen(true)}
+        onCompleteChallenge={onCompleteChallenge}
+      />
           </>
         ) : null}
 
@@ -347,15 +345,13 @@ export function EmployerExperience({
           />
         ) : null}
 
-        {tab === "challenges" ? (
-          <ChallengesPage
-            employees={employees}
-            challenges={appData.challenges.filter((challenge) => challenge.employerId === user.id)}
-            rewardEvents={rewardEvents}
-            employeePoints={employeePoints}
-            onOpenCreate={() => setChallengeModalOpen(true)}
-            onCompleteChallenge={onCompleteChallenge}
-            onGrantReward={onGrantReward}
+        {tab === "catalog" ? (
+          <ProviderCatalogPage
+            providerProfiles={appData.providerProfiles}
+            benefits={appData.benefits}
+            enabledBenefitIds={enabledBenefitIds}
+            onToggleBenefit={onToggleBenefit}
+            onToggleProvider={onToggleProvider}
           />
         ) : null}
 
@@ -378,7 +374,13 @@ export function EmployerExperience({
         employees={employees}
         employerId={user.id}
         onClose={() => setChallengeModalOpen(false)}
-        onCreate={onCreateChallenge}
+        onCreate={(challenge) => {
+          if (!onCreateChallenge) {
+            Alert.alert("Unavailable", "Challenge creation is not available right now.");
+            return;
+          }
+          onCreateChallenge(challenge);
+        }}
       />
 
       <EmployeeDetailModal
@@ -567,7 +569,7 @@ function InviteEmployeeModal({
                 <View style={styles.inviteSuccessIcon}>
                   <Mail size={22} color={colors.onPrimary} />
                 </View>
-                <Text style={styles.cardTitle}>Invite sent (demo)</Text>
+                <Text style={styles.cardTitle}>Invite sent</Text>
                 <Text style={styles.bodyText}>
                   Share this code with {sentInvite.email}. They enter it when joining PerX.
                 </Text>
@@ -597,9 +599,6 @@ function InviteEmployeeModal({
                   placeholderTextColor={colors.muted}
                   style={styles.input}
                 />
-                <Text style={styles.bodyText}>
-                  Demo only — no real email is sent. The invite appears under pending invites with a join code.
-                </Text>
                 <View style={{ height: 6 }} />
                 <CapsuleButton
                   label="Send invite"
@@ -733,36 +732,248 @@ function EmployeeDetailModal({
   );
 }
 
-function ChallengesPage({
-  employees,
-  challenges,
-  rewardEvents,
-  employeePoints,
-  onOpenCreate,
-  onCompleteChallenge,
-  onGrantReward
+function ProviderCatalogPage({
+  providerProfiles,
+  benefits,
+  enabledBenefitIds,
+  onToggleBenefit,
+  onToggleProvider
 }: {
-  employees: User[];
+  providerProfiles: ProviderProfile[];
+  benefits: Benefit[];
+  enabledBenefitIds: string[];
+  onToggleBenefit?: (benefitId: string) => void;
+  onToggleProvider?: (benefitIds: string[], selected: boolean) => void;
+}) {
+  const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
+  const groups = useMemo(
+    () => groupProvidersWithOffers(providerProfiles, benefits),
+    [providerProfiles, benefits]
+  );
+  const selectedCount = enabledBenefitIds.length;
+
+  const toggleExpanded = (key: string) => {
+    setExpandedKeys((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  return (
+    <>
+      <View style={styles.adminHeader}>
+        <View style={styles.adminHeaderCopy}>
+          <Text style={styles.greetingText}>Providers</Text>
+          <Text style={styles.greetingSub}>
+            Choose which partners and perks your employees can browse.
+          </Text>
+        </View>
+      </View>
+
+      <GlassPanel style={styles.catalogSummary} intensity={24}>
+        <View style={styles.catalogSummaryIcon}>
+          <Store size={20} color={colors.primary} />
+        </View>
+        <View style={styles.listText}>
+          <Text style={styles.listTitle}>{selectedCount} perks enabled</Text>
+          <Text style={styles.listSub}>
+            {selectedCount ? "Visible in the employee marketplace." : "Nothing visible until you select perks."}
+          </Text>
+        </View>
+      </GlassPanel>
+
+      {groups.length ? (
+        groups.map((group) => {
+          const providerName = group.profile?.businessName ?? group.offers[0]?.providerName ?? "Provider";
+          const logoUrl = group.profile?.logoUrl ?? group.offers[0]?.imageUrl;
+          const offerIds = group.offers.map((offer) => offer.id);
+          const allSelected = offerIds.length > 0 && offerIds.every((id) => enabledBenefitIds.includes(id));
+          const expanded = expandedKeys[group.key] ?? false;
+
+          return (
+            <GlassPanel key={group.key} style={styles.catalogProviderCard} intensity={20}>
+              <View style={styles.catalogProviderHead}>
+                {logoUrl ? (
+                  <Image source={{ uri: logoUrl }} style={styles.catalogProviderLogo} />
+                ) : (
+                  <View style={[styles.catalogProviderLogo, styles.catalogProviderLogoFallback]}>
+                    <Store size={18} color={colors.primary} />
+                  </View>
+                )}
+                <View style={styles.listText}>
+                  <Text style={styles.listTitle}>{providerName}</Text>
+                  <Text style={styles.listSub}>
+                    {group.profile?.category ?? group.offers[0]?.category ?? "Partner"} · {group.offers.length}{" "}
+                    {group.offers.length === 1 ? "perk" : "perks"}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => onToggleProvider?.(offerIds, !allSelected)}
+                  style={[styles.catalogSelectBtn, allSelected && styles.catalogSelectBtnActive]}
+                >
+                  {allSelected ? <Check size={16} color={colors.onPrimary} /> : null}
+                  <Text style={[styles.catalogSelectText, allSelected && styles.catalogSelectTextActive]}>
+                    {allSelected ? "Selected" : "Select"}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {group.offers.length ? (
+                <>
+                  <Pressable onPress={() => toggleExpanded(group.key)} style={styles.catalogExpandRow}>
+                    <Text style={styles.catalogExpandText}>{expanded ? "Hide perks" : "View perks"}</Text>
+                    <ChevronRight
+                      size={16}
+                      color={colors.muted}
+                      style={{ transform: [{ rotate: expanded ? "90deg" : "0deg" }] }}
+                    />
+                  </Pressable>
+
+                  {expanded
+                    ? group.offers.map((offer) => {
+                        const selected = enabledBenefitIds.includes(offer.id);
+                        return (
+                          <Pressable
+                            key={offer.id}
+                            onPress={() => onToggleBenefit?.(offer.id)}
+                            style={styles.catalogOfferRow}
+                          >
+                            <Image source={{ uri: offer.imageUrl }} style={styles.catalogOfferThumb} />
+                            <View style={styles.listText}>
+                              <Text style={styles.listTitle}>{offer.title}</Text>
+                              <Text style={styles.listSub}>
+                                {offer.discount} · {currency(offer.price)}
+                              </Text>
+                            </View>
+                            <View style={[styles.catalogOfferCheck, selected && styles.catalogOfferCheckActive]}>
+                              {selected ? <Check size={14} color={colors.onPrimary} /> : null}
+                            </View>
+                          </Pressable>
+                        );
+                      })
+                    : null}
+                </>
+              ) : (
+                <Text style={styles.listSub}>No published perks yet.</Text>
+              )}
+            </GlassPanel>
+          );
+        })
+      ) : (
+        <View style={styles.listRow}>
+          <View style={styles.smallIcon}>
+            <Store size={18} color={colors.text} />
+          </View>
+          <View style={styles.listText}>
+            <Text style={styles.listTitle}>No providers yet</Text>
+            <Text style={styles.listSub}>Registered partners will appear here for you to curate.</Text>
+          </View>
+        </View>
+      )}
+    </>
+  );
+}
+
+const REDEMPTIONS_PAGE_SIZE = 10;
+
+function RecentRedemptionsSection({
+  selectionRequests,
+  benefits
+}: {
+  selectionRequests: SelectionRequest[];
+  benefits: Benefit[];
+}) {
+  const [visibleCount, setVisibleCount] = useState(REDEMPTIONS_PAGE_SIZE);
+  const sorted = useMemo(
+    () => [...selectionRequests].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "")),
+    [selectionRequests]
+  );
+  const visible = sorted.slice(0, visibleCount);
+  const hasMore = visibleCount < sorted.length;
+
+  useEffect(() => {
+    setVisibleCount(REDEMPTIONS_PAGE_SIZE);
+  }, [selectionRequests.length]);
+
+  return (
+    <Section title="Recent redemptions" meta={sorted.length ? `${sorted.length}` : undefined}>
+      {visible.length ? (
+        <>
+          {visible.map((request) => {
+            const requestBenefits = request.benefitIds
+              .map((benefitId) => benefits.find((benefit) => benefit.id === benefitId))
+              .filter(Boolean) as Benefit[];
+            const providers = Array.from(new Set(requestBenefits.map((benefit) => benefit.providerName)));
+            const settled = request.status === "approved";
+
+            return (
+              <GlassPanel key={request.id} style={styles.approvalCard} intensity={14}>
+                <View style={styles.employeeBudgetHeader}>
+                  <View style={styles.listText}>
+                    <Text style={styles.cardTitle}>{request.employeeName}</Text>
+                    <Text style={styles.bodyText}>
+                      {requestBenefits.map((benefit) => benefit.title).join(", ") || "Perk selection"}
+                    </Text>
+                    <Text style={styles.listSub}>Routed to {providers.join(", ") || "Provider"}</Text>
+                  </View>
+                  <Text style={styles.confidence}>{currency(request.total)}</Text>
+                </View>
+                <Text style={styles.listSub}>
+                  {request.totalPoints} pts · employer paid {currency(request.total)}
+                </Text>
+                <View style={styles.packageFooter}>
+                  <View style={styles.selectedBadge}>
+                    <Text style={styles.selectedBadgeText}>{settled ? "Settled" : "Pending"}</Text>
+                  </View>
+                </View>
+              </GlassPanel>
+            );
+          })}
+
+          {hasMore ? (
+            <Pressable
+              onPress={() => setVisibleCount((current) => current + REDEMPTIONS_PAGE_SIZE)}
+              style={styles.redemptionPagerRow}
+            >
+              <Text style={styles.redemptionPagerText}>
+                Show next {Math.min(REDEMPTIONS_PAGE_SIZE, sorted.length - visibleCount)}
+              </Text>
+              <ChevronRight size={16} color={colors.primary} style={{ transform: [{ rotate: "90deg" }] }} />
+            </Pressable>
+          ) : visibleCount > REDEMPTIONS_PAGE_SIZE ? (
+            <Pressable
+              onPress={() => setVisibleCount(REDEMPTIONS_PAGE_SIZE)}
+              style={styles.redemptionPagerRow}
+            >
+              <Text style={styles.redemptionPagerText}>Show less</Text>
+              <ChevronRight size={16} color={colors.primary} style={{ transform: [{ rotate: "-90deg" }] }} />
+            </Pressable>
+          ) : null}
+        </>
+      ) : (
+        <View style={styles.listRow}>
+          <View style={styles.smallIcon}>
+            <CircleDollarSign size={18} color={colors.text} />
+          </View>
+          <View style={styles.listText}>
+            <Text style={styles.listTitle}>No redemptions yet</Text>
+            <Text style={styles.listSub}>Employee redemptions will land here automatically.</Text>
+          </View>
+        </View>
+      )}
+    </Section>
+  );
+}
+
+function ChallengesPage({
+  challenges,
+  onOpenCreate,
+  onCompleteChallenge
+}: {
   challenges: Challenge[];
-  rewardEvents: RewardEvent[];
-  employeePoints: Record<string, number>;
-  onOpenCreate?: () => void;
+  onOpenCreate: () => void;
   onCompleteChallenge?: (challengeId: string) => void;
-  onGrantReward?: (input: {
-    employeeId: string;
-    employeeName: string;
-    kind: RewardEvent["kind"];
-    points: number;
-    note: string;
-  }) => void;
 }) {
   const [automations, setAutomations] = useState<RewardAutomation[]>(defaultRewardAutomations);
-  const [spotEmployeeId, setSpotEmployeeId] = useState(employees[0]?.id ?? "");
-  const [spotPoints, setSpotPoints] = useState("50");
-  const [spotNote, setSpotNote] = useState("Great work this week");
 
   const openChallenges = challenges.filter((challenge) => challenge.status === "open");
-  const totalPointsGranted = rewardEvents.reduce((sum, event) => sum + event.points, 0);
 
   const toggleAutomation = (kind: RewardAutomation["kind"]) => {
     setAutomations((current) =>
@@ -779,53 +990,18 @@ function ChallengesPage({
     );
   };
 
-  const grantAutomation = (automation: RewardAutomation) => {
-    if (!automation.enabled || !onGrantReward || !employees.length) return;
-    employees.forEach((employee) => {
-      const points =
-        automation.kind === "anniversary"
-          ? automation.points * Math.max(1, yearsSince(employee.startDate) || employee.yearsEmployed || 1)
-          : automation.points;
-      onGrantReward({
-        employeeId: employee.id,
-        employeeName: employee.name,
-        kind: automation.kind === "seasonal" ? "seasonal" : automation.kind,
-        points,
-        note: automation.label
-      });
-    });
-    Alert.alert("Granted (demo)", `${automation.label} applied to ${employees.length} employee(s).`);
-  };
-
-  const grantSpotBonus = () => {
-    const employee = employees.find((item) => item.id === spotEmployeeId);
-    const points = Number(spotPoints.replace(/\D/g, ""));
-    if (!employee || !onGrantReward || !points) {
-      Alert.alert("Pick employee and points", "Choose an employee and a valid points amount.");
-      return;
-    }
-    onGrantReward({
-      employeeId: employee.id,
-      employeeName: employee.name,
-      kind: "spot",
-      points,
-      note: spotNote.trim() || "Spot bonus"
-    });
-    Alert.alert("Spot bonus sent", `${points} points added to ${employee.name}.`);
-  };
-
   return (
     <>
       <View style={styles.adminHeader}>
         <View style={styles.adminHeaderCopy}>
-          <Text style={styles.greetingText}>Challenges & rewards</Text>
+          <Text style={styles.greetingText}>Challenges</Text>
           <Text style={styles.greetingSub}>
-            {openChallenges.length} active challenges · {totalPointsGranted.toLocaleString()} pts granted
+            {openChallenges.length} active · visible to all employees
           </Text>
         </View>
         <Pressable onPress={onOpenCreate} style={styles.inviteButton}>
           <Trophy size={16} color={colors.onPrimary} />
-          <Text style={styles.inviteButtonText}>New</Text>
+          <Text style={styles.inviteButtonText}>Create</Text>
         </Pressable>
       </View>
 
@@ -838,7 +1014,7 @@ function ChallengesPage({
                   <Text style={styles.listTitle}>{challenge.title}</Text>
                   <Text style={styles.listSub}>{challenge.description}</Text>
                   <Text style={styles.listSub}>
-                    {challenge.target === "everyone" ? "Everyone" : challenge.employeeName} · +{challenge.rewardPoints} pts
+                    All employees · +{challenge.rewardPoints} pts
                     {challenge.dueDate ? ` · due ${formatDateLabel(challenge.dueDate)}` : ""}
                   </Text>
                 </View>
@@ -863,7 +1039,10 @@ function ChallengesPage({
         )}
       </Section>
 
-      <Section title="Recognition automations" meta="Demo">
+      <Section title="Recognition automations">
+        <Text style={styles.automationNote}>
+          Points are granted automatically when each rule triggers. Toggle rules on or off and set the reward amount.
+        </Text>
         {automations.map((automation) => (
           <GlassPanel key={automation.kind} style={styles.automationRow} intensity={18}>
             <Pressable
@@ -882,87 +1061,9 @@ function ChallengesPage({
               style={styles.automationPointsInput}
               keyboardType="number-pad"
             />
-            <CapsuleButton label="Grant" onPress={() => grantAutomation(automation)} variant="ghost" />
           </GlassPanel>
         ))}
       </Section>
-
-      <Section title="Spot bonus" meta="One-off">
-        <GlassPanel style={styles.challengeCard} intensity={18}>
-          <Text style={styles.modalFieldLabel}>Employee</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-            {employees.map((employee) => {
-              const selected = spotEmployeeId === employee.id;
-              return (
-                <Pressable
-                  key={employee.id}
-                  onPress={() => setSpotEmployeeId(employee.id)}
-                  style={[styles.filterChip, selected && styles.filterChipActive]}
-                >
-                  <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
-                    {employee.name.split(" ")[0]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <Text style={styles.modalFieldLabel}>Points</Text>
-          <TextInput
-            value={spotPoints}
-            onChangeText={setSpotPoints}
-            style={styles.input}
-            keyboardType="number-pad"
-          />
-          <Text style={styles.modalFieldLabel}>Note</Text>
-          <TextInput value={spotNote} onChangeText={setSpotNote} style={styles.input} />
-          <CapsuleButton label="Send spot bonus" onPress={grantSpotBonus} icon={<Gift size={16} color={colors.onPrimary} />} />
-        </GlassPanel>
-      </Section>
-
-      <Section title="Points feed" meta={`${rewardEvents.length}`}>
-        {rewardEvents.length ? (
-          rewardEvents.slice(0, 8).map((event) => (
-            <View key={event.id} style={styles.pointsFeedRow}>
-              <View style={styles.pointsFeedIcon}>
-                <Star size={16} color={colors.primary} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>{event.employeeName ?? "Employee"}</Text>
-                <Text style={styles.listSub}>
-                  {rewardKindLabel(event.kind)} · {event.note}
-                </Text>
-              </View>
-              <Text style={styles.challengePoints}>+{event.points}</Text>
-            </View>
-          ))
-        ) : (
-          <View style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <Sparkles size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>No rewards yet</Text>
-              <Text style={styles.listSub}>Complete challenges or grant recognition to populate the feed.</Text>
-            </View>
-          </View>
-        )}
-      </Section>
-
-      {employees.length ? (
-        <Section title="Team balances" meta="Points">
-          {employees.map((employee) => (
-            <View key={employee.id} style={styles.listRow}>
-              <View style={styles.smallIcon}>
-                <Gift size={18} color={colors.primary} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>{employee.name}</Text>
-                <Text style={styles.listSub}>{employeePoints[employee.id] ?? 0} PerX Points</Text>
-              </View>
-            </View>
-          ))}
-        </Section>
-      ) : null}
     </>
   );
 }
@@ -978,12 +1079,11 @@ function CreateChallengeModal({
   employees: User[];
   employerId: string;
   onClose: () => void;
-  onCreate?: (challenge: Omit<Challenge, "id" | "status">) => void;
+  onCreate: (challenge: Omit<Challenge, "id" | "status">) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [rewardPoints, setRewardPoints] = useState("75");
-  const [target, setTarget] = useState<"everyone" | string>("everyone");
   const [dueDate, setDueDate] = useState("");
 
   useEffect(() => {
@@ -991,7 +1091,6 @@ function CreateChallengeModal({
       setTitle("");
       setDescription("");
       setRewardPoints("75");
-      setTarget("everyone");
       setDueDate("");
     }
   }, [visible]);
@@ -1003,18 +1102,19 @@ function CreateChallengeModal({
       Alert.alert("Add details", "Enter a title and reward points.");
       return;
     }
-    const employee = employees.find((item) => item.id === target);
-    onCreate?.({
-      employeeId: target === "everyone" ? employees[0]?.id ?? "everyone" : target,
-      employeeName: target === "everyone" ? "Everyone" : employee?.name ?? "Employee",
+
+    onCreate({
+      employeeId: employees[0]?.id ?? "all",
+      employeeName: "All employees",
       employerId,
       title: trimmedTitle,
       description: description.trim(),
       rewardPoints: points,
-      target,
+      target: "everyone",
       dueDate: dueDate.trim() || undefined
     });
     onClose();
+    Alert.alert("Challenge created", "All employees can see this challenge in their app.");
   };
 
   return (
@@ -1043,29 +1143,7 @@ function CreateChallengeModal({
             />
             <Text style={styles.modalFieldLabel}>Reward points</Text>
             <TextInput value={rewardPoints} onChangeText={setRewardPoints} style={styles.input} keyboardType="number-pad" />
-            <Text style={styles.modalFieldLabel}>Target</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-              <Pressable
-                onPress={() => setTarget("everyone")}
-                style={[styles.filterChip, target === "everyone" && styles.filterChipActive]}
-              >
-                <Text style={[styles.filterChipText, target === "everyone" && styles.filterChipTextActive]}>Everyone</Text>
-              </Pressable>
-              {employees.map((employee) => {
-                const selected = target === employee.id;
-                return (
-                  <Pressable
-                    key={employee.id}
-                    onPress={() => setTarget(employee.id)}
-                    style={[styles.filterChip, selected && styles.filterChipActive]}
-                  >
-                    <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
-                      {employee.name.split(" ")[0]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            <Text style={styles.listSub}>This challenge is visible to all employees on your team.</Text>
             <Text style={styles.modalFieldLabel}>Due date (optional)</Text>
             <TextInput value={dueDate} onChangeText={setDueDate} style={styles.input} placeholder="YYYY-MM-DD" />
             <CapsuleButton label="Create challenge" onPress={handleCreate} icon={<Trophy size={16} color={colors.onPrimary} />} />

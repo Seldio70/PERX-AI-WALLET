@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { Building2, Store, UserRound } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { ComponentProps, ReactNode, useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,22 +14,25 @@ import {
 import { AppIcon } from "./src/components/AppIcon";
 import { CapsuleButton } from "./src/components/CapsuleButton";
 import { GlassPanel } from "./src/components/GlassPanel";
+import { LogoutButton } from "./src/components/LogoutButton";
 import { MeshBackground } from "./src/components/MeshBackground";
-import { MetricPill } from "./src/components/MetricPill";
-import { UserProfileScreen } from "./src/components/UserProfileScreen";
-import { market } from "./src/lib/format";
 import { getSupabaseClient } from "./src/lib/supabase";
 import {
   createPlatformUser,
+  createSelectionRequest,
+  fetchEmployerEnabledBenefits,
   fetchPerxLiveData,
   PerxLiveData,
   requestPasswordReset,
+  setEmployerBenefitEnabled,
+  setEmployerBenefitsEnabled,
   signInPlatformUser,
   signInOrSignUpPlatformAuth
 } from "./src/lib/perxRepository";
 import { BusinessExperience } from "./src/screens/BusinessScreen";
 import { EmployeeExperience } from "./src/screens/EmployeeScreens";
 import { EmployerExperience } from "./src/screens/EmployerScreen";
+import { filterBenefitsForEmployee, setBenefitIds, toggleBenefitId } from "./src/lib/employerCatalog";
 import { styles } from "./src/styles/appStyles";
 import { colors } from "./src/theme";
 import {
@@ -45,13 +48,11 @@ import {
   User
 } from "./src/types";
 import {
-  BUDGET_PER_REDEEM,
   createDemoChallenges,
   createDemoEmployeePoints,
   createDemoInvites,
   createDemoRewardEvents,
-  defaultRewardAutomations,
-  POINTS_REDEEM_RATE
+  defaultRewardAutomations
 } from "./src/lib/rewardsDemo";
 
 type Session = {
@@ -80,7 +81,7 @@ const roleCopy: Record<Role, { title: string; subtitle: string; icon: typeof Use
   },
   employer: {
     title: "Employer",
-    subtitle: "Wallet for points, perks, approvals, and employee challenges.",
+    subtitle: "Manage your team, provider catalog, and employee challenges.",
     icon: Building2
   },
   business: {
@@ -96,7 +97,6 @@ function createSessionToken(role: Role) {
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
-  const [showProfile, setShowProfile] = useState(false);
   const [selectionRequests, setSelectionRequests] = useState<SelectionRequest[]>([]);
   const [challengeItems, setChallengeItems] = useState<Challenge[]>([]);
   const [inviteItems, setInviteItems] = useState<EmployerInvite[]>([]);
@@ -104,12 +104,12 @@ export default function App() {
   const [providerProfileItems, setProviderProfileItems] = useState<ProviderProfile[]>([]);
   const [benefitItems, setBenefitItems] = useState<Benefit[]>([]);
   const [liveData, setLiveData] = useState<AppData | null>(null);
-  const [dataSource, setDataSource] = useState<"empty" | "supabase">("empty");
   const [localUsers, setLocalUsers] = useState<User[]>([]);
   const [employeePoints, setEmployeePoints] = useState<Record<string, number>>({});
   const [rewardEvents, setRewardEvents] = useState<RewardEvent[]>([]);
   const [employeeInvites, setEmployeeInvites] = useState<EmployeeInvite[]>([]);
   const [bonusBudgetByEmployee, setBonusBudgetByEmployee] = useState<Record<string, number>>({});
+  const [employerEnabledBenefits, setEmployerEnabledBenefits] = useState<Record<string, string[]>>({});
   const [demoSeeded, setDemoSeeded] = useState(false);
   const supabaseReady = Boolean(getSupabaseClient());
   const mergedUsers = [...(liveData?.users ?? emptyAppData.users), ...localUsers];
@@ -127,7 +127,7 @@ export default function App() {
   useEffect(() => {
     let active = true;
 
-    fetchPerxLiveData().then((data) => {
+    fetchPerxLiveData().then(async (data) => {
       if (!active || !data) return;
       setLiveData(data);
       setSelectionRequests(data.selectionRequests);
@@ -136,7 +136,9 @@ export default function App() {
       setWalletCardItems(data.employerWalletCards);
       setProviderProfileItems(data.providerProfiles);
       setBenefitItems(data.benefits);
-      setDataSource("supabase");
+
+      const enabledMap = await fetchEmployerEnabledBenefits();
+      if (active) setEmployerEnabledBenefits(enabledMap);
     });
 
     return () => {
@@ -286,6 +288,26 @@ export default function App() {
     ]);
   };
 
+  const handleToggleEmployerBenefit = (employerId: string, benefitId: string) => {
+    const current = employerEnabledBenefits[employerId] ?? [];
+    const next = toggleBenefitId(current, benefitId);
+    const enabled = next.includes(benefitId);
+    setEmployerEnabledBenefits((state) => ({
+      ...state,
+      [employerId]: next
+    }));
+    void setEmployerBenefitEnabled(employerId, benefitId, enabled);
+  };
+
+  const handleToggleEmployerProvider = (employerId: string, benefitIds: string[], selected: boolean) => {
+    const next = setBenefitIds(employerEnabledBenefits[employerId] ?? [], benefitIds, selected);
+    setEmployerEnabledBenefits((state) => ({
+      ...state,
+      [employerId]: next
+    }));
+    void setEmployerBenefitsEnabled(employerId, benefitIds, selected);
+  };
+
   const handleSendEmployeeInvite = (invite: EmployeeInvite) => {
     setEmployeeInvites((current) => [invite, ...current]);
   };
@@ -322,18 +344,58 @@ export default function App() {
     return true;
   };
 
-  const handleRedeemPoints = (employeeId: string, points: number) => {
-    const balance = employeePoints[employeeId] ?? 0;
-    if (balance < points) return false;
+  const handlePayForPerk = (input: {
+    employee: User;
+    companyId: string;
+    employerId?: string;
+    benefit: Benefit;
+  }) => {
+    return handlePayForPerks({
+      ...input,
+      benefits: [input.benefit]
+    });
+  };
+
+  const handlePayForPerks = (input: {
+    employee: User;
+    companyId: string;
+    employerId?: string;
+    benefits: Benefit[];
+  }) => {
+    if (!input.benefits.length) return false;
+    const balance = employeePoints[input.employee.id] ?? 0;
+    const totalPoints = input.benefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
+    if (balance < totalPoints) return false;
+
     setEmployeePoints((current) => ({
       ...current,
-      [employeeId]: balance - points
+      [input.employee.id]: balance - totalPoints
     }));
-    const budgetGain = Math.round((points / POINTS_REDEEM_RATE) * BUDGET_PER_REDEEM);
-    setBonusBudgetByEmployee((current) => ({
-      ...current,
-      [employeeId]: (current[employeeId] ?? 0) + budgetGain
-    }));
+
+    const now = new Date().toISOString();
+    const request: SelectionRequest = {
+      id: `request_${Date.now()}`,
+      employeeId: input.employee.id,
+      employeeName: input.employee.name,
+      employerId: input.employerId,
+      benefitIds: input.benefits.map((benefit) => benefit.id),
+      total: input.benefits.reduce((sum, benefit) => sum + benefit.price, 0),
+      totalPoints,
+      status: "approved",
+      createdAt: now,
+      approvedAt: now
+    };
+
+    setSelectionRequests((current) => [request, ...current]);
+
+    void createSelectionRequest({
+      employeeId: input.employee.id,
+      employerId: input.employerId,
+      companyId: input.companyId || undefined,
+      benefitIds: request.benefitIds,
+      benefits: input.benefits
+    });
+
     return true;
   };
 
@@ -346,15 +408,12 @@ export default function App() {
         style={styles.keyboard}
       >
         <View style={styles.appChrome}>
-          <AppHeader
-            session={session}
-            supabaseReady={supabaseReady}
-            onLogout={() => {
-              setShowProfile(false);
-              setSession(null);
-            }}
-            onProfilePress={session ? () => setShowProfile(true) : undefined}
-          />
+          {session ? (
+            <AppHeader
+              session={session}
+              onLogout={() => setSession(null)}
+            />
+          ) : null}
           {session ? (
             <RoleRouter
               session={session}
@@ -364,18 +423,9 @@ export default function App() {
               rewardEvents={rewardEvents}
               employeeInvites={employeeInvites}
               bonusBudgetByEmployee={bonusBudgetByEmployee}
-              onOpenProfile={() => setShowProfile(true)}
-              onLogout={() => {
-                setShowProfile(false);
-                setSession(null);
-              }}
+              onLogout={() => setSession(null)}
               onSubmitSelection={(request) => {
                 setSelectionRequests((current) => [request, ...current]);
-                setWalletCardItems((current) =>
-                  current.map((card, index) =>
-                    index === 0 ? { ...card, points: Math.max(0, card.points - request.totalPoints) } : card
-                  )
-                );
               }}
               onUpdateProviderProfile={(profile) =>
                 setProviderProfileItems((current) => [
@@ -393,9 +443,42 @@ export default function App() {
               onCompleteChallenge={handleCompleteChallenge}
               onGrantReward={handleGrantReward}
               onSendEmployeeInvite={handleSendEmployeeInvite}
-              onRedeemPoints={(points) =>
-                session.user.role === "employee" ? handleRedeemPoints(session.user.id, points) : false
+              employerEnabledBenefits={employerEnabledBenefits}
+              enabledBenefitIds={employerEnabledBenefits[session.user.id] ?? []}
+              onToggleBenefit={(benefitId) => handleToggleEmployerBenefit(session.user.id, benefitId)}
+              onToggleProvider={(benefitIds, selected) =>
+                handleToggleEmployerProvider(session.user.id, benefitIds, selected)
               }
+              onPayForPerk={(benefit) => {
+                if (session.user.role !== "employee") return false;
+                const company = appData.companies.find((item) => item.id === session.user.companyId);
+                const employerId =
+                  company?.employerId ??
+                  appData.users.find(
+                    (user) => user.role === "employer" && user.companyId === session.user.companyId
+                  )?.id;
+                return handlePayForPerk({
+                  employee: session.user,
+                  companyId: session.user.companyId ?? company?.id ?? "",
+                  employerId,
+                  benefit
+                });
+              }}
+              onPayForPerks={(benefits) => {
+                if (session.user.role !== "employee") return false;
+                const company = appData.companies.find((item) => item.id === session.user.companyId);
+                const employerId =
+                  company?.employerId ??
+                  appData.users.find(
+                    (user) => user.role === "employer" && user.companyId === session.user.companyId
+                  )?.id;
+                return handlePayForPerks({
+                  employee: session.user,
+                  companyId: session.user.companyId ?? company?.id ?? "",
+                  employerId,
+                  benefits
+                });
+              }}
             />
           ) : (
             <LoginScreen
@@ -403,22 +486,9 @@ export default function App() {
               onStartSession={startSessionForUser}
               onJoinWithInvite={handleJoinWithInvite}
               onForgotPassword={forgotPassword}
-              supabaseReady={supabaseReady}
-              dataSource={dataSource}
               appData={appData}
-              employeeInvites={employeeInvites}
             />
           )}
-          {session && showProfile ? (
-            <UserProfileScreen
-              user={session.user}
-              onClose={() => setShowProfile(false)}
-              onLogout={() => {
-                setShowProfile(false);
-                setSession(null);
-              }}
-            />
-          ) : null}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -427,14 +497,10 @@ export default function App() {
 
 function AppHeader({
   session,
-  supabaseReady,
-  onLogout,
-  onProfilePress
+  onLogout
 }: {
   session: Session | null;
-  supabaseReady: boolean;
   onLogout: () => void;
-  onProfilePress?: () => void;
 }) {
   return (
     <View style={styles.header}>
@@ -448,20 +514,7 @@ function AppHeader({
         </View>
       </View>
       <View style={styles.headerActions}>
-        <View style={styles.statusPill}>
-          <Text style={styles.statusDot}>{supabaseReady ? "Live" : "Off"}</Text>
-          <Text style={styles.statusText}>{supabaseReady ? "Supabase" : "No DB"}</Text>
-        </View>
-        {session ? (
-          <>
-            <Pressable onPress={onProfilePress} style={styles.avatarButton}>
-              <AppIcon name="account-circle" size={24} color={colors.primary} />
-            </Pressable>
-            <Pressable onPress={onLogout} style={styles.iconButton}>
-              <Text style={styles.logoutText}>Out</Text>
-            </Pressable>
-          </>
-        ) : null}
+        {session ? <LogoutButton onPress={onLogout} /> : null}
       </View>
     </View>
   );
@@ -469,14 +522,14 @@ function AppHeader({
 
 type SignupRole = Extract<Role, "employer" | "business">;
 
+type SignupPath = "employee" | "employer" | "provider";
+
 function LoginScreen({
   onLogin,
   onStartSession,
   onJoinWithInvite,
   onForgotPassword,
-  supabaseReady,
-  appData,
-  employeeInvites
+  appData
 }: {
   onLogin: (email: string, password: string) => Promise<boolean>;
   onStartSession: (user: User, password?: string) => Promise<void>;
@@ -488,25 +541,29 @@ function LoginScreen({
     inviteCode: string;
   }) => Promise<boolean>;
   onForgotPassword: (email: string) => Promise<boolean>;
-  supabaseReady: boolean;
-  dataSource: "empty" | "supabase";
   appData: AppData;
-  employeeInvites: EmployeeInvite[];
 }) {
-  const [authMode, setAuthMode] = useState<"login" | "signup" | "invite">("login");
-  const [selectedRole, setSelectedRole] = useState<SignupRole>("employer");
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [signupPath, setSignupPath] = useState<SignupPath>("employer");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [companyName, setCompanyName] = useState("NovaWorks Tirana");
+  const [companyName, setCompanyName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
 
-  const submitLogin = async () => {
+  const isLogin = mode === "login";
+
+  const clearFeedback = () => {
     setMessage("");
     setNotice("");
+  };
+
+  const submitLogin = async () => {
+    clearFeedback();
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
     if (!trimmedEmail || !trimmedPassword) {
@@ -519,23 +576,18 @@ function LoginScreen({
   };
 
   const submitForgotPassword = async () => {
-    setMessage("");
-    setNotice("");
+    clearFeedback();
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setMessage("Enter your email first, then tap reset.");
+      setMessage("Enter your email first.");
       return;
     }
     const ok = await onForgotPassword(trimmedEmail);
-    setNotice(
-      ok
-        ? `Password reset link sent to ${trimmedEmail}.`
-        : "Could not start a reset. Try again."
-    );
+    setNotice(ok ? `Reset link sent to ${trimmedEmail}.` : "Could not send reset link.");
   };
 
-  const submitSignup = async () => {
-    setMessage("");
+  const submitSignup = async (role: SignupRole) => {
+    clearFeedback();
     const trimmedPassword = password.trim();
     if (trimmedPassword.length < 6) {
       setMessage("Password needs at least 6 characters.");
@@ -545,7 +597,7 @@ function LoginScreen({
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     if (!trimmedName || !trimmedEmail) {
-      setMessage("Enter name, email, and password to sign up.");
+      setMessage("Fill in all fields.");
       return;
     }
 
@@ -555,20 +607,19 @@ function LoginScreen({
 
     await onStartSession(
       {
-        id: `local_${selectedRole}_${Date.now()}`,
+        id: `local_${role}_${Date.now()}`,
         name: trimmedName,
         email: trimmedEmail,
-        role: selectedRole,
-        companyId: selectedRole === "employer" ? matchedCompany?.id : undefined,
-        businessId: selectedRole === "business" ? `business_${Date.now()}` : undefined
+        role,
+        companyId: role === "employer" ? matchedCompany?.id : undefined,
+        businessId: role === "business" ? `business_${Date.now()}` : undefined
       },
       trimmedPassword
     );
   };
 
   const submitInviteJoin = async () => {
-    setMessage("");
-    setNotice("");
+    clearFeedback();
     const trimmedPassword = password.trim();
     if (trimmedPassword.length < 6) {
       setMessage("Password needs at least 6 characters.");
@@ -579,7 +630,7 @@ function LoginScreen({
     const trimmedBirthDate = birthDate.trim();
     const trimmedInviteCode = inviteCode.trim();
     if (!trimmedName || !trimmedEmail || !trimmedBirthDate || !trimmedInviteCode) {
-      setMessage("Enter name, email, password, birthdate, and invite code.");
+      setMessage("Fill in all fields.");
       return;
     }
 
@@ -590,54 +641,56 @@ function LoginScreen({
       birthDate: trimmedBirthDate,
       inviteCode: trimmedInviteCode
     });
-    if (!ok) {
-      setMessage("Invalid invite code. Try PERX-DEMO from a pending employer invite.");
-    }
+    if (!ok) setMessage("Invalid invite code.");
   };
 
+  const handleContinue = () => {
+    if (isLogin) {
+      void submitLogin();
+      return;
+    }
+    if (signupPath === "employee") void submitInviteJoin();
+    else if (signupPath === "employer") void submitSignup("employer");
+    else void submitSignup("business");
+  };
+
+  const continueLabel = isLogin ? "Continue" : signupPath === "employee" ? "Join" : "Create account";
+
+  const roleOptions: Array<{ id: SignupPath; label: string }> = [
+    { id: "employee", label: "Employee" },
+    { id: "employer", label: "Employer" },
+    { id: "provider", label: "Provider" }
+  ];
+
   return (
-    <ScrollView contentContainerStyle={styles.loginContent} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.loginScreen}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.loginBrand}>
         <View style={styles.loginLogo}>
-          <AppIcon name="wallet-plus-outline" size={28} color={colors.onPrimary} />
+          <AppIcon name="bullseye" size={30} color={colors.onPrimary} />
         </View>
-        <Text style={styles.loginTitle}>Welcome to PerX</Text>
-        <Text style={styles.loginSubtitle}>
-          {authMode === "login"
-            ? "Log in to your account."
-            : authMode === "signup"
-              ? "Create an employer or provider account."
-              : "Join your company with an employer invite."}
-        </Text>
+        <Text style={styles.loginTitle}>{isLogin ? "Log in" : "Sign up"}</Text>
       </View>
 
       <GlassPanel style={styles.loginCard} intensity={40}>
-        <View style={styles.segmented}>
-          {(["login", "signup", "invite"] as const).map((mode) => (
-            <Pressable
-              key={mode}
-              onPress={() => setAuthMode(mode)}
-              style={[styles.segment, authMode === mode && styles.segmentActive]}
-            >
-              <Text style={[styles.segmentText, authMode === mode && styles.segmentTextActive]}>
-                {mode === "login" ? "Log in" : mode === "signup" ? "Sign up" : "Invite"}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {authMode === "signup" ? (
-          <View style={styles.rolePills}>
-            {(["employer", "business"] as SignupRole[]).map((role) => {
-              const selected = selectedRole === role;
+        {!isLogin ? (
+          <View style={styles.loginRoleStack}>
+            {roleOptions.map((option) => {
+              const active = signupPath === option.id;
               return (
                 <Pressable
-                  key={role}
-                  onPress={() => setSelectedRole(role)}
-                  style={[styles.rolePill, selected && styles.rolePillActive]}
+                  key={option.id}
+                  onPress={() => {
+                    clearFeedback();
+                    setSignupPath(option.id);
+                  }}
+                  style={[styles.loginRoleButton, active && styles.loginRoleButtonActive]}
                 >
-                  <Text style={[styles.rolePillText, selected && styles.rolePillTextActive]}>
-                    {roleCopy[role].title}
+                  <Text style={[styles.loginRoleButtonText, active && styles.loginRoleButtonTextActive]}>
+                    {option.label}
                   </Text>
                 </Pressable>
               );
@@ -645,124 +698,156 @@ function LoginScreen({
           </View>
         ) : null}
 
-        {authMode === "invite" ? (
+        {!isLogin && signupPath === "employee" ? (
           <>
-            <TextInput
+            <LoginField
+              icon="account-outline"
               value={name}
               onChangeText={setName}
               placeholder="Full name"
-              placeholderTextColor={colors.soft}
-              style={styles.input}
             />
-            <TextInput
+            <LoginField
+              icon="calendar-outline"
               value={birthDate}
               onChangeText={setBirthDate}
               placeholder="Birthdate (YYYY-MM-DD)"
-              placeholderTextColor={colors.soft}
-              style={styles.input}
             />
-            <TextInput
+            <LoginField
+              icon="ticket-outline"
               value={inviteCode}
               onChangeText={setInviteCode}
-              placeholder="Invite code (e.g. PERX-DEMO)"
-              placeholderTextColor={colors.soft}
-              style={styles.input}
+              placeholder="Invite code"
               autoCapitalize="characters"
             />
           </>
         ) : null}
 
-        <View style={styles.inputWrap}>
-          <AppIcon name="email-outline" size={18} color={colors.soft} />
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email address"
-            placeholderTextColor={colors.soft}
-            style={styles.inputField}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputWrap}>
-          <AppIcon name="lock-outline" size={18} color={colors.soft} />
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder={supabaseReady ? "Password" : "Password optional"}
-            placeholderTextColor={colors.soft}
-            style={styles.inputField}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-        </View>
-
-        {authMode === "signup" ? (
+        {!isLogin && (signupPath === "employer" || signupPath === "provider") ? (
           <>
-            <TextInput
+            <LoginField
+              icon={signupPath === "provider" ? "store-outline" : "account-outline"}
               value={name}
               onChangeText={setName}
-              placeholder={selectedRole === "business" ? "Business name" : "Full name"}
-              placeholderTextColor={colors.soft}
-              style={styles.input}
+              placeholder={signupPath === "provider" ? "Business name" : "Full name"}
             />
-            {selectedRole === "employer" ? (
-              <TextInput
+            {signupPath === "employer" ? (
+              <LoginField
+                icon="domain"
                 value={companyName}
                 onChangeText={setCompanyName}
                 placeholder="Company"
-                placeholderTextColor={colors.soft}
-                style={styles.input}
               />
             ) : null}
           </>
         ) : null}
 
+        <LoginField
+          icon="email-outline"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email address"
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        <View>
+          <LoginField
+            icon="lock-outline"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            trailing={
+              <Pressable onPress={() => setShowPassword((current) => !current)} hitSlop={8}>
+                <AppIcon
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={colors.soft}
+                />
+              </Pressable>
+            }
+          />
+          {isLogin ? (
+            <Pressable onPress={() => void submitForgotPassword()} style={styles.loginForgotLink}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
         <CapsuleButton
-          label={
-            authMode === "login"
-              ? "Continue"
-              : authMode === "signup"
-                ? "Create account"
-                : "Join with invite"
-          }
-          onPress={() =>
-            void (authMode === "login"
-              ? submitLogin()
-              : authMode === "signup"
-                ? submitSignup()
-                : submitInviteJoin())
-          }
+          label={continueLabel}
+          onPress={handleContinue}
           variant="dark"
           style={styles.loginContinue}
         />
 
-        {authMode === "login" ? (
-          <Pressable onPress={() => void submitForgotPassword()} style={styles.forgotLink}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
-          </Pressable>
-        ) : null}
-
         {message ? <Text style={styles.errorText}>{message}</Text> : null}
         {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
-
-        <Text style={styles.authHint}>
-          {authMode === "login"
-            ? "Employees join with an invite from their employer."
-            : authMode === "signup"
-              ? "Only employers and providers can sign up. Employees are invited by their employer."
-              : employeeInvites.find((invite) => invite.status === "sent")
-                ? `Demo code available: ${employeeInvites.find((invite) => invite.status === "sent")?.code}`
-                : "Ask your employer for an invite code."}
-        </Text>
       </GlassPanel>
 
-      <View style={styles.heroMetrics}>
-        <MetricPill label="Data" value={supabaseReady ? "Supabase" : "Connect DB"} />
-        <MetricPill label="Market" value={market.city} />
-      </View>
+      <Pressable
+        onPress={() => {
+          clearFeedback();
+          if (isLogin) {
+            setMode("signup");
+            setSignupPath("employer");
+          } else {
+            setMode("login");
+          }
+        }}
+        style={styles.loginFooterLink}
+      >
+        <Text style={styles.loginFooterText}>
+          {isLogin ? (
+            <>
+              New here? <Text style={styles.loginFooterAction}>Create an account</Text>
+            </>
+          ) : (
+            <>
+              Already have an account? <Text style={styles.loginFooterAction}>Log in</Text>
+            </>
+          )}
+        </Text>
+      </Pressable>
     </ScrollView>
+  );
+}
+
+function LoginField({
+  icon,
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize,
+  trailing
+}: {
+  icon: ComponentProps<typeof AppIcon>["name"];
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  secureTextEntry?: boolean;
+  keyboardType?: "default" | "email-address";
+  autoCapitalize?: "none" | "characters" | "sentences" | "words";
+  trailing?: ReactNode;
+}) {
+  return (
+    <View style={styles.loginFieldWrap}>
+      <AppIcon name={icon} size={20} color={colors.soft} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.soft}
+        style={styles.loginFieldInput}
+        secureTextEntry={secureTextEntry}
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize ?? "sentences"}
+      />
+      {trailing}
+    </View>
   );
 }
 
@@ -774,7 +859,6 @@ function RoleRouter({
   rewardEvents,
   employeeInvites,
   bonusBudgetByEmployee,
-  onOpenProfile,
   onLogout,
   onSubmitSelection,
   onUpdateProviderProfile,
@@ -783,7 +867,12 @@ function RoleRouter({
   onCompleteChallenge,
   onGrantReward,
   onSendEmployeeInvite,
-  onRedeemPoints
+  employerEnabledBenefits,
+  enabledBenefitIds,
+  onToggleBenefit,
+  onToggleProvider,
+  onPayForPerk,
+  onPayForPerks
 }: {
   session: Session;
   appData: AppData;
@@ -792,7 +881,6 @@ function RoleRouter({
   rewardEvents: RewardEvent[];
   employeeInvites: EmployeeInvite[];
   bonusBudgetByEmployee: Record<string, number>;
-  onOpenProfile: () => void;
   onLogout: () => void;
   onSubmitSelection: (request: SelectionRequest) => void;
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
@@ -807,7 +895,12 @@ function RoleRouter({
     note: string;
   }) => void;
   onSendEmployeeInvite: (invite: EmployeeInvite) => void;
-  onRedeemPoints: (points: number) => boolean;
+  employerEnabledBenefits: Record<string, string[]>;
+  enabledBenefitIds: string[];
+  onToggleBenefit: (benefitId: string) => void;
+  onToggleProvider: (benefitIds: string[], selected: boolean) => void;
+  onPayForPerk: (benefit: Benefit) => boolean;
+  onPayForPerks: (benefits: Benefit[]) => boolean;
 }) {
   if (session.user.role === "employer") {
     return (
@@ -823,6 +916,9 @@ function RoleRouter({
         onCompleteChallenge={onCompleteChallenge}
         onGrantReward={onGrantReward}
         onSendEmployeeInvite={onSendEmployeeInvite}
+        enabledBenefitIds={enabledBenefitIds}
+        onToggleBenefit={onToggleBenefit}
+        onToggleProvider={onToggleProvider}
       />
     );
   }
@@ -834,14 +930,17 @@ function RoleRouter({
         selectionRequests={selectionRequests}
         onUpdateProviderProfile={onUpdateProviderProfile}
         onAddOffer={onAddOffer}
-        onOpenProfile={onOpenProfile}
+        onLogout={onLogout}
       />
     );
   }
   return (
     <EmployeeExperience
       user={session.user}
-      appData={appData}
+      appData={{
+        ...appData,
+        benefits: filterBenefitsForEmployee(appData, session.user, employerEnabledBenefits)
+      }}
       onSubmitSelection={onSubmitSelection}
       onLogout={onLogout}
       pointsBalance={employeePoints[session.user.id] ?? 0}
@@ -853,8 +952,8 @@ function RoleRouter({
             challenge.target === session.user.id ||
             challenge.employeeId === session.user.id)
       )}
-      bonusBudget={bonusBudgetByEmployee[session.user.id] ?? 0}
-      onRedeemPoints={onRedeemPoints}
+      onPayForPerk={onPayForPerk}
+      onPayForPerks={onPayForPerks}
     />
   );
 }

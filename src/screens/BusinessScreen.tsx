@@ -1,12 +1,27 @@
 import * as ImagePicker from "expo-image-picker";
 import { Activity, BadgeCheck, Building2, Calendar, Camera, Check, ChevronRight, Dumbbell, GraduationCap, HeartPulse, Home, LayoutGrid, MapPin, Pencil, Plane, Plus, Settings, ShieldCheck, ShoppingBag, Sparkles, Store, Tag, Trash2, TrendingUp, UserRound, UsersRound, Wallet, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View
+} from "react-native";
+import { AccountSettingsHub } from "../components/AccountSettingsHub";
 import { AppIcon } from "../components/AppIcon";
 import { BentoMetricCard } from "../components/BentoMetricCard";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
 import { currency, market } from "../lib/format";
+import { ensurePublicImageUrl, isLocalImageUri, uploadImageToStorage } from "../lib/imageUpload";
+import { DEFAULT_PROVIDER_LOGO, isProviderProfileComplete, validateProviderProfileDraft } from "../lib/providerProfile";
 import { createProviderOffer, PerxLiveData, upsertProviderProfile } from "../lib/perxRepository";
 import { styles } from "../styles/appStyles";
 import { colors } from "../theme";
@@ -189,6 +204,7 @@ function OfferFormModal({
     category: initial?.category ?? defaultCategory
   }));
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -207,7 +223,22 @@ function OfferFormModal({
 
   const handlePickImage = async () => {
     const uri = await pickImageFromDevice();
-    if (uri) setDraft((current) => ({ ...current, imageUrl: uri }));
+    if (!uri) return;
+    setDraft((current) => ({ ...current, imageUrl: uri }));
+    setUploadingImage(true);
+    try {
+      const publicUrl = await uploadImageToStorage(uri, "offers");
+      if (publicUrl) {
+        setDraft((current) => ({ ...current, imageUrl: publicUrl }));
+      } else {
+        Alert.alert(
+          "Upload failed",
+          "Could not upload the photo. Check your connection and try again."
+        );
+      }
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -217,7 +248,19 @@ function OfferFormModal({
     }
     setSubmitting(true);
     try {
-      await onSubmit(draft);
+      let imageUrl = draft.imageUrl;
+      if (imageUrl && isLocalImageUri(imageUrl)) {
+        const uploaded = await ensurePublicImageUrl(imageUrl, "offers");
+        if (!uploaded || isLocalImageUri(uploaded)) {
+          Alert.alert(
+            "Upload failed",
+            "The offer photo could not be uploaded. Try picking the image again."
+          );
+          return;
+        }
+        imageUrl = uploaded;
+      }
+      await onSubmit({ ...draft, imageUrl });
       onClose();
     } finally {
       setSubmitting(false);
@@ -241,7 +284,7 @@ function OfferFormModal({
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <Pressable onPress={handlePickImage} style={styles.imagePicker}>
+            <Pressable onPress={handlePickImage} disabled={uploadingImage} style={styles.imagePicker}>
               {draft.imageUrl ? (
                 <Image source={{ uri: draft.imageUrl }} style={styles.imagePickerPreview} />
               ) : (
@@ -251,7 +294,12 @@ function OfferFormModal({
                   <Text style={styles.imagePickerHint}>JPG or PNG, 4:3 looks best</Text>
                 </View>
               )}
-              {draft.imageUrl ? (
+              {uploadingImage ? (
+                <View style={styles.imagePickerOverlay}>
+                  <ActivityIndicator color={colors.onPrimary} />
+                  <Text style={styles.imagePickerOverlayText}>Uploading…</Text>
+                </View>
+              ) : draft.imageUrl ? (
                 <View style={styles.imagePickerOverlay}>
                   <Camera size={16} color={colors.onPrimary} />
                   <Text style={styles.imagePickerOverlayText}>Replace</Text>
@@ -575,14 +623,14 @@ export function BusinessExperience({
   selectionRequests,
   onUpdateProviderProfile,
   onAddOffer,
-  onOpenProfile
+  onLogout
 }: {
   user: User;
   appData: AppData;
   selectionRequests: SelectionRequest[];
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
   onAddOffer: (offer: Benefit) => void;
-  onOpenProfile: () => void;
+  onLogout: () => void;
 }) {
   const existingProfile =
     appData.providerProfiles.find((profile) => profile.userId === user.id) ??
@@ -597,13 +645,17 @@ export function BusinessExperience({
 
   const [profileDraft, setProfileDraft] = useState({
     businessName: existingProfile?.businessName ?? user.name,
-    description: existingProfile?.description ?? "Local partner offering employee perks.",
+    description: existingProfile?.description ?? "",
     category: (existingProfile?.category ?? "Wellness") as BenefitCategory,
     logoUrl:
-      existingProfile?.logoUrl ??
-      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=300&q=80",
-    city: existingProfile?.city ?? market.city
+      existingProfile?.logoUrl && existingProfile.logoUrl !== DEFAULT_PROVIDER_LOGO
+        ? existingProfile.logoUrl
+        : "",
+    city: existingProfile?.city ?? ""
   });
+
+  const profileComplete = isProviderProfileComplete(profileDraft);
+  const showProfileModal = profileEditOpen || !profileComplete;
 
   useEffect(() => {
     if (!existingProfile) return;
@@ -611,7 +663,10 @@ export function BusinessExperience({
       businessName: existingProfile.businessName,
       description: existingProfile.description,
       category: existingProfile.category,
-      logoUrl: existingProfile.logoUrl,
+      logoUrl:
+        existingProfile.logoUrl && existingProfile.logoUrl !== DEFAULT_PROVIDER_LOGO
+          ? existingProfile.logoUrl
+          : "",
       city: existingProfile.city
     });
   }, [existingProfile]);
@@ -640,6 +695,7 @@ export function BusinessExperience({
     [selectionRequests, allBenefits, user.businessId]
   );
   const payoutTotal = routedPayments.reduce((sum, { benefit }) => sum + benefit.price, 0);
+  const pointsRedeemed = routedPayments.reduce((sum, { benefit }) => sum + benefit.pointsPrice, 0);
   const reachedEmployees = new Set(routedPayments.map(({ request }) => request.employeeId)).size;
 
   const statsForOffer = (offerId: string) => {
@@ -651,18 +707,34 @@ export function BusinessExperience({
   };
 
   const saveProviderProfile = async (next: typeof profileDraft) => {
+    const validationError = validateProviderProfileDraft(next);
+    if (validationError) {
+      Alert.alert("Profile incomplete", validationError);
+      return;
+    }
+
+    let logoUrl = next.logoUrl.trim();
+    if (logoUrl && isLocalImageUri(logoUrl)) {
+      const uploaded = await ensurePublicImageUrl(logoUrl, "logos");
+      if (!uploaded || isLocalImageUri(uploaded)) {
+        Alert.alert("Upload failed", "The logo could not be uploaded. Try picking the image again.");
+        return;
+      }
+      logoUrl = uploaded;
+    }
+
     const localProfile: ProviderProfile = {
       id: existingProfile?.id ?? `provider_${Date.now()}`,
       userId: user.id,
       businessName: next.businessName.trim() || user.name,
-      logoUrl: next.logoUrl.trim(),
+      logoUrl,
       description: next.description.trim(),
       category: next.category,
       city: next.city.trim() || market.city,
       isApproved: true
     };
 
-    setProfileDraft(next);
+    setProfileDraft({ ...next, logoUrl });
 
     const savedProfile = await upsertProviderProfile({
       providerUserId: user.id,
@@ -677,6 +749,16 @@ export function BusinessExperience({
   };
 
   const handleOfferSubmit = async (draft: OfferFormDraft) => {
+    let imageUrl = draft.imageUrl;
+    if (imageUrl && isLocalImageUri(imageUrl)) {
+      const uploaded = await ensurePublicImageUrl(imageUrl, "offers");
+      if (!uploaded || isLocalImageUri(uploaded)) {
+        Alert.alert("Upload failed", "The offer photo could not be uploaded. Try picking the image again.");
+        return;
+      }
+      imageUrl = uploaded;
+    }
+
     if (editingOffer) {
       const updated: Benefit = {
         ...editingOffer,
@@ -685,7 +767,7 @@ export function BusinessExperience({
         discount: draft.discount || editingOffer.discount,
         price: Number(draft.price) || editingOffer.price,
         pointsPrice: Number(draft.pointsPrice) || editingOffer.pointsPrice,
-        imageUrl: draft.imageUrl || editingOffer.imageUrl,
+        imageUrl: imageUrl || editingOffer.imageUrl,
         redemptionType: draft.redemptionType,
         category: draft.category,
         validUntil: draft.validUntil
@@ -707,7 +789,7 @@ export function BusinessExperience({
       price: Number(draft.price) || 1200,
       pointsPrice: Number(draft.pointsPrice) || 140,
       imageUrl:
-        draft.imageUrl ||
+        imageUrl ||
         "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80",
       redemptionType: draft.redemptionType,
       category: draft.category,
@@ -750,6 +832,10 @@ export function BusinessExperience({
   };
 
   const handleOpenAdd = () => {
+    if (!profileComplete) {
+      Alert.alert("Finish your profile", "Complete your business profile before publishing offers.");
+      return;
+    }
     setEditingOffer(null);
     setOfferFormOpen(true);
   };
@@ -771,9 +857,10 @@ export function BusinessExperience({
           <BusinessHomeTab
             profileDraft={profileDraft}
             payoutTotal={payoutTotal}
+            pointsRedeemed={pointsRedeemed}
             reachedEmployees={reachedEmployees}
             routedPayments={routedPayments}
-            onOpenProfile={onOpenProfile}
+            onOpenAccount={() => setTab("account")}
             onSelectTransaction={(item) => setDetailTransaction(item)}
             onSeeAllTransactions={() => setTab("offers")}
           />
@@ -803,7 +890,7 @@ export function BusinessExperience({
           <BusinessAccountTab
             user={user}
             profile={profileDraft}
-            onOpenProfile={onOpenProfile}
+            onLogout={onLogout}
           />
         ) : null}
       </ScrollView>
@@ -840,11 +927,16 @@ export function BusinessExperience({
       />
 
       <ProfileEditModal
-        visible={profileEditOpen}
+        visible={showProfileModal}
+        mode={profileComplete ? "edit" : "onboarding"}
         initial={profileDraft}
-        onClose={() => setProfileEditOpen(false)}
+        onClose={() => {
+          if (!profileComplete) return;
+          setProfileEditOpen(false);
+        }}
         onSubmit={async (next) => {
           await saveProviderProfile(next);
+          setProfileEditOpen(false);
         }}
       />
     </View>
@@ -854,17 +946,19 @@ export function BusinessExperience({
 function BusinessHomeTab({
   profileDraft,
   payoutTotal,
+  pointsRedeemed,
   reachedEmployees,
   routedPayments,
-  onOpenProfile,
+  onOpenAccount,
   onSelectTransaction,
   onSeeAllTransactions
 }: {
   profileDraft: { businessName: string };
   payoutTotal: number;
+  pointsRedeemed: number;
   reachedEmployees: number;
   routedPayments: Array<{ request: SelectionRequest; benefit: Benefit }>;
-  onOpenProfile: () => void;
+  onOpenAccount: () => void;
   onSelectTransaction: (data: { request: SelectionRequest; benefit: Benefit }) => void;
   onSeeAllTransactions: () => void;
 }) {
@@ -885,8 +979,8 @@ function BusinessHomeTab({
           <Text style={styles.greetingText}>Insights</Text>
           <Text style={styles.insightsTagline}>{heroTagline}</Text>
         </View>
-        <Pressable onPress={onOpenProfile} style={styles.searchPill}>
-          <AppIcon name="magnify" size={18} color={colors.soft} />
+        <Pressable onPress={onOpenAccount} style={styles.searchPill}>
+          <AppIcon name="account-cog-outline" size={18} color={colors.soft} />
         </Pressable>
       </View>
 
@@ -899,18 +993,18 @@ function BusinessHomeTab({
           Icon={Wallet}
         />
         <BentoMetricCard
-          title="Customers"
-          value={`${reachedEmployees}`}
-          trend={reachedEmployees > 0 ? `+${reachedEmployees}` : "—"}
+          title="Pts redeemed"
+          value={`${pointsRedeemed}`}
+          trend="Employee spend"
           accent={colors.tertiary}
           Icon={UsersRound}
         />
         <BentoMetricCard
-          title="Growth"
-          value={`${Math.min(99, routedPayments.length * 4)}%`}
-          trend={growthTrend}
+          title="Customers"
+          value={`${reachedEmployees}`}
+          trend={reachedEmployees > 0 ? `+${reachedEmployees}` : "—"}
           accent={colors.secondary}
-          Icon={TrendingUp}
+          Icon={UsersRound}
         />
       </View>
 
@@ -1158,57 +1252,41 @@ function BusinessProfileTab({
 function BusinessAccountTab({
   user,
   profile,
-  onOpenProfile
+  onLogout
 }: {
   user: User;
   profile: { businessName: string };
-  onOpenProfile: () => void;
+  onLogout: () => void;
 }) {
-  const tiles: Array<{ label: string; sub: string; Icon: typeof Settings; onPress?: () => void }> = [
-    { label: "Account", sub: "Personal details and password", Icon: UserRound, onPress: onOpenProfile },
-    { label: "Notifications", sub: "Get pinged on every redemption", Icon: ShieldCheck },
-    { label: "Payouts", sub: "Bank account, IBAN, settlement cycle", Icon: Wallet },
-    { label: "Help & support", sub: "FAQs, contact a human", Icon: Settings }
-  ];
   return (
     <>
       <View style={styles.adminHeader}>
         <View style={styles.adminHeaderCopy}>
           <Text style={styles.greetingText}>Account</Text>
           <Text style={styles.insightsTagline}>
-            Signed in as {profile.businessName}. Manage how PERX works for you.
+            Signed in as {profile.businessName}. Manage how PerX works for you.
           </Text>
         </View>
       </View>
-      {tiles.map((tile) => (
-        <Pressable
-          key={tile.label}
-          style={styles.accountTile}
-          onPress={tile.onPress ?? (() => Alert.alert(tile.label, "Coming soon."))}
-        >
-          <View style={styles.accountTileIcon}>
-            <tile.Icon size={18} color={colors.primary} />
-          </View>
-          <View style={styles.accountTileBody}>
-            <Text style={styles.accountTileTitle}>{tile.label}</Text>
-            <Text style={styles.accountTileSub}>{tile.sub}</Text>
-          </View>
-          <ChevronRight size={18} color={colors.muted} />
-        </Pressable>
-      ))}
-      <View style={{ height: 6 }} />
-      <Text style={styles.accountTileSub}>Logged in as {user.email}</Text>
+      <AccountSettingsHub
+        user={user}
+        onLogout={onLogout}
+        subtitle={`Provider account for ${profile.businessName}`}
+        showHero={false}
+      />
     </>
   );
 }
 
 function ProfileEditModal({
   visible,
+  mode = "edit",
   initial,
   onClose,
   onSubmit
 }: {
   visible: boolean;
+  mode?: "edit" | "onboarding";
   initial: {
     businessName: string;
     description: string;
@@ -1221,6 +1299,7 @@ function ProfileEditModal({
 }) {
   const [draft, setDraft] = useState(initial);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     if (visible) setDraft(initial);
@@ -1228,35 +1307,81 @@ function ProfileEditModal({
 
   const handlePickLogo = async () => {
     const uri = await pickImageFromDevice();
-    if (uri) setDraft((c) => ({ ...c, logoUrl: uri }));
+    if (!uri) return;
+    setDraft((current) => ({ ...current, logoUrl: uri }));
+    setUploadingLogo(true);
+    try {
+      const publicUrl = await uploadImageToStorage(uri, "logos");
+      if (publicUrl) {
+        setDraft((current) => ({ ...current, logoUrl: publicUrl }));
+      } else {
+        Alert.alert(
+          "Upload failed",
+          "Could not upload the logo. Check your connection and try again."
+        );
+      }
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleSave = async () => {
+    const validationError = validateProviderProfileDraft(draft);
+    if (validationError) {
+      Alert.alert("Profile incomplete", validationError);
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await onSubmit(draft);
-      onClose();
+      let logoUrl = draft.logoUrl;
+      if (logoUrl && isLocalImageUri(logoUrl)) {
+        const uploaded = await ensurePublicImageUrl(logoUrl, "logos");
+        if (!uploaded || isLocalImageUri(uploaded)) {
+          Alert.alert("Upload failed", "The logo could not be uploaded. Try picking the image again.");
+          return;
+        }
+        logoUrl = uploaded;
+      }
+      await onSubmit({ ...draft, logoUrl });
+      if (mode === "edit") onClose();
     } finally {
       setSubmitting(false);
     }
   };
 
+  const isOnboarding = mode === "onboarding";
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={isOnboarding ? () => undefined : onClose}
+    >
       <View style={styles.modalBackdrop}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>Edit profile</Text>
-              <Text style={styles.modalSub}>How customers see your business.</Text>
+              <Text style={styles.modalTitle}>
+                {isOnboarding ? "Set up your business profile" : "Edit profile"}
+              </Text>
+              <Text style={styles.modalSub}>
+                {isOnboarding
+                  ? "Complete every field below before you start publishing offers."
+                  : "How customers see your business."}
+              </Text>
             </View>
-            <Pressable onPress={onClose} style={styles.modalClose}>
-              <X size={18} color={colors.text} />
-            </Pressable>
+            {isOnboarding ? null : (
+              <Pressable onPress={onClose} style={styles.modalClose}>
+                <X size={18} color={colors.text} />
+              </Pressable>
+            )}
           </View>
           <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <Pressable onPress={handlePickLogo} style={styles.imagePicker}>
+            <Text style={styles.modalFieldLabel}>Logo *</Text>
+            <Pressable onPress={handlePickLogo} disabled={uploadingLogo} style={styles.imagePicker}>
               {draft.logoUrl ? (
                 <Image source={{ uri: draft.logoUrl }} style={styles.imagePickerPreview} />
               ) : (
@@ -1265,7 +1390,12 @@ function ProfileEditModal({
                   <Text style={styles.imagePickerLabel}>Upload a logo</Text>
                 </View>
               )}
-              {draft.logoUrl ? (
+              {uploadingLogo ? (
+                <View style={styles.imagePickerOverlay}>
+                  <ActivityIndicator color={colors.onPrimary} />
+                  <Text style={styles.imagePickerOverlayText}>Uploading…</Text>
+                </View>
+              ) : draft.logoUrl ? (
                 <View style={styles.imagePickerOverlay}>
                   <Camera size={16} color={colors.onPrimary} />
                   <Text style={styles.imagePickerOverlayText}>Replace logo</Text>
@@ -1273,7 +1403,7 @@ function ProfileEditModal({
               ) : null}
             </Pressable>
 
-            <Text style={styles.modalFieldLabel}>Business name</Text>
+            <Text style={styles.modalFieldLabel}>Business name *</Text>
             <TextInput
               value={draft.businessName}
               onChangeText={(businessName) => setDraft((c) => ({ ...c, businessName }))}
@@ -1282,7 +1412,7 @@ function ProfileEditModal({
               style={styles.input}
             />
 
-            <Text style={styles.modalFieldLabel}>Description</Text>
+            <Text style={styles.modalFieldLabel}>Description *</Text>
             <TextInput
               value={draft.description}
               onChangeText={(description) => setDraft((c) => ({ ...c, description }))}
@@ -1292,25 +1422,25 @@ function ProfileEditModal({
               multiline
             />
 
-            <Text style={styles.modalFieldLabel}>Category</Text>
+            <Text style={styles.modalFieldLabel}>Category *</Text>
             <CategoryGrid
               options={benefitCategoryOptions}
               value={draft.category}
               onChange={(category) => setDraft((c) => ({ ...c, category }))}
             />
 
-            <Text style={styles.modalFieldLabel}>City</Text>
+            <Text style={styles.modalFieldLabel}>City *</Text>
             <TextInput
               value={draft.city}
               onChangeText={(city) => setDraft((c) => ({ ...c, city }))}
-              placeholder="Tirana"
+              placeholder="Your city"
               placeholderTextColor={colors.muted}
               style={styles.input}
             />
 
             <View style={{ height: 8 }} />
             <CapsuleButton
-              label={submitting ? "Saving..." : "Save profile"}
+              label={submitting ? "Saving..." : isOnboarding ? "Finish setup" : "Save profile"}
               onPress={() => void handleSave()}
               icon={<Check size={16} color={colors.onPrimary} />}
             />

@@ -1,16 +1,16 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { Nfc, QrCode } from "lucide-react-native";
+import { Lock, Nfc, QrCode } from "lucide-react-native";
 import { useEffect, useRef } from "react";
 import { Animated, Image, StyleSheet, Text, View } from "react-native";
+import { perkPointsCost } from "../lib/perkPayment";
 import { Benefit, User } from "../types";
-import { currency } from "../lib/format";
 import { cardGradients, colors, radius, shadow } from "../theme";
 
 type Props = {
   user: User;
   companyName: string;
-  balance: number;
   benefit: Benefit;
+  pointsBalance: number;
   variant?: number;
   compact?: boolean;
   selected?: boolean;
@@ -19,14 +19,16 @@ type Props = {
 export function WalletCard({
   user,
   companyName,
-  balance,
   benefit,
+  pointsBalance,
   variant = 0,
   compact = false,
   selected = false
 }: Props) {
   const scale = useRef(new Animated.Value(compact ? 1 : 0.96)).current;
   const gradient = cardGradients[variant % cardGradients.length];
+  const cost = perkPointsCost(benefit);
+  const affordable = pointsBalance >= cost;
 
   useEffect(() => {
     if (compact) return;
@@ -39,6 +41,7 @@ export function WalletCard({
         styles.wrap,
         compact && styles.wrapCompact,
         selected && styles.wrapSelected,
+        !affordable && styles.wrapDisabled,
         { transform: [{ scale }] }
       ]}
     >
@@ -46,14 +49,23 @@ export function WalletCard({
         colors={[...gradient]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.card, selected && styles.cardSelected]}
+        style={[styles.card, selected && styles.cardSelected, !affordable && styles.cardDisabled]}
       >
         <View style={styles.overlay} />
+        {!affordable ? (
+          <View style={styles.lockedOverlay}>
+            <Lock size={18} color={colors.onPrimary} />
+            <Text style={styles.lockedText}>Need {cost - pointsBalance} more pts</Text>
+          </View>
+        ) : null}
         <View style={styles.topRow}>
           <View style={styles.topCopy}>
             <Text style={styles.eyebrow}>{benefit.category}</Text>
             <Text style={styles.name} numberOfLines={1}>
               {benefit.title}
+            </Text>
+            <Text style={styles.provider} numberOfLines={1}>
+              {benefit.providerName}
             </Text>
           </View>
           {benefit.imageUrl ? (
@@ -78,13 +90,16 @@ export function WalletCard({
               {companyName}
             </Text>
           </View>
-          {selected ? (
+          {selected && affordable ? (
             <View style={styles.readyPill}>
               <Nfc size={14} color={colors.onPrimary} />
               <Text style={styles.readyText}>Ready</Text>
             </View>
           ) : (
-            <Text style={styles.balance}>{currency(balance)}</Text>
+            <View style={styles.pointsPill}>
+              <Text style={styles.pointsValue}>{cost}</Text>
+              <Text style={styles.pointsLabel}>pts</Text>
+            </View>
           )}
         </View>
       </LinearGradient>
@@ -106,6 +121,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 30
   },
+  wrapDisabled: {
+    opacity: 0.72
+  },
   card: {
     height: 178,
     borderRadius: radius.cardLg,
@@ -119,9 +137,30 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFFFFF"
   },
+  cardDisabled: {
+    borderColor: "rgba(255,255,255,0.2)"
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.1)"
+  },
+  lockedOverlay: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(0,0,0,0.35)"
+  },
+  lockedText: {
+    color: colors.onPrimary,
+    fontSize: 11,
+    fontWeight: "700"
   },
   topRow: {
     flexDirection: "row",
@@ -145,6 +184,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 4
   },
+  provider: {
+    color: "rgba(254,252,255,0.78)",
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: "600"
+  },
   logo: {
     width: 48,
     height: 48,
@@ -161,10 +206,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.16)"
   },
-  balance: {
+  pointsPill: {
+    alignItems: "flex-end"
+  },
+  pointsValue: {
     color: colors.onPrimaryContainer,
     fontSize: 22,
     fontWeight: "900"
+  },
+  pointsLabel: {
+    color: "rgba(254,252,255,0.75)",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: -2
   },
   bottomRow: {
     flexDirection: "row",

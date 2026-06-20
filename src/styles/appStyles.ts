@@ -510,14 +510,24 @@ export const styles = StyleSheet.create({
     gap: 18,
     paddingTop: 8
   },
+  loginScreen: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 32,
+    gap: 24,
+    maxWidth: 420,
+    width: "100%",
+    alignSelf: "center"
+  },
   loginBrand: {
     alignItems: "center",
-    gap: 8
+    gap: 16
   },
   loginLogo: {
     width: 64,
     height: 64,
-    borderRadius: radius.capsule,
+    borderRadius: 32,
     backgroundColor: colors.text,
     alignItems: "center",
     justifyContent: "center"
@@ -525,7 +535,9 @@ export const styles = StyleSheet.create({
   loginTitle: {
     color: colors.text,
     fontSize: 28,
-    fontWeight: "900"
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    textAlign: "center"
   },
   loginSubtitle: {
     color: colors.muted,
@@ -534,10 +546,162 @@ export const styles = StyleSheet.create({
   },
   loginCard: {
     padding: 24,
-    gap: 14
+    gap: 12
+  },
+  loginFieldWrap: {
+    minHeight: 56,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(0,0,0,0.03)",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    gap: 12
+  },
+  loginFieldInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 15,
+    paddingVertical: 12
+  },
+  loginForgotLink: {
+    alignSelf: "flex-end",
+    paddingTop: 8,
+    paddingRight: 8
+  },
+  loginRoleStack: {
+    gap: 12,
+    marginTop: 8
+  },
+  loginRoleButton: {
+    minHeight: 48,
+    borderRadius: radius.capsule,
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  loginRoleButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(0,88,188,0.08)"
+  },
+  loginRoleButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "600"
+  },
+  loginRoleButtonTextActive: {
+    color: colors.primary,
+    fontWeight: "700"
+  },
+  loginFooterLink: {
+    alignItems: "center",
+    paddingVertical: 4
+  },
+  loginFooterText: {
+    color: colors.muted,
+    fontSize: 15,
+    textAlign: "center"
+  },
+  loginFooterAction: {
+    color: colors.primary,
+    fontWeight: "700"
   },
   loginContinue: {
-    marginTop: 4
+    marginTop: 8,
+    minHeight: 56
+  },
+  catalogSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16
+  },
+  catalogSummaryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,88,188,0.1)"
+  },
+  catalogProviderCard: {
+    padding: 16,
+    gap: 12
+  },
+  catalogProviderHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  catalogProviderLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 14
+  },
+  catalogProviderLogoFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  catalogSelectBtn: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: radius.capsule,
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle,
+    backgroundColor: "rgba(255,255,255,0.55)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  catalogSelectBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  catalogSelectText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  catalogSelectTextActive: {
+    color: colors.onPrimary
+  },
+  catalogExpandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 4
+  },
+  catalogExpandText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  catalogOfferRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8
+  },
+  catalogOfferThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 12
+  },
+  catalogOfferCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.55)"
+  },
+  catalogOfferCheckActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
   },
   inputWrap: {
     minHeight: 56,
@@ -1976,5 +2140,214 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10
+  },
+  logoutWrap: {
+    position: "relative"
+  },
+  logoutButton: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: radius.capsule,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle,
+    backgroundColor: colors.panel
+  },
+  accountHero: {
+    alignItems: "center",
+    marginBottom: 4
+  },
+  accountAvatarRing: {
+    borderRadius: radius.capsule,
+    padding: 4,
+    backgroundColor: colors.primary
+  },
+  accountAvatar: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.surfaceContainerHigh,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 4,
+    borderColor: colors.surface
+  },
+  accountHeroName: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 14
+  },
+  accountHeroMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 4
+  },
+  accountHeroSub: {
+    color: colors.soft,
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: "center"
+  },
+  accountSettingsRow: {
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14
+  },
+  accountSettingsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.capsule,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  accountSettingsCopy: {
+    flex: 1
+  },
+  accountSettingsTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "600"
+  },
+  accountSettingsSub: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16
+  },
+  accountFieldPanel: {
+    padding: 18,
+    gap: 4
+  },
+  accountFieldLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  accountFieldValue: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "700"
+  },
+  accountFieldGap: {
+    marginTop: 10
+  },
+  accountSubpage: {
+    gap: 14
+  },
+  accountBackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start"
+  },
+  accountBackText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  accountSubpageTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "800"
+  },
+  accountSubpageSub: {
+    color: colors.muted,
+    fontSize: 13,
+    marginTop: -6
+  },
+  accountInput: {
+    marginTop: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: radius.compact,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    backgroundColor: colors.panel,
+    color: colors.text,
+    fontSize: 14
+  },
+  accountToggleRow: {
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  accountCycleRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8
+  },
+  accountCycleChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.capsule,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    backgroundColor: colors.panel
+  },
+  accountCycleChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  accountCycleChipText: {
+    color: colors.soft,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  accountCycleChipTextActive: {
+    color: colors.onPrimary
+  },
+  activityPageHeader: {
+    gap: 4,
+    marginBottom: 4
+  },
+  redemptionPagerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 8
+  },
+  redemptionPagerText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  automationNote: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 4
+  },
+  employerQuickRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  employerQuickCard: {
+    flex: 1,
+    minWidth: 140,
+    padding: 14,
+    gap: 6
+  },
+  employerAlertCard: {
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  employerAlertIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.capsule,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 152, 0, 0.14)"
   }
 });
