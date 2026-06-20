@@ -3,12 +3,7 @@ const path = require("path");
 
 const config = getDefaultConfig(__dirname);
 
-config.resolver.resolverMainFields = [
-  "react-native",
-  "browser",
-  "module",
-  "main"
-];
+config.resolver.resolverMainFields = ["react-native", "browser", "main"];
 
 config.resolver.extraNodeModules = {
   ...(config.resolver.extraNodeModules ?? {}),
