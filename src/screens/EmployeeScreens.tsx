@@ -539,6 +539,7 @@ function PerkDuelModal({
   const [pairs, setPairs] = useState<[Benefit, Benefit][]>([]);
   const [choices, setChoices] = useState<Benefit[]>([]);
   const [picked, setPicked] = useState<"left" | "right" | null>(null);
+  const [redeemedInDuel, setRedeemedInDuel] = useState<Set<string>>(new Set());
 
   const leftScale = useRef(new Animated.Value(1)).current;
   const rightScale = useRef(new Animated.Value(1)).current;
@@ -562,6 +563,7 @@ function PerkDuelModal({
     setChoices([]);
     setRound(0);
     setPicked(null);
+    setRedeemedInDuel(new Set());
     resetAnims();
     screenFade.setValue(1);
     setPhase("duel");
@@ -635,6 +637,7 @@ function PerkDuelModal({
     setRound(0);
     setChoices([]);
     setPicked(null);
+    setRedeemedInDuel(new Set());
     onClose();
   };
 
@@ -794,34 +797,57 @@ function PerkDuelModal({
             {topPicks.length > 0 && (
               <>
                 <Text style={styles.duelPicksTitle}>Your top picks</Text>
-                {topPicks.map((benefit) => (
-                  <View key={benefit.id} style={styles.duelPickRow}>
-                    <Image source={{ uri: benefit.imageUrl }} style={styles.duelPickThumb} />
-                    <View style={styles.listText}>
-                      <Text style={styles.listTitle} numberOfLines={1}>{benefit.title}</Text>
-                      <Text style={styles.listSub}>{benefit.providerName} · {benefit.pointsPrice} pts</Text>
+                {topPicks.map((benefit) => {
+                  const redeemed = redeemedInDuel.has(benefit.id);
+                  const affordable = canAffordPerk(pointsBalance, benefit);
+                  return (
+                    <View key={benefit.id} style={styles.duelPickRow}>
+                      <Image source={{ uri: benefit.imageUrl }} style={styles.duelPickThumb} />
+                      <View style={styles.listText}>
+                        <Text style={styles.listTitle} numberOfLines={1}>{benefit.title}</Text>
+                        <Text style={styles.listSub}>{benefit.providerName} · {benefit.pointsPrice} pts</Text>
+                      </View>
+                      {redeemed ? (
+                        <View style={styles.duelRedeemedBadge}>
+                          <Check size={13} color={colors.onPrimary} />
+                          <Text style={styles.duelRedeemedText}>Added</Text>
+                        </View>
+                      ) : affordable ? (
+                        <Pressable
+                          style={({ pressed }) => [styles.duelUseBtn, pressed && { opacity: 0.75 }]}
+                          onPress={() => {
+                            const ok = onPayForPerk?.(benefit);
+                            if (ok) {
+                              setRedeemedInDuel((prev) => new Set([...prev, benefit.id]));
+                            } else {
+                              Alert.alert("Could not redeem", "Try again from the Offers tab.");
+                            }
+                          }}
+                        >
+                          <Text style={styles.duelUseBtnText}>Use · {benefit.pointsPrice} pts</Text>
+                        </Pressable>
+                      ) : (
+                        <Text style={styles.duelPickPts}>{benefit.pointsPrice} pts</Text>
+                      )}
                     </View>
-                    {canAffordPerk(pointsBalance, benefit) ? (
-                      <CapsuleButton
-                        label="Use"
-                        onPress={() => {
-                          if (onPayForPerk?.(benefit)) {
-                            Alert.alert("Perk ready!", `${benefit.title} added to My Cards.`);
-                          }
-                        }}
-                        style={styles.duelUseBtn}
-                      />
-                    ) : (
-                      <Text style={styles.duelPickPts}>{benefit.pointsPrice} pts</Text>
-                    )}
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
 
             <View style={styles.duelResultActions}>
-              <CapsuleButton label="Duel again" onPress={startDuel} variant="soft" style={{ flex: 1 }} />
-              <CapsuleButton label="Close" onPress={handleClose} style={{ flex: 1 }} />
+              <Pressable
+                onPress={startDuel}
+                style={({ pressed }) => [styles.duelActionBtn, styles.duelActionBtnGhost, pressed && { opacity: 0.75 }]}
+              >
+                <Text style={styles.duelActionBtnGhostText}>Duel again</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleClose}
+                style={({ pressed }) => [styles.duelActionBtn, styles.duelActionBtnPrimary, pressed && { opacity: 0.75 }]}
+              >
+                <Text style={styles.duelActionBtnText}>Close</Text>
+              </Pressable>
             </View>
           </ScrollView>
         )}

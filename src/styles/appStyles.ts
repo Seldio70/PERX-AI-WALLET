@@ -3526,19 +3526,67 @@ export const styles = StyleSheet.create({
     borderRadius: 10
   },
   duelPickPts: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
-    color: colors.muted
+    color: colors.muted,
+    textAlign: "right"
   },
   duelUseBtn: {
+    backgroundColor: colors.tertiary,
+    borderRadius: radius.capsule,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    minWidth: 60
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  duelUseBtnText: {
+    color: colors.onPrimary,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  duelRedeemedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.capsule,
+    paddingHorizontal: 10,
+    paddingVertical: 7
+  },
+  duelRedeemedText: {
+    color: colors.onPrimary,
+    fontSize: 12,
+    fontWeight: "700"
   },
   duelResultActions: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
     width: "100%",
     marginTop: 24
+  },
+  duelActionBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: radius.capsule,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  duelActionBtnPrimary: {
+    backgroundColor: colors.tertiary
+  },
+  duelActionBtnGhost: {
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: colors.tertiary
+  },
+  duelActionBtnText: {
+    color: colors.onPrimary,
+    fontSize: 15,
+    fontWeight: "700"
+  },
+  duelActionBtnGhostText: {
+    color: colors.tertiary,
+    fontSize: 15,
+    fontWeight: "700"
   }
 });
