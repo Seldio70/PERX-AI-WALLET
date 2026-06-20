@@ -1,6 +1,7 @@
 import { Activity, BadgeCheck, Calendar } from "lucide-react-native";
-import { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { ReactNode, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import Svg, { Circle } from "react-native-svg";
 import { styles } from "../styles/appStyles";
 import { colors } from "../theme";
 import { GlassPanel } from "./GlassPanel";
@@ -48,6 +49,82 @@ const homeChallenges: ChallengeItem[] = [
   }
 ];
 
+const RING_SIZE = 64;
+const RING_STROKE = 5;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+function ChallengeProgressRing({
+  progress,
+  completed,
+  icon
+}: {
+  progress: number;
+  completed?: boolean;
+  icon: ReactNode;
+}) {
+  const fillColor = completed ? colors.secondary : colors.primary;
+  const dash = Math.min(1, progress) * RING_CIRCUMFERENCE;
+
+  return (
+    <View style={styles.challengeRingWrap}>
+      <Svg width={RING_SIZE} height={RING_SIZE}>
+        <Circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_RADIUS}
+          stroke="rgba(0,88,188,0.1)"
+          strokeWidth={RING_STROKE}
+          fill="none"
+        />
+        <Circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_RADIUS}
+          stroke={fillColor}
+          strokeWidth={RING_STROKE}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={`${dash} ${RING_CIRCUMFERENCE}`}
+          transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+        />
+      </Svg>
+      <View style={styles.challengeRingCenter}>{icon}</View>
+    </View>
+  );
+}
+
+function ChallengeCapsule({
+  challenge,
+  selected,
+  onPress
+}: {
+  challenge: ChallengeItem;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const pct = Math.round(challenge.progress * 100);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.challengeCapsule, selected && styles.challengeCapsuleSelected]}
+    >
+      <ChallengeProgressRing
+        progress={challenge.progress}
+        completed={challenge.completed}
+        icon={challenge.icon}
+      />
+      <Text style={styles.challengeCapsuleTitle} numberOfLines={2}>
+        {challenge.title}
+      </Text>
+      <Text style={styles.challengeCapsuleMeta}>
+        {challenge.completed ? "Done" : `${pct}% · +${challenge.rewardPoints}`}
+      </Text>
+    </Pressable>
+  );
+}
+
 function ChallengeProgressCard({ challenge }: { challenge: ChallengeItem }) {
   const fillColor = challenge.completed ? colors.secondary : colors.primary;
   const pct = Math.round(challenge.progress * 100);
@@ -87,15 +164,32 @@ function ChallengeProgressCard({ challenge }: { challenge: ChallengeItem }) {
 }
 
 export function EmployeePointChallenges() {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const availablePoints = homeChallenges
     .filter((challenge) => !challenge.completed)
     .reduce((sum, challenge) => sum + challenge.rewardPoints, 0);
+  const expanded = homeChallenges.find((challenge) => challenge.id === expandedId) ?? null;
 
   return (
     <Section title="Point challenges" meta={`${availablePoints.toLocaleString()} pts left`}>
-      {homeChallenges.map((challenge) => (
-        <ChallengeProgressCard key={challenge.id} challenge={challenge} />
-      ))}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.challengeCapsuleRow}
+      >
+        {homeChallenges.map((challenge) => (
+          <ChallengeCapsule
+            key={challenge.id}
+            challenge={challenge}
+            selected={expandedId === challenge.id}
+            onPress={() =>
+              setExpandedId((current) => (current === challenge.id ? null : challenge.id))
+            }
+          />
+        ))}
+      </ScrollView>
+
+      {expanded ? <ChallengeProgressCard challenge={expanded} /> : null}
     </Section>
   );
 }

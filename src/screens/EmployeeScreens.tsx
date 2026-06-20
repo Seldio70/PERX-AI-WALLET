@@ -1,4 +1,5 @@
 import {
+  ChevronRight,
   Gift,
   Heart,
   MapPin,
@@ -10,11 +11,12 @@ import {
   Tag,
   Trophy,
   WalletCards,
+  X,
   Zap
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useMemo, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { BottomNav, NavTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { EmployeePointChallenges } from "../components/EmployeePointChallenges";
@@ -35,7 +37,8 @@ import { market } from "../lib/format";
 import {
   canAffordPerk,
   computePointsHealth,
-  perkPointsCost
+  perkPointsCost,
+  redeemedWalletBenefits
 } from "../lib/perkPayment";
 import { PerxLiveData } from "../lib/perxRepository";
 import { styles } from "../styles/appStyles";
@@ -147,13 +150,7 @@ export function EmployeeExperience({
           <EmployeeWallet
             user={user}
             companyName={company.name}
-            companyId={company.id}
             appData={appData}
-            pointsBalance={pointsBalance}
-            pointsHealth={pointsHealth}
-            rewardEvents={rewardEvents}
-            openChallenges={openChallenges}
-            onPayForPerk={onPayForPerk}
           />
         ) : null}
         {tab === "challenges" ? (
@@ -164,7 +161,15 @@ export function EmployeeExperience({
             rewardEvents={rewardEvents}
           />
         ) : null}
-        {tab === "alerts" ? <EmployeeOffers appData={appData} /> : null}
+        {tab === "alerts" ? (
+          <EmployeeOffers
+            user={user}
+            companyName={company.name}
+            appData={appData}
+            pointsBalance={pointsBalance}
+            onPayForPerk={onPayForPerk}
+          />
+        ) : null}
         {tab === "profile" ? <UserProfileScreen user={user} onLogout={onLogout} /> : null}
       </ScrollView>
 
@@ -416,6 +421,7 @@ function EmployeeHome({
   const [planItems, setPlanItems] = useState<Benefit[]>(basePlan.items);
   const [autopilotOpen, setAutopilotOpen] = useState(false);
   const [sent, setSent] = useState(false);
+  const [aiOfferDetail, setAiOfferDetail] = useState<Benefit | null>(null);
 
   const planTotal = planItems.reduce((sum, benefit) => sum + perkPointsCost(benefit), 0);
 
@@ -463,12 +469,36 @@ function EmployeeHome({
     }
   };
 
+  const logoFor = (providerName: string) =>
+    appData.providerProfiles.find((provider) => provider.businessName === providerName)?.logoUrl;
+
   return (
     <>
       <View style={styles.greeting}>
         <Text style={styles.greetingText}>Hi, {user.name.split(" ")[0]}</Text>
         <Text style={styles.greetingSub}>{companyName}</Text>
       </View>
+
+      {planItems.length ? (
+        <Pressable style={styles.packageCapsule} onPress={() => setAutopilotOpen(true)}>
+          <View style={styles.packageCapsuleThumbs}>
+            {planItems.slice(0, 3).map((benefit, index) => (
+              <Image
+                key={benefit.id}
+                source={{ uri: benefit.imageUrl }}
+                style={[styles.packageCapsuleThumb, index > 0 && { marginLeft: -10 }]}
+              />
+            ))}
+          </View>
+          <View style={styles.packageCapsuleCopy}>
+            <Text style={styles.packageCapsuleTitle}>My package</Text>
+            <Text style={styles.packageCapsuleMeta}>
+              {planItems.length} perk{planItems.length === 1 ? "" : "s"} · {planTotal} pts
+            </Text>
+          </View>
+          <ChevronRight size={16} color={colors.muted} />
+        </Pressable>
+      ) : null}
 
       <GlassPanel style={styles.aiCard} intensity={40}>
         <View style={styles.aiHead}>
@@ -481,7 +511,7 @@ function EmployeeHome({
 
         {primary ? (
           <>
-            <View style={styles.aiPrimary}>
+            <Pressable onPress={() => setAiOfferDetail(primary)} style={styles.aiPrimary}>
               <Image source={{ uri: primary.imageUrl }} style={styles.aiThumb} />
               <View style={styles.aiPrimaryInfo}>
                 <Text style={styles.aiName} numberOfLines={1}>
@@ -491,8 +521,10 @@ function EmployeeHome({
                   {primary.providerName} · {primary.discount}
                 </Text>
                 <Text style={styles.aiPrice}>{perkPointsCost(primary)} pts</Text>
+                <Text style={styles.aiTapHint}>Tap for full details</Text>
               </View>
-            </View>
+              <ChevronRight size={18} color={colors.muted} />
+            </Pressable>
             <Text style={styles.aiReason}>
               Based on your points balance, past selections, and nearby offers.
             </Text>
@@ -627,6 +659,28 @@ function EmployeeHome({
           ) : null}
         </GlassPanel>
       </Section>
+
+      <OfferDetailModal
+        visible={!!aiOfferDetail}
+        benefit={aiOfferDetail}
+        pointsBalance={pointsBalance}
+        logoUrl={aiOfferDetail ? logoFor(aiOfferDetail.providerName) : undefined}
+        onClose={() => setAiOfferDetail(null)}
+        onRedeem={(benefit) => {
+          useNow(benefit);
+          setAiOfferDetail(null);
+        }}
+        primaryLabel={
+          aiOfferDetail && canAffordPerk(pointsBalance, aiOfferDetail)
+            ? `Use now · ${perkPointsCost(aiOfferDetail)} pts`
+            : undefined
+        }
+        secondaryLabel="Add to package"
+        onSecondary={(benefit) => {
+          addToPackage(benefit);
+          setAiOfferDetail(null);
+        }}
+      />
     </>
   );
 }
@@ -634,127 +688,51 @@ function EmployeeHome({
 function EmployeeWallet({
   user,
   companyName,
-  appData,
-  pointsBalance = 0,
-  pointsHealth,
-  rewardEvents = [],
-  openChallenges = [],
-  onPayForPerk
+  appData
 }: {
   user: User;
   companyName: string;
-  companyId: string;
   appData: AppData;
-  pointsBalance?: number;
-  pointsHealth: ReturnType<typeof computePointsHealth>;
-  rewardEvents?: RewardEvent[];
-  openChallenges?: Challenge[];
-  onPayForPerk?: (benefit: Benefit) => boolean;
 }) {
-  const walletBenefits = appData.benefits;
-  const [activeCategory, setActiveCategory] = useState<CategoryFilter>("All");
+  const redeemedBenefits = useMemo(
+    () => redeemedWalletBenefits(user.id, appData.selectionRequests, appData.benefits),
+    [user.id, appData.selectionRequests, appData.benefits]
+  );
   const [focusId, setFocusId] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [celebrateKey, setCelebrateKey] = useState(0);
 
-  const categories = useMemo<CategoryFilter[]>(() => {
-    const present = Array.from(new Set(walletBenefits.map((benefit) => benefit.category)));
-    return ["All", ...present];
-  }, [walletBenefits]);
-
-  const filteredBenefits = walletBenefits.filter((benefit) => {
-    if (activeCategory !== "All" && benefit.category !== activeCategory) return false;
-    return true;
-  });
-
-  if (!walletBenefits.length) {
-    return (
-      <Section title="My Cards" meta="No perks">
-        <View style={styles.listRow}>
-          <View style={styles.smallIcon}>
-            <WalletCards size={18} color={colors.text} />
-          </View>
-          <View style={styles.listText}>
-            <Text style={styles.listTitle}>No perk cards yet</Text>
-            <Text style={styles.listSub}>Your employer must enable providers before cards appear here.</Text>
-          </View>
-        </View>
-      </Section>
-    );
-  }
-
-  const focusIndex = filteredBenefits.findIndex((benefit) => benefit.id === focusId);
-  const focused = focusIndex >= 0 ? filteredBenefits[focusIndex] : null;
-
-  const handlePay = () => {
-    if (!focused) return;
-    if (!canAffordPerk(pointsBalance, focused)) {
-      Alert.alert(
-        "Not enough points",
-        `You need ${perkPointsCost(focused)} pts. Your balance is ${pointsBalance}.`
-      );
-      return;
-    }
-    if (onPayForPerk?.(focused)) {
-      setAccepted(true);
-      setCelebrateKey((value) => value + 1);
-    }
-  };
+  const focusIndex = redeemedBenefits.findIndex((benefit) => benefit.id === focusId);
+  const focused = focusIndex >= 0 ? redeemedBenefits[focusIndex] : null;
 
   return (
     <>
       <View style={styles.walletHero}>
         <Text style={styles.greetingText}>My Cards</Text>
-        <Text style={styles.greetingSub}>Each card is a provider perk · pay with your points.</Text>
+        <Text style={styles.greetingSub}>
+          {redeemedBenefits.length
+            ? `${redeemedBenefits.length} perk${redeemedBenefits.length === 1 ? "" : "s"} redeemed · tap to use at the provider.`
+            : "Perks you redeem from Offers will appear here."}
+        </Text>
       </View>
 
-      <GlassPanel style={styles.compactPointsCard} intensity={28}>
-        <View style={styles.redeemRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.pointsHeroValue}>{pointsBalance.toLocaleString()} pts</Text>
-            <Text style={styles.pointsHeroSub}>
-              {pointsHealth.spentThisMonth} spent this month · tap a card to pay
-            </Text>
-          </View>
-          <Gift size={22} color={colors.primary} />
-        </View>
-      </GlassPanel>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
-        {categories.map((category) => {
-          const active = activeCategory === category;
-          return (
-            <Pressable
-              key={category}
-              onPress={() => setActiveCategory(category)}
-              style={[styles.filterChip, active && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{category}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {filteredBenefits.length ? (
-        <View style={styles.cardStack}>
-          {filteredBenefits.map((benefit, index) => (
+      {redeemedBenefits.length ? (
+        <View style={styles.walletCardList}>
+          {redeemedBenefits.map((benefit, index) => (
             <Pressable
               key={benefit.id}
               onPress={() => {
                 setFocusId(benefit.id);
                 setAccepted(false);
               }}
-              style={[styles.stackItem, index > 0 && styles.stackItemCollapsed]}
+              style={styles.walletCardListItem}
             >
               <WalletCard
                 user={user}
                 companyName={companyName}
                 benefit={benefit}
-                pointsBalance={pointsBalance}
+                pointsBalance={perkPointsCost(benefit)}
+                redeemed
                 variant={index}
                 compact
               />
@@ -764,11 +742,11 @@ function EmployeeWallet({
       ) : (
         <View style={styles.listRow}>
           <View style={styles.smallIcon}>
-            <Store size={18} color={colors.text} />
+            <WalletCards size={18} color={colors.text} />
           </View>
           <View style={styles.listText}>
-            <Text style={styles.listTitle}>No cards in this category</Text>
-            <Text style={styles.listSub}>Try another filter above.</Text>
+            <Text style={styles.listTitle}>No cards yet</Text>
+            <Text style={styles.listSub}>Redeem perks from Offers and they will appear here.</Text>
           </View>
         </View>
       )}
@@ -778,11 +756,15 @@ function EmployeeWallet({
         benefit={focused}
         user={user}
         companyName={companyName}
-        pointsBalance={pointsBalance}
+        pointsBalance={focused ? perkPointsCost(focused) : 0}
         variant={focusIndex < 0 ? 0 : focusIndex}
         accepted={accepted}
         celebrateKey={celebrateKey}
-        onTap={handlePay}
+        redeemed
+        onTap={() => {
+          setAccepted(true);
+          setCelebrateKey((value) => value + 1);
+        }}
         onClose={() => {
           setFocusId(null);
           setAccepted(false);
@@ -794,12 +776,25 @@ function EmployeeWallet({
 
 type CategoryFilter = BenefitCategory | "All";
 
-function EmployeeOffers({ appData }: { appData: AppData }) {
+function EmployeeOffers({
+  user,
+  companyName,
+  appData,
+  pointsBalance = 0,
+  onPayForPerk
+}: {
+  user: User;
+  companyName: string;
+  appData: AppData;
+  pointsBalance?: number;
+  onPayForPerk?: (benefit: Benefit) => boolean;
+}) {
   const marketplaceBenefits = appData.benefits;
   const marketplaceProviders = appData.providerProfiles;
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("All");
   const [savedOnly, setSavedOnly] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState<Benefit | null>(null);
 
   const categories = useMemo<CategoryFilter[]>(() => {
     const present = Array.from(new Set(marketplaceBenefits.map((benefit) => benefit.category)));
@@ -819,6 +814,20 @@ function EmployeeOffers({ appData }: { appData: AppData }) {
     setSavedIds((current) =>
       current.includes(benefitId) ? current.filter((id) => id !== benefitId) : [...current, benefitId]
     );
+  };
+
+  const handleRedeem = (benefit: Benefit) => {
+    if (!canAffordPerk(pointsBalance, benefit)) {
+      Alert.alert(
+        "Not enough points",
+        `You need ${perkPointsCost(benefit)} pts. Your balance is ${pointsBalance}.`
+      );
+      return;
+    }
+    if (onPayForPerk?.(benefit)) {
+      setSelectedOffer(null);
+      Alert.alert("Redeemed", `${benefit.title} is in My Cards. Use it at ${benefit.providerName}.`);
+    }
   };
 
   return (
@@ -866,7 +875,8 @@ function EmployeeOffers({ appData }: { appData: AppData }) {
           const tint = categoryTint[benefit.category] ?? colors.primary;
           const logo = logoFor(benefit.providerName);
           return (
-            <View key={benefit.id} style={styles.offerV2}>
+            <Pressable key={benefit.id} onPress={() => setSelectedOffer(benefit)}>
+            <View style={styles.offerV2}>
               <View style={styles.offerV2Hero}>
                 <Image source={{ uri: benefit.imageUrl }} style={styles.offerV2Img} />
                 <LinearGradient
@@ -881,7 +891,10 @@ function EmployeeOffers({ appData }: { appData: AppData }) {
                   <Text style={styles.offerV2DiscountText}>{benefit.discount}</Text>
                 </View>
                 <Pressable
-                  onPress={() => toggleSaved(benefit.id)}
+                  onPress={(event) => {
+                    event.stopPropagation?.();
+                    toggleSaved(benefit.id);
+                  }}
                   hitSlop={8}
                   style={[styles.offerV2Save, saved && styles.offerV2SaveActive]}
                 >
@@ -927,6 +940,7 @@ function EmployeeOffers({ appData }: { appData: AppData }) {
                 </View>
               </View>
             </View>
+            </Pressable>
           );
         })
       ) : (
@@ -942,6 +956,106 @@ function EmployeeOffers({ appData }: { appData: AppData }) {
           </View>
         </View>
       )}
+
+      <OfferDetailModal
+        visible={!!selectedOffer}
+        benefit={selectedOffer}
+        pointsBalance={pointsBalance}
+        logoUrl={selectedOffer ? logoFor(selectedOffer.providerName) : undefined}
+        onClose={() => setSelectedOffer(null)}
+        onRedeem={handleRedeem}
+      />
     </>
+  );
+}
+
+function OfferDetailModal({
+  visible,
+  benefit,
+  pointsBalance,
+  logoUrl,
+  onClose,
+  onRedeem,
+  primaryLabel,
+  secondaryLabel,
+  onSecondary
+}: {
+  visible: boolean;
+  benefit: Benefit | null;
+  pointsBalance: number;
+  logoUrl?: string;
+  onClose: () => void;
+  onRedeem: (benefit: Benefit) => void;
+  primaryLabel?: string;
+  secondaryLabel?: string;
+  onSecondary?: (benefit: Benefit) => void;
+}) {
+  if (!benefit) return null;
+  const cost = perkPointsCost(benefit);
+  const affordable = canAffordPerk(pointsBalance, benefit);
+  const tint = categoryTint[benefit.category] ?? colors.primary;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>{benefit.title}</Text>
+              <Text style={styles.modalSub}>{benefit.providerName} · {benefit.city}</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.modalClose}>
+              <X size={18} color={colors.text} />
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <Image source={{ uri: benefit.imageUrl }} style={styles.detailHeroImage} />
+            <View style={[styles.offerV2Cat, { backgroundColor: tint, alignSelf: "flex-start" }]}>
+              <Text style={styles.offerV2CatText}>{benefit.category}</Text>
+            </View>
+            <View style={styles.offerV2ProviderRow}>
+              {logoUrl ? (
+                <Image source={{ uri: logoUrl }} style={styles.offerV2Logo} />
+              ) : (
+                <View style={[styles.offerV2Logo, styles.offerV2LogoFallback]}>
+                  <Store size={14} color={colors.primary} />
+                </View>
+              )}
+              <Text style={styles.offerV2Provider}>{benefit.providerName}</Text>
+            </View>
+            <Text style={styles.bodyText}>{benefit.description}</Text>
+            <View style={styles.offerV2Discount}>
+              <Tag size={12} color={colors.onPrimary} />
+              <Text style={styles.offerV2DiscountText}>{benefit.discount}</Text>
+            </View>
+            <Text style={styles.listSub}>Valid until {benefit.validUntil}</Text>
+            <Text style={styles.listSub}>
+              Redeem with {cost} pts · your balance {pointsBalance.toLocaleString()} pts
+            </Text>
+            <View style={styles.offerModalActions}>
+              <CapsuleButton
+                label={
+                  primaryLabel ??
+                  (affordable ? `Redeem for ${cost} pts` : `Need ${cost - pointsBalance} more pts`)
+                }
+                onPress={() => onRedeem(benefit)}
+                variant={affordable ? "primary" : "soft"}
+                style={secondaryLabel ? { flex: 1 } : undefined}
+              />
+              {secondaryLabel && onSecondary ? (
+                <CapsuleButton
+                  label={secondaryLabel}
+                  onPress={() => onSecondary(benefit)}
+                  variant="soft"
+                  style={{ flex: 1 }}
+                />
+              ) : null}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }

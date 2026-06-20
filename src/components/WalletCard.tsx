@@ -14,6 +14,7 @@ type Props = {
   variant?: number;
   compact?: boolean;
   selected?: boolean;
+  redeemed?: boolean;
 };
 
 export function WalletCard({
@@ -23,12 +24,13 @@ export function WalletCard({
   pointsBalance,
   variant = 0,
   compact = false,
-  selected = false
+  selected = false,
+  redeemed = false
 }: Props) {
   const scale = useRef(new Animated.Value(compact ? 1 : 0.96)).current;
   const gradient = cardGradients[variant % cardGradients.length];
   const cost = perkPointsCost(benefit);
-  const affordable = pointsBalance >= cost;
+  const affordable = redeemed || pointsBalance >= cost;
 
   useEffect(() => {
     if (compact) return;
@@ -93,7 +95,12 @@ export function WalletCard({
           {selected && affordable ? (
             <View style={styles.readyPill}>
               <Nfc size={14} color={colors.onPrimary} />
-              <Text style={styles.readyText}>Ready</Text>
+              <Text style={styles.readyText}>{redeemed ? "Use" : "Ready"}</Text>
+            </View>
+          ) : redeemed ? (
+            <View style={styles.readyPill}>
+              <Nfc size={14} color={colors.onPrimary} />
+              <Text style={styles.readyText}>Redeemed</Text>
             </View>
           ) : (
             <View style={styles.pointsPill}>

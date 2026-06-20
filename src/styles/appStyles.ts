@@ -1124,6 +1124,11 @@ export const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 16
   },
+  offerModalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4
+  },
   modalFieldLabel: {
     color: colors.muted,
     fontSize: 12,
@@ -1524,6 +1529,12 @@ export const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 4
   },
+  walletCardList: {
+    gap: 12
+  },
+  walletCardListItem: {
+    marginBottom: 0
+  },
   cardStack: {
     gap: 0
   },
@@ -1590,6 +1601,12 @@ export const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 15,
     fontWeight: "900",
+    marginTop: 2
+  },
+  aiTapHint: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "600",
     marginTop: 2
   },
   aiReason: {
@@ -2066,6 +2083,86 @@ export const styles = StyleSheet.create({
     color: colors.secondary,
     fontSize: 12,
     fontWeight: "800"
+  },
+  packageCapsule: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: colors.stroke
+  },
+  packageCapsuleThumbs: {
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  packageCapsuleThumb: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.surface,
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  packageCapsuleCopy: {
+    flex: 1,
+    gap: 1
+  },
+  packageCapsuleTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  packageCapsuleMeta: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "600"
+  },
+  challengeCapsuleRow: {
+    gap: 10,
+    paddingVertical: 2
+  },
+  challengeCapsule: {
+    width: 96,
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: radius.compact,
+    backgroundColor: colors.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: colors.stroke
+  },
+  challengeCapsuleSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer
+  },
+  challengeCapsuleTitle: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 14
+  },
+  challengeCapsuleMeta: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  challengeRingWrap: {
+    width: 64,
+    height: 64,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  challengeRingCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center"
   },
   automationRow: {
     padding: 14,

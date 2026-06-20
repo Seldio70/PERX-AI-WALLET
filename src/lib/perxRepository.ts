@@ -188,7 +188,7 @@ function mapSelection(row: DbSelectionRequest): SelectionRequest {
     employeeId: row.employee_id,
     employeeName: relationName(row.users) ?? "Employee",
     employerId: row.employer_id ?? undefined,
-    benefitIds: row.selection_items?.map((item) => item.benefit_id) ?? [],
+    benefitIds: Array.from(new Set(row.selection_items?.map((item) => item.benefit_id) ?? [])),
     total: numberFromDb(row.total),
     totalPoints: numberFromDb(row.total_points),
     status: row.status,

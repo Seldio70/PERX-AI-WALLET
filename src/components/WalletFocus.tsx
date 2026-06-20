@@ -18,6 +18,7 @@ type Props = {
   variant: number;
   accepted: boolean;
   celebrateKey: number;
+  redeemed?: boolean;
   onTap: () => void;
   onClose: () => void;
 };
@@ -31,6 +32,7 @@ export function WalletFocus({
   variant,
   accepted,
   celebrateKey,
+  redeemed = false,
   onTap,
   onClose
 }: Props) {
@@ -51,7 +53,7 @@ export function WalletFocus({
   if (!benefit) return null;
 
   const cost = perkPointsCost(benefit);
-  const affordable = canAffordPerk(pointsBalance, benefit);
+  const affordable = redeemed || canAffordPerk(pointsBalance, benefit);
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [60, 0] });
   const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] });
 
@@ -72,13 +74,16 @@ export function WalletFocus({
               pointsBalance={pointsBalance}
               variant={variant}
               selected
+              redeemed={redeemed}
             />
             <View style={styles.caption}>
               <Text style={styles.captionTitle}>{benefit.title}</Text>
               <Text style={styles.captionText} numberOfLines={2}>
                 {benefit.description}
               </Text>
-              <Text style={styles.captionCost}>{cost} pts to use this perk</Text>
+              <Text style={styles.captionCost}>
+                {redeemed ? "Already redeemed · tap to use at provider" : `${cost} pts to use this perk`}
+              </Text>
             </View>
           </Animated.View>
         </View>
@@ -88,15 +93,25 @@ export function WalletFocus({
             <View style={[styles.dot, accepted && styles.dotActive]} />
             <Text style={styles.statusText}>
               {accepted
-                ? "Perk paid · points deducted"
+                ? redeemed
+                  ? "Ready at provider"
+                  : "Perk paid · points deducted"
                 : affordable
-                  ? "Ready for the NFC reader"
+                  ? redeemed
+                    ? "Hold near the NFC reader"
+                    : "Ready for the NFC reader"
                   : `Need ${cost - pointsBalance} more points`}
             </Text>
           </View>
           <CapsuleButton
             label={
-              accepted ? "Pay again" : affordable ? "Simulate NFC tap & pay" : "Not enough points"
+              accepted
+                ? "Tap again"
+                : affordable
+                  ? redeemed
+                    ? "Simulate NFC tap"
+                    : "Simulate NFC tap & pay"
+                  : "Not enough points"
             }
             onPress={onTap}
             variant={affordable ? "primary" : "soft"}

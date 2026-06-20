@@ -98,3 +98,33 @@ export function providerSettlementStats(
 
   return { redemptionCount, pointsRedeemed, revenue };
 }
+
+/** One wallet card per unique redeemed perk (most recent redemption wins). */
+export function redeemedWalletBenefits(
+  userId: string,
+  selectionRequests: SelectionRequest[],
+  benefits: Benefit[]
+): Benefit[] {
+  const benefitById = new Map(benefits.map((benefit) => [benefit.id, benefit]));
+  const orderedIds: string[] = [];
+  const seen = new Set<string>();
+
+  const mine = selectionRequests
+    .filter((request) => request.employeeId === userId && request.status === "approved")
+    .sort((a, b) =>
+      (b.approvedAt ?? b.createdAt ?? "").localeCompare(a.approvedAt ?? a.createdAt ?? "")
+    );
+
+  for (const request of mine) {
+    const uniqueIds = Array.from(new Set(request.benefitIds));
+    for (const benefitId of uniqueIds) {
+      if (seen.has(benefitId) || !benefitById.has(benefitId)) continue;
+      seen.add(benefitId);
+      orderedIds.push(benefitId);
+    }
+  }
+
+  return orderedIds
+    .map((id) => benefitById.get(id))
+    .filter((benefit): benefit is Benefit => Boolean(benefit));
+}
