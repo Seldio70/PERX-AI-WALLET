@@ -6,7 +6,7 @@ type Props = {
   label: string;
   onPress: () => void;
   icon?: ReactNode;
-  variant?: "primary" | "ghost" | "soft";
+  variant?: "primary" | "ghost" | "soft" | "dark";
   style?: ViewStyle;
 };
 
@@ -22,7 +22,15 @@ export function CapsuleButton({ label, onPress, icon, variant = "primary", style
       ]}
     >
       {icon}
-      <Text style={[styles.label, variant === "ghost" && styles.ghostLabel]}>{label}</Text>
+      <Text
+        style={[
+          styles.label,
+          variant === "ghost" && styles.ghostLabel,
+          variant === "soft" && styles.softLabel
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -38,24 +46,30 @@ const styles = StyleSheet.create({
     gap: 8
   },
   primary: {
+    backgroundColor: colors.primary
+  },
+  dark: {
     backgroundColor: colors.text
   },
   soft: {
-    backgroundColor: colors.panelStrong,
-    borderWidth: 1,
-    borderColor: colors.stroke
+    backgroundColor: "rgba(255,255,255,0.55)",
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle
   },
   ghost: {
     backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: colors.stroke
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle
   },
   label: {
-    color: colors.background,
+    color: colors.onPrimary,
     fontSize: 15,
     fontWeight: "700"
   },
   ghostLabel: {
+    color: colors.text
+  },
+  softLabel: {
     color: colors.text
   },
   pressed: {

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "stitch": {
+      "url": "https://your-stitch-mcp-url.example",
+      "headers": {
+        "Authorization": "Bearer YOUR_STITCH_TOKEN"
+      }
+    }
+  }
+}

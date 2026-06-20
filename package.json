@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "server": "ts-node-dev --respawn --transpile-only server/index.ts",
+    "postinstall": "node scripts/patch-react-native-startup.js",
     "setup:accounts": "node scripts/setup-clean-accounts.js",
     "verify:supabase": "node scripts/verify-supabase.js",
     "typecheck": "tsc --noEmit"
@@ -23,6 +24,7 @@
     "dotenv": "^16.4.5",
     "expo": "^54.0.0",
     "expo-blur": "~15.0.8",
+    "expo-font": "~14.0.12",
     "expo-linear-gradient": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "express": "^4.19.2",
@@ -34,15 +36,14 @@
     "react-native-qrcode-svg": "^6.3.2",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-svg": "15.12.1",
+    "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
-    "@babel/plugin-transform-class-properties": "^7.29.7",
-    "@babel/plugin-transform-private-methods": "^7.29.7",
-    "@babel/plugin-transform-private-property-in-object": "^7.29.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/react": "~19.1.10",
+    "babel-preset-expo": "~54.0.11",
     "ts-node-dev": "^2.0.0",
     "typescript": "~5.9.2"
   }

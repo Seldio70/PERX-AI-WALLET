@@ -1,3 +1,4 @@
+import "react-native-url-polyfill/auto";
 import "./src/polyfills/runtime";
 import { registerRootComponent } from "expo";
 

@@ -3,6 +3,9 @@
 !.env.example
 node_modules/
 .expo/
+.cursor/mcp.json
+dist/
+dist-debug*/
 expo.out.log
 expo.err.log
 npm-debug.log*

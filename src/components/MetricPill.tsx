@@ -18,8 +18,8 @@ export function MetricPill({ label, value }: Props) {
 const styles = StyleSheet.create({
   pill: {
     borderRadius: radius.capsule,
-    borderWidth: 1,
-    borderColor: colors.stroke,
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle,
     backgroundColor: colors.panel,
     paddingHorizontal: 14,
     paddingVertical: 10,

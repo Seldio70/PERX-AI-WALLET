@@ -1,0 +1,278 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>User Profile | Nexus</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;700;900&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-fixed": "#001a41",
+                      "on-surface": "#1a1b1f",
+                      "surface-variant": "#e3e2e7",
+                      "on-background": "#1a1b1f",
+                      "inverse-on-surface": "#f1f0f5",
+                      "surface-container-lowest": "#ffffff",
+                      "primary": "#0058bc",
+                      "outline-variant": "#c1c6d7",
+                      "inverse-surface": "#2f3034",
+                      "tertiary-fixed": "#e2dfff",
+                      "on-primary-fixed-variant": "#004493",
+                      "on-secondary-fixed-variant": "#00531c",
+                      "surface-container-low": "#f4f3f8",
+                      "tertiary": "#4c4aca",
+                      "on-surface-variant": "#414755",
+                      "surface-dim": "#dad9df",
+                      "on-tertiary-fixed": "#0c006a",
+                      "on-error": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-fixed": "#002107",
+                      "secondary-fixed-dim": "#53e16f",
+                      "secondary-fixed": "#72fe88",
+                      "outline": "#717786",
+                      "surface-bright": "#faf9fe",
+                      "error": "#ba1a1a",
+                      "on-secondary-container": "#00732a",
+                      "on-primary-container": "#fefcff",
+                      "tertiary-fixed-dim": "#c2c1ff",
+                      "tertiary-container": "#6664e4",
+                      "surface": "#faf9fe",
+                      "on-secondary": "#ffffff",
+                      "inverse-primary": "#adc6ff",
+                      "error-container": "#ffdad6",
+                      "surface-tint": "#005bc1",
+                      "on-error-container": "#93000a",
+                      "surface-container-high": "#e9e7ed",
+                      "on-tertiary-container": "#fffbff",
+                      "surface-container-highest": "#e3e2e7",
+                      "on-primary": "#ffffff",
+                      "primary-fixed-dim": "#adc6ff",
+                      "on-tertiary-fixed-variant": "#3631b4",
+                      "secondary-container": "#6ffb85",
+                      "secondary": "#006e28",
+                      "primary-container": "#0070eb",
+                      "background": "#faf9fe",
+                      "surface-container": "#eeedf3",
+                      "primary-fixed": "#d8e2ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "1rem",
+                      "lg": "2rem",
+                      "xl": "3rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "margin-desktop": "40px",
+                      "stack-lg": "24px",
+                      "stack-sm": "8px",
+                      "gutter": "16px",
+                      "unit": "4px",
+                      "stack-md": "16px",
+                      "margin-mobile": "20px"
+              },
+              "fontFamily": {
+                      "h1": ["Be Vietnam Pro"],
+                      "caption": ["Be Vietnam Pro"],
+                      "h2": ["Be Vietnam Pro"],
+                      "display-header": ["Be Vietnam Pro"],
+                      "display-header-mobile": ["Be Vietnam Pro"],
+                      "body-std": ["Be Vietnam Pro"],
+                      "body-lg": ["Be Vietnam Pro"]
+              },
+              "fontSize": {
+                      "h1": ["24px", { "lineHeight": "30px", "letterSpacing": "-0.3px", "fontWeight": "700" }],
+                      "caption": ["12px", { "lineHeight": "16px", "fontWeight": "300" }],
+                      "h2": ["20px", { "lineHeight": "25px", "letterSpacing": "-0.2px", "fontWeight": "600" }],
+                      "display-header": ["34px", { "lineHeight": "40px", "letterSpacing": "-0.5px", "fontWeight": "900" }],
+                      "display-header-mobile": ["28px", { "lineHeight": "34px", "fontWeight": "900" }],
+                      "body-std": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                      "body-lg": ["16px", { "lineHeight": "22px", "fontWeight": "400" }]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        body {
+            background-color: #faf9fe;
+            font-family: 'Be Vietnam Pro', sans-serif;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 0.5px solid rgba(255, 255, 255, 0.4);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .avatar-ring {
+            background: linear-gradient(135deg, #0058bc 0%, #4c4aca 100%);
+            padding: 4px;
+        }
+        .page-transition {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface antialiased">
+<!-- Atmospheric Background -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+<div class="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[120px]"></div>
+<div class="absolute top-[20%] -right-[5%] w-[40%] h-[40%] rounded-full bg-tertiary/10 blur-[100px]"></div>
+</div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/70 backdrop-blur-[30px] border-b-[0.5px] border-white/20 shadow-sm">
+<div class="flex justify-between items-center px-margin-mobile h-[64px] w-full">
+<button class="hover:opacity-80 transition-opacity active:scale-95 duration-200">
+<span class="material-symbols-outlined text-primary">grid_view</span>
+</button>
+<h1 class="font-display-header-mobile text-display-header-mobile font-black text-on-surface">Nexus</h1>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-white/40 shadow-sm">
+<img class="w-full h-full object-cover" data-alt="A professional close-up studio portrait of a modern man in his 30s with a friendly expression. He is wearing a minimalist dark grey shirt against a clean, soft-lit studio background. The lighting is high-key and soft, creating a premium light-mode aesthetic that fits a sophisticated high-end app profile. The focus is sharp on his features with a shallow depth of field." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPm4qR29LVTXBqzvInyxFoo7XC-DF8Q7xUqHlHiGftd3IAAa03Z6s59rQHW2bsli7ZfgPxRLUSx69x8kZBwYHHWSKmezw2LVugxg_ZskLuOxCqcpRvX2_GAl8aKQaZ3aeLbqiGWB4ZPSXkHxQx1UFYKcObp_FmMK1m7Gve8UHIrNuhdab_8M1qN5gFuKqIz9FV8coYukHDWagYLgXkcDhAtm74zs17pYcUU3cwRcKmftaQODbIMOV9nD0rAmB3h-pPQ6iWlFCDDjI">
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="relative z-10 pt-24 pb-32 px-margin-mobile max-w-lg mx-auto page-transition">
+<!-- Profile Hero Section -->
+<section class="flex flex-col items-center mb-stack-lg">
+<div class="relative mb-stack-md">
+<div class="avatar-ring rounded-full shadow-2xl">
+<div class="w-32 h-32 rounded-full overflow-hidden border-4 border-surface shadow-inner">
+<img class="w-full h-full object-cover" data-alt="A high-quality, professional headshot of John Doe, a middle-aged male with a kind and confident smile. The portrait is captured with cinematic lighting and soft shadows, set against a blurred office background with cool blue and white tones. The overall look is clean, modern, and high-fidelity, perfectly suited for a premium user profile interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCG_wzxxxSuPP7z_SlPqe_kHRJ1WQMTXqVBIFoTM8S35dx7i7N1E4_vIf0Q24NwtyEfgRUGMQIlferpSMAVwL4m-xrrwtnxKaKylb1aDtOlJsvqoQPupiLmLfeNDm3A_Ydp245v_1knV4FQpCjtNFoS2If9J5lqBeKxpl9WcryVjh5fKNlxCPVxcyj1EoWeAJ7v70BZxxwoUPm37FagEL8kPjfGPo_ti3uMjn6h3pV2TmCqgU46yCT-m8b7vHEon__1XCi54-lo6-M">
+</div>
+</div>
+<div class="absolute bottom-1 right-1 bg-primary text-on-primary w-8 h-8 rounded-full flex items-center justify-center border-2 border-surface shadow-lg">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</div>
+</div>
+<h1 class="font-h1 text-h1 text-on-surface">John Doe</h1>
+<p class="font-caption text-caption text-on-surface-variant mt-1">Member since October 2023</p>
+</section>
+<!-- Glassy Menu Items -->
+<section class="space-y-gutter">
+<!-- Personal Info -->
+<div class="glass-card rounded-lg p-stack-md flex items-center gap-stack-md cursor-pointer hover:bg-white/90 transition-all duration-300 group">
+<div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">person</span>
+</div>
+<div class="flex-grow">
+<span class="block font-body-lg text-body-lg text-on-surface">Personal Info</span>
+<span class="block font-caption text-caption text-on-surface-variant">Update your details and contact information</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">person</span>
+</div>
+<!-- Security -->
+<div class="glass-card rounded-lg p-stack-md flex items-center gap-stack-md cursor-pointer hover:bg-white/90 transition-all duration-300 group">
+<div class="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">shield</span>
+</div>
+<div class="flex-grow">
+<span class="block font-body-lg text-body-lg text-on-surface">Security</span>
+<span class="block font-caption text-caption text-on-surface-variant">Manage passwords and two-factor authentication</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-secondary transition-colors">shield</span>
+</div>
+<!-- Notifications -->
+<div class="glass-card rounded-lg p-stack-md flex items-center gap-stack-md cursor-pointer hover:bg-white/90 transition-all duration-300 group">
+<div class="w-12 h-12 rounded-full bg-tertiary-fixed/30 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined">notifications</span>
+</div>
+<div class="flex-grow">
+<span class="block font-body-lg text-body-lg text-on-surface">Notifications</span>
+<span class="block font-caption text-caption text-on-surface-variant">Configure how you want to be alerted</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-tertiary transition-colors">notifications</span>
+</div>
+<!-- Support -->
+<div class="glass-card rounded-lg p-stack-md flex items-center gap-stack-md cursor-pointer hover:bg-white/90 transition-all duration-300 group">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">help</span>
+</div>
+<div class="flex-grow">
+<span class="block font-body-lg text-body-lg text-on-surface">Support</span>
+<span class="block font-caption text-caption text-on-surface-variant">Get help with your account or the app</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-on-surface transition-colors">help</span>
+</div>
+<!-- Logout Button -->
+<button class="w-full mt-stack-lg py-4 px-6 rounded-full border border-error/20 bg-error/5 text-error font-h2 text-h2 hover:bg-error hover:text-white transition-all duration-300 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">logout</span>
+                Logout
+            </button>
+</section>
+<!-- Stats Grid (Bento Style) -->
+<section class="mt-10 grid grid-cols-2 gap-stack-md">
+<div class="glass-card rounded-lg p-stack-md flex flex-col justify-between aspect-square">
+<span class="material-symbols-outlined text-primary text-[32px]">shield_person</span>
+<div>
+<span class="block font-h1 text-h1 text-on-surface">Pro</span>
+<span class="block font-caption text-caption text-on-surface-variant">Account Status</span>
+</div>
+</div>
+<div class="glass-card rounded-lg p-stack-md flex flex-col justify-between aspect-square bg-primary-container/10">
+<span class="material-symbols-outlined text-tertiary text-[32px]">stars</span>
+<div>
+<span class="block font-h1 text-h1 text-on-surface">1.2k</span>
+<span class="block font-caption text-caption text-on-surface-variant">Nexus Points</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[400px] z-50 bg-surface/80 backdrop-blur-[40px] rounded-full border-[0.5px] border-white/30 shadow-2xl">
+<div class="flex justify-around items-center py-2 px-4">
+<!-- Home -->
+<a class="flex items-center justify-center text-on-surface-variant/60 w-12 h-12 hover:scale-110 transition-transform active:scale-90 duration-150 ease-out" href="#">
+<span class="material-symbols-outlined">home</span>
+</a>
+<!-- Business -->
+<a class="flex items-center justify-center text-on-surface-variant/60 w-12 h-12 hover:scale-110 transition-transform active:scale-90 duration-150 ease-out" href="#">
+<span class="material-symbols-outlined">business_center</span>
+</a>
+<!-- Wallet -->
+<a class="flex items-center justify-center text-on-surface-variant/60 w-12 h-12 hover:scale-110 transition-transform active:scale-90 duration-150 ease-out" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</a>
+<!-- Profile (Active) -->
+<a class="flex items-center justify-center bg-primary text-on-primary rounded-full w-12 h-12 hover:scale-110 transition-transform active:scale-90 duration-150 ease-out shadow-lg shadow-primary/20" href="#">
+<span class="material-symbols-outlined">person</span>
+</a>
+</div>
+</nav>
+<script>
+        // Simple micro-interactions for menu items
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mousedown', () => {
+                card.style.transform = 'scale(0.98)';
+            });
+            card.addEventListener('mouseup', () => {
+                card.style.transform = 'scale(1)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+
+
+</body></html>

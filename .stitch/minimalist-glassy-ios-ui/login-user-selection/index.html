@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Nexus - Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-fixed": "#001a41",
+                    "on-surface": "#1a1b1f",
+                    "surface-variant": "#e3e2e7",
+                    "on-background": "#1a1b1f",
+                    "inverse-on-surface": "#f1f0f5",
+                    "surface-container-lowest": "#ffffff",
+                    "primary": "#0058bc",
+                    "outline-variant": "#c1c6d7",
+                    "inverse-surface": "#2f3034",
+                    "tertiary-fixed": "#e2dfff",
+                    "on-primary-fixed-variant": "#004493",
+                    "on-secondary-fixed-variant": "#00531c",
+                    "surface-container-low": "#f4f3f8",
+                    "tertiary": "#4c4aca",
+                    "on-surface-variant": "#414755",
+                    "surface-dim": "#dad9df",
+                    "on-tertiary-fixed": "#0c006a",
+                    "on-error": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed": "#002107",
+                    "secondary-fixed-dim": "#53e16f",
+                    "secondary-fixed": "#72fe88",
+                    "outline": "#717786",
+                    "surface-bright": "#faf9fe",
+                    "error": "#ba1a1a",
+                    "on-secondary-container": "#00732a",
+                    "on-primary-container": "#fefcff",
+                    "tertiary-fixed-dim": "#c2c1ff",
+                    "tertiary-container": "#6664e4",
+                    "surface": "#faf9fe",
+                    "on-secondary": "#ffffff",
+                    "inverse-primary": "#adc6ff",
+                    "error-container": "#ffdad6",
+                    "surface-tint": "#005bc1",
+                    "on-error-container": "#93000a",
+                    "surface-container-high": "#e9e7ed",
+                    "on-tertiary-container": "#fffbff",
+                    "surface-container-highest": "#e3e2e7",
+                    "on-primary": "#ffffff",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-tertiary-fixed-variant": "#3631b4",
+                    "secondary-container": "#6ffb85",
+                    "secondary": "#006e28",
+                    "primary-container": "#0070eb",
+                    "background": "#faf9fe",
+                    "surface-container": "#eeedf3",
+                    "primary-fixed": "#d8e2ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-desktop": "40px",
+                    "stack-lg": "24px",
+                    "stack-sm": "8px",
+                    "gutter": "16px",
+                    "unit": "4px",
+                    "stack-md": "16px",
+                    "margin-mobile": "20px"
+            },
+            "fontFamily": {
+                    "h1": ["Be Vietnam Pro"],
+                    "caption": ["Be Vietnam Pro"],
+                    "h2": ["Be Vietnam Pro"],
+                    "display-header": ["Be Vietnam Pro"],
+                    "display-header-mobile": ["Be Vietnam Pro"],
+                    "body-std": ["Be Vietnam Pro"],
+                    "body-lg": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "h1": ["24px", {"lineHeight": "30px", "letterSpacing": "-0.3px", "fontWeight": "700"}],
+                    "caption": ["12px", {"lineHeight": "16px", "fontWeight": "300"}],
+                    "h2": ["20px", {"lineHeight": "25px", "letterSpacing": "-0.2px", "fontWeight": "600"}],
+                    "display-header": ["34px", {"lineHeight": "40px", "letterSpacing": "-0.5px", "fontWeight": "900"}],
+                    "display-header-mobile": ["28px", {"lineHeight": "34px", "fontWeight": "900"}],
+                    "body-std": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-lg": ["16px", {"lineHeight": "22px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            overflow: hidden;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 0.5px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+        }
+        .animate-float {
+            animation: float 20s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-40px) rotate(5deg); }
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background min-h-screen flex items-center justify-center p-margin-mobile relative">
+<!-- Ambient Animated Background -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+<div class="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-primary/10 blur-[120px] animate-float"></div>
+<div class="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-tertiary/10 blur-[100px] animate-float" style="animation-delay: -5s;"></div>
+<div class="absolute top-[20%] right-[-5%] w-[30%] h-[30%] rounded-full bg-secondary-container/20 blur-[80px] animate-float" style="animation-delay: -10s;"></div>
+</div>
+<!-- Login Container -->
+<main class="w-full max-w-[420px] z-10">
+<!-- Brand identity (Minimal) -->
+<div class="flex flex-col items-center mb-stack-lg text-center">
+<div class="w-16 h-16 mb-stack-md flex items-center justify-center bg-black rounded-full shadow-lg overflow-hidden">
+<svg class="w-10 h-10 fill-white" viewbox="0 0 100 100">
+<path d="M50 0C22.4 0 0 22.4 0 50s22.4 50 50 50 50-22.4 50-50S77.6 0 50 0zm0 80c-16.6 0-30-13.4-30-30s13.4-30 30-30 30 13.4 30 30-13.4 30-30 30z"></path>
+<path d="M50 35c-8.3 0-15 6.7-15 15s6.7 15 15 15 15-6.7 15-15-6.7-15-15-15z"></path>
+</svg>
+</div>
+<h1 class="font-display-header-mobile text-display-header-mobile text-on-surface tracking-tight font-bold">Log in or sign up</h1>
+</div>
+<!-- Glassmorphic Card -->
+<div class="glass-card rounded-lg p-margin-desktop space-y-stack-lg">
+<form action="#" class="space-y-stack-md" method="POST" onsubmit="event.preventDefault();">
+<!-- Email Field -->
+<div class="space-y-unit">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">mail</span>
+<input class="w-full h-[56px] pl-14 pr-6 bg-black/[0.03] border-none rounded-full font-body-std text-on-surface placeholder:text-outline-variant focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all outline-none" id="email" placeholder="Email Address" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-unit">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">lock</span>
+<input class="w-full h-[56px] pl-14 pr-14 bg-black/[0.03] border-none rounded-full font-body-std text-on-surface placeholder:text-outline-variant focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all outline-none" id="password" placeholder="Password" type="password"/>
+<button class="absolute right-5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+<div class="flex justify-end px-4 mt-1">
+<a class="font-caption text-primary hover:opacity-80 transition-opacity" href="#">Forgot password?</a>
+</div>
+</div>
+<!-- Continue Button -->
+<button class="w-full h-[56px] bg-black text-white rounded-full font-h2 shadow-md hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center mt-stack-lg" type="submit">
+                    Continue
+</button>
+</form>
+<!-- Navigation Links for User Levels -->
+<div class="pt-stack-md">
+<div class="flex flex-col gap-3">
+<button class="w-full h-[48px] flex items-center justify-center rounded-full bg-white/50 border border-outline-variant/30 hover:bg-white/80 transition-colors">
+<span class="font-body-std font-semibold text-on-surface">Employee</span>
+</button>
+<button class="w-full h-[48px] flex items-center justify-center rounded-full bg-white/50 border border-outline-variant/30 hover:bg-white/80 transition-colors">
+<span class="font-body-std font-semibold text-on-surface">Employer</span>
+</button>
+<button class="w-full h-[48px] flex items-center justify-center rounded-full bg-white/50 border border-outline-variant/30 hover:bg-white/80 transition-colors">
+<span class="font-body-std font-semibold text-on-surface">Provider</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<p class="text-center mt-stack-lg font-body-std text-on-surface-variant">
+            New here? 
+            <a class="text-primary font-semibold hover:underline" href="#">Create an account</a>
+</p>
+</main>
+<!-- Micro-interaction Script -->
+<script>
+        // Subtle Mouse parallax for background blurs
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            const blurs = document.querySelectorAll('.animate-float');
+            blurs.forEach((blur, index) => {
+                const speed = (index + 1) * 20;
+                blur.style.transform = `translate(${x * speed}px, ${y * speed}px)`;
+            });
+        });
+
+        // Simple button active state visual feedback
+        const btn = document.querySelector('button[type="submit"]');
+        btn.addEventListener('mousedown', () => btn.classList.add('scale-95'));
+        btn.addEventListener('mouseup', () => btn.classList.remove('scale-95'));
+    </script>
+</body></html>

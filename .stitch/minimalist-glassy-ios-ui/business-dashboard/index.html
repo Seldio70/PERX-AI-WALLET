@@ -1,0 +1,312 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Nexus Insights Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;600;700;900&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 0.5px solid rgba(255, 255, 255, 0.4);
+        }
+        .bg-mesh {
+            background-color: #faf9fe;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(0, 88, 188, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(114, 254, 136, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(76, 74, 202, 0.1) 0px, transparent 50%),
+                radial-gradient(at 0% 100%, rgba(0, 110, 40, 0.1) 0px, transparent 50%);
+        }
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            scroll-behavior: smooth;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-fixed": "#001a41",
+                    "on-surface": "#1a1b1f",
+                    "surface-variant": "#e3e2e7",
+                    "on-background": "#1a1b1f",
+                    "inverse-on-surface": "#f1f0f5",
+                    "surface-container-lowest": "#ffffff",
+                    "primary": "#0058bc",
+                    "outline-variant": "#c1c6d7",
+                    "inverse-surface": "#2f3034",
+                    "tertiary-fixed": "#e2dfff",
+                    "on-primary-fixed-variant": "#004493",
+                    "on-secondary-fixed-variant": "#00531c",
+                    "surface-container-low": "#f4f3f8",
+                    "tertiary": "#4c4aca",
+                    "on-surface-variant": "#414755",
+                    "surface-dim": "#dad9df",
+                    "on-tertiary-fixed": "#0c006a",
+                    "on-error": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed": "#002107",
+                    "secondary-fixed-dim": "#53e16f",
+                    "secondary-fixed": "#72fe88",
+                    "outline": "#717786",
+                    "surface-bright": "#faf9fe",
+                    "error": "#ba1a1a",
+                    "on-secondary-container": "#00732a",
+                    "on-primary-container": "#fefcff",
+                    "tertiary-fixed-dim": "#c2c1ff",
+                    "tertiary-container": "#6664e4",
+                    "surface": "#faf9fe",
+                    "on-secondary": "#ffffff",
+                    "inverse-primary": "#adc6ff",
+                    "error-container": "#ffdad6",
+                    "surface-tint": "#005bc1",
+                    "on-error-container": "#93000a",
+                    "surface-container-high": "#e9e7ed",
+                    "on-tertiary-container": "#fffbff",
+                    "surface-container-highest": "#e3e2e7",
+                    "on-primary": "#ffffff",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-tertiary-fixed-variant": "#3631b4",
+                    "secondary-container": "#6ffb85",
+                    "secondary": "#006e28",
+                    "primary-container": "#0070eb",
+                    "background": "#faf9fe",
+                    "surface-container": "#eeedf3",
+                    "primary-fixed": "#d8e2ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-desktop": "40px",
+                    "stack-lg": "24px",
+                    "stack-sm": "8px",
+                    "gutter": "16px",
+                    "unit": "4px",
+                    "stack-md": "16px",
+                    "margin-mobile": "20px"
+            },
+            "fontFamily": {
+                    "h1": ["Be Vietnam Pro"],
+                    "caption": ["Be Vietnam Pro"],
+                    "h2": ["Be Vietnam Pro"],
+                    "display-header": ["Be Vietnam Pro"],
+                    "display-header-mobile": ["Be Vietnam Pro"],
+                    "body-std": ["Be Vietnam Pro"],
+                    "body-lg": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "h1": ["24px", {"lineHeight": "30px", "letterSpacing": "-0.3px", "fontWeight": "700"}],
+                    "caption": ["12px", {"lineHeight": "16px", "fontWeight": "300"}],
+                    "h2": ["20px", {"lineHeight": "25px", "letterSpacing": "-0.2px", "fontWeight": "600"}],
+                    "display-header": ["34px", {"lineHeight": "40px", "letterSpacing": "-0.5px", "fontWeight": "900"}],
+                    "display-header-mobile": ["28px", {"lineHeight": "34px", "fontWeight": "900"}],
+                    "body-std": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-lg": ["16px", {"lineHeight": "22px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-mesh min-h-screen text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/70 backdrop-blur-[30px] border-b-[0.5px] border-white/20 shadow-sm">
+<div class="flex justify-between items-center px-margin-mobile h-[64px] max-w-7xl mx-auto">
+<button class="hover:opacity-80 transition-opacity active:scale-95 duration-200">
+<span class="material-symbols-outlined text-primary text-2xl">grid_view</span>
+</button>
+<h1 class="font-display-header-mobile text-display-header-mobile font-black text-on-surface">Nexus</h1>
+<div class="w-10 h-10 rounded-full overflow-hidden border border-white/40 shadow-sm cursor-pointer hover:opacity-80 transition-opacity">
+<img class="w-full h-full object-cover" data-alt="A professional studio headshot of a creative entrepreneur in a brightly lit, modern architectural office. The lighting is soft and airy, creating a high-end light-mode aesthetic. The color palette is composed of soft whites, cool blues, and natural skin tones. The subject has a confident, welcoming expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFAUdfoUYJpaHJ0xv4ODA2UOB_y8_8itUmwbERdH2KnnAD0Ib3c8ZAWb-6MHINgqCrJiiIsxUluuvggT8vIuil6rXNRCKGnLpkfWO-u1jcQpqj-1CDhBtYnFtYMVHQXbLn0oSSCbxy9FAgVmTPLD_kA5ibLYPBdyrZetkoW9i_MXlPYWVbOEjyhbZM8rvaqoLnhmMzbgi9epWwt4bZBd9_BjruCTuW2h5Uz_a9TBtJEoYa4arrUmy-cQN8VzNfupcQ0ZfJgPVEhO4">
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-margin-mobile max-w-7xl mx-auto space-y-stack-lg">
+<!-- Hero Section -->
+<section class="animate-in fade-in slide-in-from-bottom-4 duration-700">
+<h2 class="font-display-header text-display-header text-on-surface tracking-tighter">Insights</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-lg mt-2">
+                Your business ecosystem at a glance. Performance is up 12% this quarter.
+            </p>
+</section>
+<!-- Metrics Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Revenue Card -->
+<div class="glass-card p-6 rounded-lg shadow-[0_8px_32px_0_rgba(0,0,0,0.05)] flex flex-col justify-between h-48 transition-transform hover:scale-[1.02] duration-300">
+<div>
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: &quot;FILL&quot; 0;">payments</span>
+<h3 class="font-h2 text-h2 mt-2">Revenue</h3>
+</div>
+<div class="flex items-end justify-between">
+<span class="font-display-header-mobile text-display-header-mobile text-primary">$42,900</span>
+<span class="text-secondary font-bold flex items-center gap-1 text-sm bg-secondary-container/30 px-2 py-1 rounded-full">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: &quot;FILL&quot; 0;">trending_up</span>
+                        +8.2%
+                    </span>
+</div>
+</div>
+<!-- Customers Card -->
+<div class="glass-card p-6 rounded-lg shadow-[0_8px_32px_0_rgba(0,0,0,0.05)] flex flex-col justify-between h-48 transition-transform hover:scale-[1.02] duration-300">
+<div>
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: &quot;FILL&quot; 0;">groups</span>
+<h3 class="font-h2 text-h2 mt-2">Customers</h3>
+</div>
+<div class="flex items-end justify-between">
+<span class="font-display-header-mobile text-display-header-mobile text-tertiary">1,284</span>
+<span class="text-secondary font-bold flex items-center gap-1 text-sm bg-secondary-container/30 px-2 py-1 rounded-full">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: &quot;FILL&quot; 0;">trending_up</span>
+                        +4.1%
+                    </span>
+</div>
+</div>
+<!-- Growth Card -->
+<div class="glass-card p-6 rounded-lg shadow-[0_8px_32px_0_rgba(0,0,0,0.05)] flex flex-col justify-between h-48 transition-transform hover:scale-[1.02] duration-300">
+<div>
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: &quot;FILL&quot; 0;">auto_graph</span>
+<h3 class="font-h2 text-h2 mt-2">Growth</h3>
+</div>
+<div class="flex items-end justify-between">
+<span class="font-display-header-mobile text-display-header-mobile text-secondary">24.5%</span>
+<span class="text-secondary font-bold flex items-center gap-1 text-sm bg-secondary-container/30 px-2 py-1 rounded-full">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: &quot;FILL&quot; 0;">trending_up</span>
+                        +12%
+                    </span>
+</div>
+</div>
+</section>
+<!-- Visualization Section -->
+<section class="glass-card rounded-lg p-6 shadow-sm overflow-hidden relative min-h-[300px]">
+<div class="flex justify-between items-start relative z-10">
+<div>
+<h2 class="font-h2 text-h2">Activity Heatmap</h2>
+<p class="font-body-std text-body-std text-on-surface-variant">Global performance metrics across nodes.</p>
+</div>
+<button class="bg-primary text-on-primary px-4 py-2 rounded-full font-body-std hover:opacity-90 transition-opacity">
+                    Export Report
+                </button>
+</div>
+<div class="mt-8 h-48 w-full relative overflow-hidden rounded-md border border-white/20">
+
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="text-center">
+<span class="font-h1 text-h1 text-primary">Live Optimization</span>
+<div class="flex justify-center gap-2 mt-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Transactions List -->
+<section class="space-y-stack-md">
+<div class="flex items-center justify-between">
+<h2 class="font-h2 text-h2 text-on-surface">Recent Transactions</h2>
+<button class="text-primary font-body-std font-semibold hover:underline">View All</button>
+</div>
+<div class="glass-card rounded-lg overflow-hidden border border-white/30">
+<!-- Transaction Item 1 -->
+<div class="flex items-center justify-between p-4 hover:bg-white/40 transition-colors cursor-pointer border-b border-white/20">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">shopping_bag</span>
+</div>
+<div>
+<h3 class="font-h2 text-h2 !text-body-lg">Adobe Systems Inc.</h3>
+<p class="font-body-std text-body-std text-on-surface-variant">Software Subscription • 12:45 PM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h2 text-h2 !text-body-lg text-error">-$249.00</p>
+<p class="font-caption text-caption text-on-surface-variant">Confirmed</p>
+</div>
+</div>
+<!-- Transaction Item 2 -->
+<div class="flex items-center justify-between p-4 hover:bg-white/40 transition-colors cursor-pointer border-b border-white/20">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">credit_card</span>
+</div>
+<div>
+<h3 class="font-h2 text-h2 !text-body-lg">Client Deposit</h3>
+<p class="font-body-std text-body-std text-on-surface-variant">Wire Transfer • 11:20 AM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h2 text-h2 !text-body-lg text-secondary">+$4,200.00</p>
+<p class="font-caption text-caption text-on-surface-variant">Settled</p>
+</div>
+</div>
+<!-- Transaction Item 3 -->
+<div class="flex items-center justify-between p-4 hover:bg-white/40 transition-colors cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-tertiary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary">restaurant</span>
+</div>
+<div>
+<h3 class="font-h2 text-h2 !text-body-lg">The Blue Bottle</h3>
+<p class="font-body-std text-body-std text-on-surface-variant">Business Meal • 09:15 AM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h2 text-h2 !text-body-lg text-error">-$34.50</p>
+<p class="font-caption text-caption text-on-surface-variant">Confirmed</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[400px] z-50 bg-surface/80 backdrop-blur-[40px] rounded-full border-[0.5px] border-white/30 shadow-2xl flex justify-around items-center py-2 px-4">
+<!-- Home (Active) -->
+<a class="flex items-center justify-center bg-primary text-on-primary rounded-full w-12 h-12 hover:scale-110 transition-transform active:scale-90 duration-150 ease-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">home</span>
+</a>
+<!-- Insights -->
+<a class="flex items-center justify-center text-on-surface-variant/60 w-12 h-12 hover:scale-110 transition-transform active:scale-90 duration-150 ease-out" href="#">
+<span class="material-symbols-outlined">work</span>
+</a>
+<!-- Wallet -->
+<a class="flex items-center justify-center text-on-surface-variant/60 w-12 h-12 hover:scale-110 transition-transform active:scale-90 duration-150 ease-out" href="#">
+<span class="material-symbols-outlined">credit_card</span>
+</a>
+<!-- Profile -->
+<a class="flex items-center justify-center text-on-surface-variant/60 w-12 h-12 hover:scale-110 transition-transform active:scale-90 duration-150 ease-out" href="#">
+<span class="material-symbols-outlined">person</span>
+</a>
+</nav>
+<script>
+        // Simple micro-interaction for cards
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mousedown', () => {
+                card.style.transform = 'scale(0.98)';
+            });
+            card.addEventListener('mouseup', () => {
+                card.style.transform = 'scale(1.02)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+
+
+</body></html>
