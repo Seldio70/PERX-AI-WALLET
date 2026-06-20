@@ -1,50 +1,46 @@
-import { Check, CircleDollarSign, Plus, QrCode, Store, UsersRound, WalletCards } from "lucide-react-native";
+import { CircleDollarSign, Plus, QrCode, Store, UsersRound, WalletCards } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { AllocationSlider } from "../components/AllocationSlider";
-import { BottomNav, NavTab } from "../components/BottomNav";
+import { BottomNav, EmployeeTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
 import { MetricPill } from "../components/MetricPill";
 import { Section } from "../components/Section";
 import { WalletCard } from "../components/WalletCard";
-import { createSelectionRequest } from "../lib/perxRepository";
+import { currency, market } from "../lib/format";
+import { createSelectionRequest, PerxLiveData } from "../lib/perxRepository";
 import { styles } from "../styles/appStyles";
 import { colors } from "../theme";
 import { Benefit, BenefitCategory, SelectionRequest, User } from "../types";
-import { allocationCategories, benefitCategoryOptions, currency, market } from "../utils/format";
 
-type EmployeeTab = "home" | "wallet" | "allocate" | "alerts";
+type AppData = PerxLiveData;
 
-const employeeTabs: NavTab<EmployeeTab>[] = [
-  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
-  { id: "wallet", label: "Wallet", icon: "wallet-outline", iconActive: "wallet" },
-  { id: "allocate", label: "Split", icon: "tune-variant", iconActive: "tune" },
-  { id: "alerts", label: "Offers", icon: "tag-outline", iconActive: "tag" }
-];
+const allocationCategories: BenefitCategory[] = ["Food", "Fitness", "Family", "Learning"];
 
-type AppData = {
-  companies: { id: string; name: string; employerId: string; monthlyBudgetPerEmployee: number }[];
-  users: User[];
-  providerProfiles: { id: string; userId: string; businessName: string; logoUrl: string; description: string; category: BenefitCategory; city: string; isApproved: boolean }[];
-  benefits: Benefit[];
-  selectionRequests: SelectionRequest[];
-  [key: string]: unknown;
+const emptyAllocation: Record<BenefitCategory, number> = {
+  Food: 0,
+  Fitness: 0,
+  Family: 0,
+  Learning: 0,
+  Health: 0,
+  Mobility: 0,
+  Wellness: 0
 };
 
 export function EmployeeExperience({
   user,
   appData,
-  onSubmitSelection
+  onSubmitSelection,
+  onOpenProfile
 }: {
   user: User;
   appData: AppData;
   onSubmitSelection: (request: SelectionRequest) => void;
+  onOpenProfile: () => void;
 }) {
   const [tab, setTab] = useState<EmployeeTab>("home");
-  const [spent, setSpent] = useState(0);
-  const [redeemedItems, setRedeemedItems] = useState<Benefit[]>([]);
 
   const company =
     appData.companies.find((item) => item.id === user.companyId) ??
@@ -52,19 +48,13 @@ export function EmployeeExperience({
       id: "",
       name: "No company connected",
       employerId: "",
-      monthlyBudgetPerEmployee: 15000
+      monthlyBudgetPerEmployee: 0
     };
-  const monthlyBudget = (company.monthlyBudgetPerEmployee || 15000) + (user.yearsEmployed ?? 0) * 500;
-  const balance = monthlyBudget - spent;
-
-  const handleRedeem = (request: SelectionRequest) => {
-    const benefits = request.benefitIds
-      .map((id) => appData.benefits.find((b) => b.id === id))
-      .filter((b): b is Benefit => Boolean(b));
-    setSpent((s) => s + request.total);
-    setRedeemedItems((prev) => [...benefits, ...prev]);
-    onSubmitSelection(request);
-  };
+  const monthlyBudget = company.monthlyBudgetPerEmployee + (user.yearsEmployed ?? 0) * 500;
+  const spent = appData.selectionRequests
+    .filter((request) => request.employeeId === user.id)
+    .reduce((sum, request) => sum + request.total, 0);
+  const balance = Math.max(0, monthlyBudget - spent);
 
   return (
     <View style={styles.roleShell}>
@@ -79,20 +69,15 @@ export function EmployeeExperience({
             monthlyBudget={monthlyBudget}
             balance={balance}
             appData={appData}
-            redeemedItems={redeemedItems}
           />
         ) : null}
         {tab === "wallet" ? (
           <EmployeeWallet user={user} companyName={company.name} balance={balance} appData={appData} />
         ) : null}
-        {tab === "allocate" ? (
-          <BudgetAllocation user={user} monthlyBudget={monthlyBudget} spent={spent} appData={appData} />
-        ) : null}
-        {tab === "alerts" ? (
-          <EmployeeOffers user={user} appData={appData} onSubmitSelection={handleRedeem} />
-        ) : null}
+        {tab === "allocate" ? <BudgetAllocation monthlyBudget={monthlyBudget} /> : null}
+        {tab === "alerts" ? <EmployeeOffers user={user} appData={appData} onSubmitSelection={onSubmitSelection} /> : null}
       </ScrollView>
-      <BottomNav tabs={employeeTabs} active={tab} onChange={setTab} />
+      <BottomNav active={tab} onChange={setTab} onProfilePress={onOpenProfile} />
     </View>
   );
 }
@@ -102,15 +87,13 @@ function EmployeeHome({
   companyName,
   monthlyBudget,
   balance,
-  appData,
-  redeemedItems
+  appData
 }: {
   user: User;
   companyName: string;
   monthlyBudget: number;
   balance: number;
   appData: AppData;
-  redeemedItems: Benefit[];
 }) {
   return (
     <>
@@ -137,32 +120,16 @@ function EmployeeHome({
         <MetricPill label="Used" value={currency(monthlyBudget - balance)} />
       </View>
 
-      <Section
-        title="This month"
-        meta={redeemedItems.length ? currency(redeemedItems.reduce((s, b) => s + b.price, 0)) : "No spending"}
-      >
-        {redeemedItems.length ? redeemedItems.map((benefit, i) => (
-          <View key={`${benefit.id}-${i}`} style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <CircleDollarSign size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>{benefit.title}</Text>
-              <Text style={styles.listSub}>{benefit.providerName} · {benefit.category}</Text>
-            </View>
-            <Text style={styles.listAmount}>{currency(benefit.price)}</Text>
+      <Section title="Spending" meta="June">
+        <View style={styles.listRow}>
+          <View style={styles.smallIcon}>
+            <CircleDollarSign size={18} color={colors.text} />
           </View>
-        )) : (
-          <View style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <CircleDollarSign size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>No spending yet</Text>
-              <Text style={styles.listSub}>Redeemed perks will appear here.</Text>
-            </View>
+          <View style={styles.listText}>
+            <Text style={styles.listTitle}>No spending yet</Text>
+            <Text style={styles.listSub}>Approved redemptions will appear after providers and offers are added.</Text>
           </View>
-        )}
+        </View>
       </Section>
     </>
   );
@@ -181,9 +148,9 @@ function EmployeeWallet({
 }) {
   const [activeBenefit, setActiveBenefit] = useState(appData.benefits[0]);
   const [nfcActive, setNfcActive] = useState(false);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(appData.benefits[0]?.id ?? null);
   const walletBenefits = appData.benefits;
   const currentBenefit = activeBenefit ?? walletBenefits[0];
-
   if (!currentBenefit) {
     return (
       <Section title="Wallet" meta="No offers">
@@ -199,24 +166,43 @@ function EmployeeWallet({
       </Section>
     );
   }
-
   const qrValue = `PERX:${user.id}:${currentBenefit.id}:${Date.now().toString().slice(-6)}`;
 
   return (
     <>
-      <Section title="Wallet" meta="Swipe benefits">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={332}>
-          {walletBenefits.map((benefit) => (
-            <Pressable key={benefit.id} onPress={() => setActiveBenefit(benefit)}>
-              <WalletCard user={user} companyName={companyName} balance={balance} benefit={benefit} />
+      <View style={styles.walletHero}>
+        <Text style={styles.greetingText}>My Cards</Text>
+        <Text style={styles.greetingSub}>Manage your digital perks and passes</Text>
+      </View>
+
+      <View style={styles.cardStack}>
+        {walletBenefits.map((benefit, index) => {
+          const expanded = expandedCardId === benefit.id;
+          return (
+            <Pressable
+              key={benefit.id}
+              onPress={() => {
+                setActiveBenefit(benefit);
+                setExpandedCardId(expanded ? null : benefit.id);
+              }}
+              style={[styles.stackItem, !expanded && index > 0 && styles.stackItemCollapsed]}
+            >
+              <WalletCard
+                user={user}
+                companyName={companyName}
+                balance={balance}
+                benefit={benefit}
+                variant={index}
+                compact
+              />
             </Pressable>
-          ))}
-        </ScrollView>
-      </Section>
+          );
+        })}
+      </View>
 
       <GlassPanel style={styles.qrPanel}>
         <View style={styles.qrBox}>
-          <QRCode value={qrValue} size={158} color={colors.background} backgroundColor={colors.text} />
+          <QRCode value={qrValue} size={158} color={colors.text} backgroundColor={colors.surface} />
         </View>
         <View style={styles.qrText}>
           <Text style={styles.cardTitle}>{currentBenefit.title}</Text>
@@ -229,14 +215,12 @@ function EmployeeWallet({
         <View style={styles.nfcCopy}>
           <Text style={styles.cardTitle}>NFC simulation</Text>
           <Text style={styles.bodyText}>
-            {nfcActive
-              ? "Hold near terminal. Awaiting provider confirmation."
-              : "Tap to arm a wallet payment session."}
+            {nfcActive ? "Hold near terminal. Awaiting provider confirmation." : "Tap to arm a wallet payment session."}
           </Text>
         </View>
         <CapsuleButton
           label={nfcActive ? "Armed" : "Tap NFC"}
-          onPress={() => setNfcActive((v) => !v)}
+          onPress={() => setNfcActive((value) => !value)}
           variant={nfcActive ? "soft" : "primary"}
         />
       </GlassPanel>
@@ -244,32 +228,18 @@ function EmployeeWallet({
   );
 }
 
-function BudgetAllocation({
-  user,
-  monthlyBudget,
-  spent,
-  appData
-}: {
-  user: User;
-  monthlyBudget: number;
-  spent: number;
-  appData: AppData;
-}) {
-  const startingValues = useMemo(() => ({
-    Food: 0, Fitness: 0, Family: 0, Learning: 0,
-    Health: 0, Mobility: 0, Wellness: 0
-  } as Record<BenefitCategory, number>), []);
-
-  const [values, setValues] = useState(startingValues);
-  const total = allocationCategories.reduce((sum, cat) => sum + values[cat], 0);
-  const remaining = Math.max(0, monthlyBudget - spent - total);
+function BudgetAllocation({ monthlyBudget }: { monthlyBudget: number }) {
+  const [values, setValues] = useState<Record<BenefitCategory, number>>(emptyAllocation);
+  const total = allocationCategories.reduce((sum, category) => sum + values[category], 0);
+  const remaining = Math.max(0, monthlyBudget - total);
 
   const updateCategory = (category: BenefitCategory, nextValue: number) => {
     const otherTotal = allocationCategories.reduce(
-      (sum, item) => sum + (item === category ? 0 : values[item]), 0
+      (sum, item) => sum + (item === category ? 0 : values[item]),
+      0
     );
-    const available = Math.max(0, monthlyBudget - spent - otherTotal);
-    setValues((current) => ({ ...current, [category]: Math.min(nextValue, available) }));
+    const capped = Math.min(nextValue, Math.max(0, monthlyBudget - otherTotal));
+    setValues((current) => ({ ...current, [category]: capped }));
   };
 
   return (
@@ -277,9 +247,7 @@ function BudgetAllocation({
       <GlassPanel style={styles.allocationSummary}>
         <Text style={styles.cardTitle}>Monthly split</Text>
         <Text style={styles.largeNumber}>{currency(remaining)}</Text>
-        <Text style={styles.bodyText}>
-          left to allocate · {currency(spent)} already spent
-        </Text>
+        <Text style={styles.bodyText}>left unallocated from {currency(monthlyBudget)}</Text>
       </GlassPanel>
 
       <Section title="Allocate" meta="Drag sliders">
@@ -308,56 +276,63 @@ function EmployeeOffers({
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedProviderNames, setSelectedProviderNames] = useState<string[]>([]);
-  const [activeCategory, setActiveCategory] = useState<BenefitCategory | null>(null);
   const [submitted, setSubmitted] = useState(false);
-
   const marketplaceBenefits = appData.benefits;
   const marketplaceProviders = appData.providerProfiles;
-  const visibleBenefits = marketplaceBenefits
-    .filter((b) => !selectedProviderNames.length || selectedProviderNames.includes(b.providerName))
-    .filter((b) => !activeCategory || b.category === activeCategory);
-  const selectedBenefits = marketplaceBenefits.filter((b) => selectedIds.includes(b.id));
-  const selectedTotal = selectedBenefits.reduce((sum, b) => sum + b.price, 0);
-  const selectedPoints = selectedBenefits.reduce((sum, b) => sum + b.pointsPrice, 0);
+  const visibleBenefits = selectedProviderNames.length
+    ? marketplaceBenefits.filter((benefit) => selectedProviderNames.includes(benefit.providerName))
+    : marketplaceBenefits;
+  const selectedBenefits = marketplaceBenefits.filter((benefit) => selectedIds.includes(benefit.id));
+  const selectedTotal = selectedBenefits.reduce((sum, benefit) => sum + benefit.price, 0);
+  const selectedPoints = selectedBenefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
   const selectedByProvider = useMemo(
-    () => selectedBenefits.reduce<Record<string, Benefit[]>>((grouped, b) => {
-      grouped[b.providerName] = [...(grouped[b.providerName] ?? []), b];
-      return grouped;
-    }, {}),
+    () =>
+      selectedBenefits.reduce<Record<string, Benefit[]>>((grouped, benefit) => {
+        grouped[benefit.providerName] = [...(grouped[benefit.providerName] ?? []), benefit];
+        return grouped;
+      }, {}),
     [selectedBenefits]
   );
   const selectedProviderGroups = Object.entries(selectedByProvider);
   const company = appData.companies.find((item) => item.id === user.companyId);
   const connectedEmployerId =
     company?.employerId ||
-    appData.users.find((c) => c.role === "employer" && c.companyId === user.companyId)?.id ||
-    appData.users.find((c) => c.role === "employer")?.id;
+    appData.users.find((candidate) => candidate.role === "employer" && candidate.companyId === user.companyId)?.id ||
+    appData.users.find((candidate) => candidate.role === "employer")?.id;
 
   const toggleBenefit = (benefitId: string) => {
     setSubmitted(false);
     setSelectedIds((current) =>
-      current.includes(benefitId) ? current.filter((id) => id !== benefitId) : [...current, benefitId]
+      current.includes(benefitId)
+        ? current.filter((id) => id !== benefitId)
+        : [...current, benefitId]
     );
   };
 
   const toggleProvider = (providerName: string) => {
     setSubmitted(false);
     const providerBenefitIds = marketplaceBenefits
-      .filter((b) => b.providerName === providerName)
-      .map((b) => b.id);
+      .filter((benefit) => benefit.providerName === providerName)
+      .map((benefit) => benefit.id);
+
     setSelectedProviderNames((current) => {
       const selected = current.includes(providerName);
-      return selected ? current.filter((n) => n !== providerName) : [...current, providerName];
+      return selected ? current.filter((name) => name !== providerName) : [...current, providerName];
     });
+
     setSelectedIds((current) => {
       const selected = selectedProviderNames.includes(providerName);
-      if (selected) return current.filter((id) => !providerBenefitIds.includes(id));
+      if (selected) {
+        return current.filter((id) => !providerBenefitIds.includes(id));
+      }
+
       return Array.from(new Set([...current, ...providerBenefitIds]));
     });
   };
 
   const submitSelection = () => {
     if (!selectedIds.length) return;
+
     const localRequest = {
       id: `request_${Date.now()}`,
       employeeId: user.id,
@@ -369,6 +344,7 @@ function EmployeeOffers({
       status: "pending",
       createdAt: new Date().toISOString()
     } satisfies SelectionRequest;
+
     void createSelectionRequest({
       employeeId: user.id,
       employerId: connectedEmployerId,
@@ -376,50 +352,10 @@ function EmployeeOffers({
       benefitIds: selectedIds,
       benefits: selectedBenefits
     });
+
     onSubmitSelection(localRequest);
     setSubmitted(true);
   };
-
-  if (submitted) {
-    return (
-      <>
-        <GlassPanel style={styles.successPanel}>
-          <View style={styles.successIconWrap}>
-            <Check size={30} color={colors.background} />
-          </View>
-          <Text style={styles.heroTitle}>Redeemed!</Text>
-          <Text style={styles.bodyText}>
-            Payment routed to{" "}
-            {Object.keys(
-              selectedBenefits.reduce<Record<string, boolean>>((acc, b) => ({ ...acc, [b.providerName]: true }), {})
-            ).join(", ")}
-            . Show your QR at the venue.
-          </Text>
-          {selectedBenefits.map((b) => (
-            <View key={b.id} style={styles.listRow}>
-              <View style={styles.smallIcon}>
-                <Check size={16} color={colors.text} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>{b.title}</Text>
-                <Text style={styles.listSub}>{b.providerName} · {currency(b.price)}</Text>
-              </View>
-            </View>
-          ))}
-          <CapsuleButton
-            label="Browse more perks"
-            onPress={() => {
-              setSubmitted(false);
-              setSelectedIds([]);
-              setSelectedProviderNames([]);
-              setActiveCategory(null);
-            }}
-            variant="soft"
-          />
-        </GlassPanel>
-      </>
-    );
-  }
 
   return (
     <>
@@ -427,9 +363,9 @@ function EmployeeOffers({
         <View style={styles.packageFooter}>
           <Text style={styles.confidence}>{currency(selectedTotal)}</Text>
           <CapsuleButton
-            label="Redeem package"
+            label={submitted ? "Redeemed" : "Redeem now"}
             onPress={submitSelection}
-            variant="primary"
+            variant={submitted ? "soft" : "primary"}
           />
         </View>
       </GlassPanel>
@@ -438,9 +374,9 @@ function EmployeeOffers({
         <GlassPanel style={styles.packageSummaryPanel} intensity={12}>
           <View style={styles.packageSummaryHeader}>
             <View style={styles.listText}>
-              <Text style={styles.cardTitle}>Your selected package</Text>
+              <Text style={styles.cardTitle}>Ready to redeem</Text>
               <Text style={styles.bodyText}>
-                Grouped by provider. Payment goes directly to each provider on redemption.
+                Grouped by provider so payment routes correctly the moment you redeem.
               </Text>
             </View>
             <View style={styles.selectedBadge}>
@@ -456,10 +392,12 @@ function EmployeeOffers({
                 </View>
                 <View style={styles.listText}>
                   <Text style={styles.listTitle}>{providerName}</Text>
-                  <Text style={styles.listSub}>{providerBenefits.map((b) => b.title).join(", ")}</Text>
+                  <Text style={styles.listSub}>
+                    {providerBenefits.map((benefit) => benefit.title).join(", ")}
+                  </Text>
                 </View>
                 <Text style={styles.listAmount}>
-                  {providerBenefits.reduce((sum, b) => sum + b.pointsPrice, 0)} pts
+                  {providerBenefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0)} pts
                 </Text>
               </View>
             ))
@@ -483,18 +421,6 @@ function EmployeeOffers({
       </Section>
 
       <Section title="Marketplace" meta={market.city}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-          {([null, ...benefitCategoryOptions] as (BenefitCategory | null)[]).map((cat) => (
-            <Pressable key={cat ?? "all"} onPress={() => setActiveCategory(cat)}>
-              <View style={[styles.categoryChip, activeCategory === cat && styles.categoryChipActive, { marginRight: 8 }]}>
-                <Text style={[styles.categoryChipText, activeCategory === cat && styles.categoryChipTextActive]}>
-                  {cat ?? "All"}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {marketplaceProviders.map((provider) => {
             const selected = selectedProviderNames.includes(provider.businessName);
@@ -515,7 +441,10 @@ function EmployeeOffers({
           const selected = selectedIds.includes(benefit.id);
           return (
             <Pressable key={benefit.id} onPress={() => toggleBenefit(benefit.id)}>
-              <GlassPanel style={[styles.offerCard, selected && styles.selectedOfferCard]} intensity={14}>
+              <GlassPanel
+                style={[styles.offerCard, selected && styles.selectedOfferCard]}
+                intensity={14}
+              >
                 <Image source={{ uri: benefit.imageUrl }} style={styles.offerImage} />
                 <View style={styles.offerTop}>
                   <View style={styles.smallIcon}>
@@ -545,15 +474,15 @@ function EmployeeOffers({
         })}
       </Section>
 
-      <Section title="How it works" meta="Live flow">
+      <Section title="How redemption works" meta="Live flow">
         <View style={styles.listRow}>
           <View style={styles.smallIcon}>
             <UsersRound size={18} color={colors.text} />
           </View>
           <View style={styles.listText}>
-            <Text style={styles.listTitle}>Redeem using employer budget</Text>
+            <Text style={styles.listTitle}>Instant routing to each provider</Text>
             <Text style={styles.listSub}>
-              Payment is routed directly to each provider. The employee never receives cash.
+              Tap redeem and the simulated payment is split across providers from your monthly budget. No employer approval step.
             </Text>
           </View>
         </View>

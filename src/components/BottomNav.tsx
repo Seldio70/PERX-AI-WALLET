@@ -10,19 +10,36 @@ export type NavTab<T extends string = string> = {
   iconActive: AppIconName;
 };
 
+export type EmployeeTab = "home" | "wallet" | "allocate" | "alerts";
+
+const defaultEmployeeTabs: Array<NavTab<EmployeeTab>> = [
+  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
+  { id: "wallet", label: "Wallet", icon: "wallet-outline", iconActive: "wallet" },
+  { id: "allocate", label: "Split", icon: "tune-variant", iconActive: "tune" },
+  { id: "alerts", label: "Offers", icon: "tag-outline", iconActive: "tag" }
+];
+
 type Props<T extends string> = {
-  tabs: ReadonlyArray<NavTab<T>>;
+  tabs?: ReadonlyArray<NavTab<T>>;
   active: T;
   onChange: (tab: T) => void;
+  onProfilePress?: () => void;
 };
 
-export function BottomNav<T extends string>({ tabs, active, onChange }: Props<T>) {
+export function BottomNav<T extends string = EmployeeTab>({
+  tabs,
+  active,
+  onChange,
+  onProfilePress
+}: Props<T>) {
+  const navTabs = tabs ?? (defaultEmployeeTabs as unknown as ReadonlyArray<NavTab<T>>);
+
   return (
     <View style={styles.shell}>
       <BlurView intensity={72} tint="light" style={styles.nav}>
         <View style={styles.navOverlay} />
         <View style={styles.navContent}>
-          {tabs.map(({ id, label, icon, iconActive }) => {
+          {navTabs.map(({ id, label, icon, iconActive }) => {
             const selected = active === id;
             return (
               <Pressable
@@ -39,6 +56,11 @@ export function BottomNav<T extends string>({ tabs, active, onChange }: Props<T>
               </Pressable>
             );
           })}
+          {onProfilePress ? (
+            <Pressable onPress={onProfilePress} style={styles.item}>
+              <AppIcon name="account-circle-outline" size={22} color={colors.muted} />
+            </Pressable>
+          ) : null}
         </View>
       </BlurView>
     </View>

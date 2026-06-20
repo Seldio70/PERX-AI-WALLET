@@ -13,14 +13,20 @@ const roleLabels: Record<Role, string> = {
 
 type Props = {
   user: User;
+  onClose?: () => void;
   onLogout: () => void;
 };
 
-export function UserProfileScreen({ user, onLogout }: Props) {
+export function UserProfileScreen({ user, onClose, onLogout }: Props) {
   const memberSince = "2024";
 
   return (
     <>
+      {onClose ? (
+        <View style={styles.closeRow}>
+          <CapsuleButton label="Back to app" onPress={onClose} variant="soft" />
+        </View>
+      ) : null}
       <View style={styles.hero}>
         <View style={styles.avatarRing}>
           <View style={styles.avatar}>
@@ -176,5 +182,8 @@ const styles = StyleSheet.create({
   actions: {
     gap: 10,
     marginTop: 8
+  },
+  closeRow: {
+    marginBottom: 10
   }
 });

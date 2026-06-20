@@ -1,180 +1,670 @@
-import {
-  Check,
-  Dumbbell,
-  GraduationCap,
-  HeartHandshake,
-  HeartPulse,
-  Plane,
-  Plus,
-  ShoppingBag,
-  Sparkles,
-  Store,
-  TrendingUp,
-  UsersRound,
-  Wallet
-} from "lucide-react-native";
-import { LucideIcon } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Activity, BadgeCheck, Building2, Calendar, Camera, Check, ChevronRight, Dumbbell, GraduationCap, HeartPulse, Home, LayoutGrid, MapPin, Pencil, Plane, Plus, Settings, ShieldCheck, ShoppingBag, Sparkles, Store, Tag, Trash2, TrendingUp, UserRound, UsersRound, Wallet, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Image, Pressable, ScrollView, StyleProp, Text, TextInput, View, ViewStyle } from "react-native";
+import { Alert, Animated, Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { AppIcon } from "../components/AppIcon";
 import { BentoMetricCard } from "../components/BentoMetricCard";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
-import { Section } from "../components/Section";
-import { createProviderOffer, upsertProviderProfile } from "../lib/perxRepository";
+import { currency, market } from "../lib/format";
+import { createProviderOffer, PerxLiveData, upsertProviderProfile } from "../lib/perxRepository";
 import { styles } from "../styles/appStyles";
 import { colors } from "../theme";
 import { Benefit, BenefitCategory, OfferDraft, ProviderProfile, SelectionRequest, User } from "../types";
-import { benefitCategoryOptions, currency, market } from "../utils/format";
 
-type AppData = {
-  providerProfiles: ProviderProfile[];
-  benefits: Benefit[];
-  selectionRequests: SelectionRequest[];
-  [key: string]: unknown;
-};
+type AppData = PerxLiveData;
 
-const categoryIcons: Record<BenefitCategory, LucideIcon> = {
+const benefitCategoryOptions: BenefitCategory[] = [
+  "Health",
+  "Food",
+  "Fitness",
+  "Family",
+  "Learning",
+  "Mobility",
+  "Wellness"
+];
+
+const businessCategoryIcons: Record<BenefitCategory, typeof Store> = {
   Food: ShoppingBag,
   Fitness: Dumbbell,
   Health: HeartPulse,
   Learning: GraduationCap,
   Mobility: Plane,
   Wellness: Sparkles,
-  Family: HeartHandshake
+  Family: UsersRound
 };
 
-const categoryAvatarStyle: Record<BenefitCategory, StyleProp<ViewStyle>> = {
-  Food: styles.transactionAvatarTertiary,
-  Fitness: styles.transactionAvatarSecondary,
-  Health: styles.transactionAvatarPrimary,
-  Learning: styles.transactionAvatarPrimary,
-  Mobility: styles.transactionAvatarTertiary,
-  Wellness: styles.transactionAvatarSecondary,
-  Family: styles.transactionAvatarPrimary
+const businessCategoryAvatar: Record<BenefitCategory, { background: string; color: string }> = {
+  Food: { background: "rgba(76,74,202,0.14)", color: colors.tertiary },
+  Fitness: { background: "rgba(0,110,40,0.14)", color: colors.secondary },
+  Health: { background: "rgba(0,88,188,0.14)", color: colors.primary },
+  Learning: { background: "rgba(0,88,188,0.14)", color: colors.primary },
+  Mobility: { background: "rgba(76,74,202,0.14)", color: colors.tertiary },
+  Wellness: { background: "rgba(0,110,40,0.14)", color: colors.secondary },
+  Family: { background: "rgba(0,88,188,0.14)", color: colors.primary }
 };
 
-const categoryAvatarColor: Record<BenefitCategory, string> = {
-  Food: colors.tertiary,
-  Fitness: colors.secondary,
-  Health: colors.primary,
-  Learning: colors.primary,
-  Mobility: colors.tertiary,
-  Wellness: colors.secondary,
-  Family: colors.primary
-};
+async function pickImageFromDevice(): Promise<string | null> {
+  try {
+    if (Platform.OS !== "web") {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Permission needed", "Allow photo access to upload images.");
+        return null;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.85
+    });
+    if (result.canceled || !result.assets?.[0]) return null;
+    return result.assets[0].uri;
+  } catch (error) {
+    Alert.alert("Image picker", "Could not open the picker. Make sure expo-image-picker is installed.");
+    return null;
+  }
+}
+
+type BusinessTab = "home" | "offers" | "profile" | "account";
+
+function BusinessBottomNav({
+  active,
+  onChange,
+  onAddOffer
+}: {
+  active: BusinessTab;
+  onChange: (tab: BusinessTab) => void;
+  onAddOffer: () => void;
+}) {
+  const items: Array<{ key: BusinessTab; Icon: typeof Home; label: string }> = [
+    { key: "home", Icon: Home, label: "Home" },
+    { key: "offers", Icon: LayoutGrid, label: "Offers" },
+    { key: "profile", Icon: Store, label: "Profile" },
+    { key: "account", Icon: Settings, label: "Account" }
+  ];
+  return (
+    <View style={styles.businessNav} pointerEvents="box-none">
+      <View style={styles.businessNavPill}>
+        {items.map(({ key, Icon, label }) => {
+          const isActive = active === key;
+          return (
+            <Pressable
+              key={key}
+              onPress={() => onChange(key)}
+              style={[styles.businessNavItem, isActive && styles.businessNavItemActive]}
+            >
+              <Icon size={20} color={isActive ? colors.onPrimary : colors.muted} />
+              <Text style={[styles.businessNavLabel, isActive && styles.businessNavLabelActive]}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Pressable onPress={onAddOffer} style={styles.businessNavFab}>
+          <Plus size={20} color={colors.onPrimary} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function CategoryGrid({
+  options,
+  value,
+  onChange
+}: {
+  options: readonly BenefitCategory[];
+  value: BenefitCategory;
+  onChange: (next: BenefitCategory) => void;
+}) {
+  return (
+    <View style={styles.categoryGrid}>
+      {options.map((category) => {
+        const selected = value === category;
+        const Icon = businessCategoryIcons[category] ?? Store;
+        const tint = businessCategoryAvatar[category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
+        return (
+          <Pressable
+            key={category}
+            onPress={() => onChange(category)}
+            style={[
+              styles.categoryTile,
+              selected && styles.categoryTileActive,
+              selected && { borderColor: tint.color, backgroundColor: tint.background }
+            ]}
+          >
+            <Icon size={18} color={selected ? tint.color : colors.muted} />
+            <Text
+              style={[
+                styles.categoryTileText,
+                selected && { color: tint.color, fontWeight: "900" }
+              ]}
+            >
+              {category}
+            </Text>
+            {selected ? (
+              <View style={[styles.categoryTileCheck, { backgroundColor: tint.color }]}>
+                <Check size={11} color={colors.onPrimary} />
+              </View>
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+type OfferFormDraft = OfferDraft & { category: BenefitCategory };
+
+function OfferFormModal({
+  visible,
+  initial,
+  defaultCategory,
+  defaultCity,
+  mode,
+  onClose,
+  onSubmit,
+  onDelete
+}: {
+  visible: boolean;
+  initial?: Benefit;
+  defaultCategory: BenefitCategory;
+  defaultCity: string;
+  mode: "create" | "edit";
+  onClose: () => void;
+  onSubmit: (draft: OfferFormDraft) => Promise<void> | void;
+  onDelete?: () => void;
+}) {
+  const [draft, setDraft] = useState<OfferFormDraft>(() => ({
+    title: initial?.title ?? "",
+    description: initial?.description ?? "",
+    discount: initial?.discount ?? "",
+    price: initial ? String(initial.price) : "",
+    pointsPrice: initial ? String(initial.pointsPrice) : "",
+    imageUrl: initial?.imageUrl ?? "",
+    redemptionType: initial?.redemptionType ?? "QR",
+    validUntil: initial?.validUntil ?? "2026-12-31",
+    category: initial?.category ?? defaultCategory
+  }));
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setDraft({
+      title: initial?.title ?? "",
+      description: initial?.description ?? "",
+      discount: initial?.discount ?? "",
+      price: initial ? String(initial.price) : "",
+      pointsPrice: initial ? String(initial.pointsPrice) : "",
+      imageUrl: initial?.imageUrl ?? "",
+      redemptionType: initial?.redemptionType ?? "QR",
+      validUntil: initial?.validUntil ?? "2026-12-31",
+      category: initial?.category ?? defaultCategory
+    });
+  }, [visible, initial, defaultCategory]);
+
+  const handlePickImage = async () => {
+    const uri = await pickImageFromDevice();
+    if (uri) setDraft((current) => ({ ...current, imageUrl: uri }));
+  };
+
+  const handleSubmit = async () => {
+    if (!draft.title.trim()) {
+      Alert.alert("Missing title", "Give the offer a name before publishing.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onSubmit(draft);
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>{mode === "edit" ? "Edit offer" : "New offer"}</Text>
+              <Text style={styles.modalSub}>
+                {mode === "edit" ? "Update the details and republish." : "Fill in the basics, add a photo, and publish."}
+              </Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.modalClose}>
+              <X size={18} color={colors.text} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <Pressable onPress={handlePickImage} style={styles.imagePicker}>
+              {draft.imageUrl ? (
+                <Image source={{ uri: draft.imageUrl }} style={styles.imagePickerPreview} />
+              ) : (
+                <View style={styles.imagePickerPlaceholder}>
+                  <Camera size={26} color={colors.muted} />
+                  <Text style={styles.imagePickerLabel}>Tap to upload from your device</Text>
+                  <Text style={styles.imagePickerHint}>JPG or PNG, 4:3 looks best</Text>
+                </View>
+              )}
+              {draft.imageUrl ? (
+                <View style={styles.imagePickerOverlay}>
+                  <Camera size={16} color={colors.onPrimary} />
+                  <Text style={styles.imagePickerOverlayText}>Replace</Text>
+                </View>
+              ) : null}
+            </Pressable>
+
+            <Text style={styles.modalFieldLabel}>Title</Text>
+            <TextInput
+              value={draft.title}
+              onChangeText={(title) => setDraft((c) => ({ ...c, title }))}
+              placeholder="e.g. Monthly gym membership"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+            />
+
+            <Text style={styles.modalFieldLabel}>Discount</Text>
+            <TextInput
+              value={draft.discount}
+              onChangeText={(discount) => setDraft((c) => ({ ...c, discount }))}
+              placeholder="e.g. 20% off, 1 month free"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+            />
+
+            <View style={styles.modalRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalFieldLabel}>Price ({market.currency})</Text>
+                <TextInput
+                  value={draft.price}
+                  onChangeText={(price) => setDraft((c) => ({ ...c, price }))}
+                  placeholder="1200"
+                  placeholderTextColor={colors.muted}
+                  style={styles.input}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalFieldLabel}>Employer points</Text>
+                <TextInput
+                  value={draft.pointsPrice}
+                  onChangeText={(pointsPrice) => setDraft((c) => ({ ...c, pointsPrice }))}
+                  placeholder="140"
+                  placeholderTextColor={colors.muted}
+                  style={styles.input}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            <Text style={styles.modalFieldLabel}>Category</Text>
+            <CategoryGrid
+              options={benefitCategoryOptions}
+              value={draft.category}
+              onChange={(category) => setDraft((c) => ({ ...c, category }))}
+            />
+
+            <Text style={styles.modalFieldLabel}>Description</Text>
+            <TextInput
+              value={draft.description}
+              onChangeText={(description) => setDraft((c) => ({ ...c, description }))}
+              placeholder="What does this perk include?"
+              placeholderTextColor={colors.muted}
+              style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+              multiline
+            />
+
+            <Text style={styles.modalFieldLabel}>Redemption</Text>
+            <View style={styles.segmented}>
+              {(["QR", "NFC"] as const).map((type) => (
+                <Pressable
+                  key={type}
+                  onPress={() => setDraft((c) => ({ ...c, redemptionType: type }))}
+                  style={[styles.segment, draft.redemptionType === type && styles.segmentActive]}
+                >
+                  <Text style={[styles.segmentText, draft.redemptionType === type && styles.segmentTextActive]}>
+                    {type}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.modalFieldLabel}>Valid until</Text>
+            <TextInput
+              value={draft.validUntil}
+              onChangeText={(validUntil) => setDraft((c) => ({ ...c, validUntil }))}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+            />
+
+            <View style={{ height: 8 }} />
+            <CapsuleButton
+              label={submitting ? "Publishing..." : mode === "edit" ? "Save changes" : "Publish offer"}
+              onPress={() => void handleSubmit()}
+              icon={<Plus size={16} color={colors.onPrimary} />}
+            />
+            {mode === "edit" && onDelete ? (
+              <Pressable onPress={onDelete} style={styles.dangerButton}>
+                <Trash2 size={16} color={colors.error} />
+                <Text style={styles.dangerButtonText}>Archive offer</Text>
+              </Pressable>
+            ) : null}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function OfferDetailModal({
+  visible,
+  offer,
+  stats,
+  onClose,
+  onEdit,
+  onArchive
+}: {
+  visible: boolean;
+  offer: Benefit | null;
+  stats: { redemptions: number; revenue: number };
+  onClose: () => void;
+  onEdit: () => void;
+  onArchive: () => void;
+}) {
+  if (!offer) return null;
+  const Icon = businessCategoryIcons[offer.category] ?? Store;
+  const tint = businessCategoryAvatar[offer.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>{offer.title}</Text>
+              <Text style={styles.modalSub}>{offer.providerName} · {offer.category}</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.modalClose}>
+              <X size={18} color={colors.text} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <Image source={{ uri: offer.imageUrl }} style={styles.detailHeroImage} />
+
+            <View style={styles.detailMetaRow}>
+              <View style={[styles.detailCategoryBadge, { backgroundColor: tint.background }]}>
+                <Icon size={16} color={tint.color} />
+                <Text style={[styles.detailCategoryText, { color: tint.color }]}>{offer.category}</Text>
+              </View>
+              <View style={styles.detailMetaPill}>
+                <Tag size={14} color={colors.muted} />
+                <Text style={styles.detailMetaText}>{offer.discount}</Text>
+              </View>
+              <View style={styles.detailMetaPill}>
+                <Calendar size={14} color={colors.muted} />
+                <Text style={styles.detailMetaText}>{offer.validUntil}</Text>
+              </View>
+              <View style={styles.detailMetaPill}>
+                <MapPin size={14} color={colors.muted} />
+                <Text style={styles.detailMetaText}>{offer.city}</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailStatsRow}>
+              <GlassPanel style={styles.detailStatCard} intensity={28}>
+                <Text style={styles.detailStatLabel}>Price</Text>
+                <Text style={styles.detailStatValue}>{currency(offer.price)}</Text>
+              </GlassPanel>
+              <GlassPanel style={styles.detailStatCard} intensity={28}>
+                <Text style={styles.detailStatLabel}>Employer pts</Text>
+                <Text style={styles.detailStatValue}>{offer.pointsPrice.toLocaleString(market.locale)}</Text>
+              </GlassPanel>
+              <GlassPanel style={styles.detailStatCard} intensity={28}>
+                <Text style={styles.detailStatLabel}>Redemptions</Text>
+                <Text style={styles.detailStatValue}>{stats.redemptions}</Text>
+              </GlassPanel>
+            </View>
+
+            <Text style={styles.modalFieldLabel}>Description</Text>
+            <Text style={styles.detailBody}>{offer.description}</Text>
+
+            <View style={styles.detailKeyValueRow}>
+              <Text style={styles.detailKeyLabel}>Redemption method</Text>
+              <Text style={styles.detailKeyValue}>{offer.redemptionType}</Text>
+            </View>
+            <View style={styles.detailKeyValueRow}>
+              <Text style={styles.detailKeyLabel}>Total revenue</Text>
+              <Text style={styles.detailKeyValue}>{currency(stats.revenue)}</Text>
+            </View>
+            <View style={styles.detailKeyValueRow}>
+              <Text style={styles.detailKeyLabel}>Offer ID</Text>
+              <Text style={styles.detailKeyValueMono}>{offer.id.slice(0, 14)}…</Text>
+            </View>
+
+            <View style={{ height: 16 }} />
+            <CapsuleButton
+              label="Edit offer"
+              onPress={onEdit}
+              icon={<Pencil size={16} color={colors.onPrimary} />}
+            />
+            <Pressable onPress={onArchive} style={styles.dangerButton}>
+              <Trash2 size={16} color={colors.error} />
+              <Text style={styles.dangerButtonText}>Archive offer</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function TransactionDetailModal({
+  visible,
+  data,
+  onClose
+}: {
+  visible: boolean;
+  data: { request: SelectionRequest; benefit: Benefit } | null;
+  onClose: () => void;
+}) {
+  if (!data) return null;
+  const { request, benefit } = data;
+  const Icon = businessCategoryIcons[benefit.category] ?? Store;
+  const tint = businessCategoryAvatar[benefit.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
+  const created = new Date(request.createdAt);
+  const formattedDate = created.toLocaleString(market.locale, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>Transaction</Text>
+              <Text style={styles.modalSub}>{formattedDate}</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.modalClose}>
+              <X size={18} color={colors.text} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.txDetailHero}>
+              <View style={[styles.txDetailIcon, { backgroundColor: tint.background }]}>
+                <Icon size={26} color={tint.color} />
+              </View>
+              <Text style={styles.txDetailAmount}>+{currency(benefit.price)}</Text>
+              <View style={styles.txDetailBadge}>
+                <BadgeCheck size={14} color={colors.secondary} />
+                <Text style={styles.txDetailBadgeText}>Settled</Text>
+              </View>
+            </View>
+
+            <GlassPanel style={styles.txDetailCard} intensity={32}>
+              <View style={styles.detailKeyValueRow}>
+                <Text style={styles.detailKeyLabel}>Customer</Text>
+                <Text style={styles.detailKeyValue}>{request.employeeName}</Text>
+              </View>
+              <View style={styles.detailKeyValueRow}>
+                <Text style={styles.detailKeyLabel}>Offer</Text>
+                <Text style={styles.detailKeyValue}>{benefit.title}</Text>
+              </View>
+              <View style={styles.detailKeyValueRow}>
+                <Text style={styles.detailKeyLabel}>Category</Text>
+                <Text style={styles.detailKeyValue}>{benefit.category}</Text>
+              </View>
+              <View style={styles.detailKeyValueRow}>
+                <Text style={styles.detailKeyLabel}>Points charged</Text>
+                <Text style={styles.detailKeyValue}>
+                  {benefit.pointsPrice.toLocaleString(market.locale)}
+                </Text>
+              </View>
+              <View style={styles.detailKeyValueRow}>
+                <Text style={styles.detailKeyLabel}>Routed to</Text>
+                <Text style={styles.detailKeyValue}>{benefit.providerName}</Text>
+              </View>
+              <View style={styles.detailKeyValueRow}>
+                <Text style={styles.detailKeyLabel}>Transaction ID</Text>
+                <Text style={styles.detailKeyValueMono}>{request.id.slice(0, 18)}…</Text>
+              </View>
+            </GlassPanel>
+
+            <View style={{ height: 16 }} />
+            <CapsuleButton label="Download receipt" onPress={() => Alert.alert("Receipt", "Receipt export is coming soon.")} />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 function PulseDot({ delay = 0 }: { delay?: number }) {
   const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
-    const loop = Animated.loop(
+    opacity.setValue(0.3);
+    const animation = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, delay, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.25, duration: 700, useNativeDriver: true })
-      ])
+        Animated.delay(delay),
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: false }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 700, useNativeDriver: false })
+      ]),
+      { resetBeforeIteration: true }
     );
-    loop.start();
-    return () => loop.stop();
+    animation.start();
+    return () => {
+      animation.stop();
+      opacity.setValue(0.3);
+    };
   }, [delay, opacity]);
 
   return <Animated.View style={[styles.activityPulseDot, { opacity }]} />;
 }
-
-type TransactionRow = {
-  id: string;
-  title: string;
-  meta: string;
-  amount: number;
-  status: string;
-  category: BenefitCategory;
-  inflow: boolean;
-};
 
 export function BusinessExperience({
   user,
   appData,
   selectionRequests,
   onUpdateProviderProfile,
-  onAddOffer
+  onAddOffer,
+  onOpenProfile
 }: {
   user: User;
   appData: AppData;
   selectionRequests: SelectionRequest[];
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
   onAddOffer: (offer: Benefit) => void;
+  onOpenProfile: () => void;
 }) {
   const existingProfile =
-    appData.providerProfiles.find((p) => p.userId === user.id) ??
-    appData.providerProfiles.find((p) => p.businessName === user.name);
+    appData.providerProfiles.find((profile) => profile.userId === user.id) ??
+    appData.providerProfiles.find((profile) => profile.businessName === user.name);
+
+  const [tab, setTab] = useState<BusinessTab>("home");
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [offerFormOpen, setOfferFormOpen] = useState(false);
+  const [editingOffer, setEditingOffer] = useState<Benefit | null>(null);
+  const [detailOffer, setDetailOffer] = useState<Benefit | null>(null);
+  const [detailTransaction, setDetailTransaction] = useState<{ request: SelectionRequest; benefit: Benefit } | null>(null);
 
   const [profileDraft, setProfileDraft] = useState({
     businessName: existingProfile?.businessName ?? user.name,
     description: existingProfile?.description ?? "Local partner offering employee perks.",
-    category: existingProfile?.category ?? "Wellness",
+    category: (existingProfile?.category ?? "Wellness") as BenefitCategory,
     logoUrl:
       existingProfile?.logoUrl ??
       "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=300&q=80",
     city: existingProfile?.city ?? market.city
   });
 
+  useEffect(() => {
+    if (!existingProfile) return;
+    setProfileDraft({
+      businessName: existingProfile.businessName,
+      description: existingProfile.description,
+      category: existingProfile.category,
+      logoUrl: existingProfile.logoUrl,
+      city: existingProfile.city
+    });
+  }, [existingProfile]);
+
   const [offers, setOffers] = useState<Benefit[]>(
     appData.benefits.filter((item) => item.businessId === (user.businessId ?? user.id))
+  );
+  const allBenefits = useMemo(
+    () => [...appData.benefits.filter((item) => !offers.some((offer) => offer.id === item.id)), ...offers],
+    [appData.benefits, offers]
   );
 
   useEffect(() => {
     setOffers(appData.benefits.filter((item) => item.businessId === (user.businessId ?? user.id)));
   }, [appData.benefits, user.businessId, user.id]);
 
-  const [draft, setDraft] = useState<OfferDraft>({
-    title: "", description: "", discount: "", price: "",
-    pointsPrice: "", imageUrl: "", redemptionType: "QR", validUntil: "2026-12-31"
-  });
-
-  const allBenefits = useMemo(() => ([
-    ...appData.benefits.filter((item) => !offers.some((o) => o.id === item.id)),
-    ...offers
-  ]), [appData.benefits, offers]);
-
-  const routedPayments = useMemo(() => selectionRequests.flatMap((request) =>
-    request.benefitIds
-      .map((id) => allBenefits.find((b) => b.id === id))
-      .filter((b): b is Benefit => Boolean(b))
-      .filter((b) => b.businessId === user.businessId)
-      .map((b) => ({ request, benefit: b }))
-  ), [selectionRequests, allBenefits, user.businessId]);
-
+  const routedPayments = useMemo(
+    () =>
+      selectionRequests.flatMap((request) =>
+        request.benefitIds
+          .map((benefitId) => allBenefits.find((benefit) => benefit.id === benefitId))
+          .filter((benefit): benefit is Benefit => Boolean(benefit))
+          .filter((benefit) => benefit.businessId === user.businessId)
+          .map((benefit) => ({ request, benefit }))
+      ),
+    [selectionRequests, allBenefits, user.businessId]
+  );
   const payoutTotal = routedPayments.reduce((sum, { benefit }) => sum + benefit.price, 0);
   const reachedEmployees = new Set(routedPayments.map(({ request }) => request.employeeId)).size;
-  const growthSignal = routedPayments.length > 0
-    ? `+${Math.min(48, routedPayments.length * 8)}%`
-    : "+0%";
 
-  const transactions: TransactionRow[] = useMemo(() => (
-    routedPayments
-      .slice(0, 6)
-      .map(({ request, benefit }) => ({
-        id: `${request.id}-${benefit.id}`,
-        title: benefit.title,
-        meta: `${request.employeeName.split(" ")[0]} • Paid out`,
-        amount: benefit.price,
-        status: "Settled",
-        category: benefit.category,
-        inflow: true
-      }))
-  ), [routedPayments]);
+  const statsForOffer = (offerId: string) => {
+    const matches = routedPayments.filter(({ benefit }) => benefit.id === offerId);
+    return {
+      redemptions: matches.length,
+      revenue: matches.reduce((sum, { benefit }) => sum + benefit.price, 0)
+    };
+  };
 
-  const saveProviderProfile = async () => {
+  const saveProviderProfile = async (next: typeof profileDraft) => {
     const localProfile: ProviderProfile = {
       id: existingProfile?.id ?? `provider_${Date.now()}`,
       userId: user.id,
-      businessName: profileDraft.businessName.trim() || user.name,
-      logoUrl: profileDraft.logoUrl.trim(),
-      description: profileDraft.description.trim(),
-      category: profileDraft.category as BenefitCategory,
-      city: profileDraft.city.trim() || market.city,
+      businessName: next.businessName.trim() || user.name,
+      logoUrl: next.logoUrl.trim(),
+      description: next.description.trim(),
+      category: next.category,
+      city: next.city.trim() || market.city,
       isApproved: true
     };
-    const saved = await upsertProviderProfile({
+
+    setProfileDraft(next);
+
+    const savedProfile = await upsertProviderProfile({
       providerUserId: user.id,
       businessName: localProfile.businessName,
       logoUrl: localProfile.logoUrl,
@@ -182,11 +672,30 @@ export function BusinessExperience({
       category: localProfile.category,
       city: localProfile.city
     });
-    onUpdateProviderProfile(saved ?? localProfile);
+
+    onUpdateProviderProfile(savedProfile ?? localProfile);
   };
 
-  const addOffer = async () => {
-    if (!draft.title.trim()) return;
+  const handleOfferSubmit = async (draft: OfferFormDraft) => {
+    if (editingOffer) {
+      const updated: Benefit = {
+        ...editingOffer,
+        title: draft.title,
+        description: draft.description || editingOffer.description,
+        discount: draft.discount || editingOffer.discount,
+        price: Number(draft.price) || editingOffer.price,
+        pointsPrice: Number(draft.pointsPrice) || editingOffer.pointsPrice,
+        imageUrl: draft.imageUrl || editingOffer.imageUrl,
+        redemptionType: draft.redemptionType,
+        category: draft.category,
+        validUntil: draft.validUntil
+      };
+      onAddOffer(updated);
+      setOffers((current) => current.map((o) => (o.id === updated.id ? updated : o)));
+      setEditingOffer(null);
+      return;
+    }
+
     const nextOffer: Benefit = {
       id: `benefit_${Date.now()}`,
       businessId: user.businessId ?? user.id,
@@ -201,11 +710,12 @@ export function BusinessExperience({
         draft.imageUrl ||
         "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80",
       redemptionType: draft.redemptionType,
-      category: profileDraft.category as BenefitCategory,
+      category: draft.category,
       validUntil: draft.validUntil,
       city: profileDraft.city.trim() || market.city
     };
-    const saved = await createProviderOffer({
+
+    const savedOffer = await createProviderOffer({
       providerUserId: user.id,
       providerName: nextOffer.providerName,
       title: nextOffer.title,
@@ -218,27 +728,173 @@ export function BusinessExperience({
       category: nextOffer.category,
       city: nextOffer.city
     });
-    onAddOffer(saved ?? nextOffer);
-    setOffers((current) => [saved ?? nextOffer, ...current]);
-    setDraft({ title: "", description: "", discount: "", price: "", pointsPrice: "", imageUrl: "", redemptionType: "QR", validUntil: "2026-12-31" });
+
+    onAddOffer(savedOffer ?? nextOffer);
+    setOffers((current) => [savedOffer ?? nextOffer, ...current]);
   };
 
-  const tagline = routedPayments.length > 0
-    ? `Your business ecosystem at a glance. ${reachedEmployees} ${reachedEmployees === 1 ? "person" : "people"} reached this period.`
-    : "Your business ecosystem at a glance. Publish your first offer to start tracking redemptions.";
+  const handleArchiveOffer = (offer: Benefit) => {
+    Alert.alert("Archive offer", `Hide "${offer.title}" from the marketplace?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Archive",
+        style: "destructive",
+        onPress: () => {
+          setOffers((current) => current.filter((o) => o.id !== offer.id));
+          setDetailOffer(null);
+          setEditingOffer(null);
+          setOfferFormOpen(false);
+        }
+      }
+    ]);
+  };
+
+  const handleOpenAdd = () => {
+    setEditingOffer(null);
+    setOfferFormOpen(true);
+  };
+
+  const handleOpenEditFromDetail = () => {
+    if (!detailOffer) return;
+    setEditingOffer(detailOffer);
+    setDetailOffer(null);
+    setOfferFormOpen(true);
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.insightsHero}>
-        <Text style={styles.insightsTitle}>Insights</Text>
-        <Text style={styles.insightsTagline}>{tagline}</Text>
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={[styles.screenContent, styles.businessContent]}
+        showsVerticalScrollIndicator={false}
+      >
+        {tab === "home" ? (
+          <BusinessHomeTab
+            profileDraft={profileDraft}
+            payoutTotal={payoutTotal}
+            reachedEmployees={reachedEmployees}
+            routedPayments={routedPayments}
+            onOpenProfile={onOpenProfile}
+            onSelectTransaction={(item) => setDetailTransaction(item)}
+            onSeeAllTransactions={() => setTab("offers")}
+          />
+        ) : null}
+
+        {tab === "offers" ? (
+          <BusinessOffersTab
+            offers={offers}
+            statsForOffer={statsForOffer}
+            onAdd={handleOpenAdd}
+            onSelect={(offer) => setDetailOffer(offer)}
+          />
+        ) : null}
+
+        {tab === "profile" ? (
+          <BusinessProfileTab
+            user={user}
+            profile={profileDraft}
+            offerCount={offers.length}
+            customerCount={reachedEmployees}
+            payoutTotal={payoutTotal}
+            onEdit={() => setProfileEditOpen(true)}
+          />
+        ) : null}
+
+        {tab === "account" ? (
+          <BusinessAccountTab
+            user={user}
+            profile={profileDraft}
+            onOpenProfile={onOpenProfile}
+          />
+        ) : null}
+      </ScrollView>
+
+      <BusinessBottomNav active={tab} onChange={setTab} onAddOffer={handleOpenAdd} />
+
+      <OfferFormModal
+        visible={offerFormOpen}
+        initial={editingOffer ?? undefined}
+        mode={editingOffer ? "edit" : "create"}
+        defaultCategory={profileDraft.category}
+        defaultCity={profileDraft.city}
+        onClose={() => {
+          setOfferFormOpen(false);
+          setEditingOffer(null);
+        }}
+        onSubmit={handleOfferSubmit}
+        onDelete={editingOffer ? () => handleArchiveOffer(editingOffer) : undefined}
+      />
+
+      <OfferDetailModal
+        visible={!!detailOffer}
+        offer={detailOffer}
+        stats={detailOffer ? statsForOffer(detailOffer.id) : { redemptions: 0, revenue: 0 }}
+        onClose={() => setDetailOffer(null)}
+        onEdit={handleOpenEditFromDetail}
+        onArchive={() => detailOffer && handleArchiveOffer(detailOffer)}
+      />
+
+      <TransactionDetailModal
+        visible={!!detailTransaction}
+        data={detailTransaction}
+        onClose={() => setDetailTransaction(null)}
+      />
+
+      <ProfileEditModal
+        visible={profileEditOpen}
+        initial={profileDraft}
+        onClose={() => setProfileEditOpen(false)}
+        onSubmit={async (next) => {
+          await saveProviderProfile(next);
+        }}
+      />
+    </View>
+  );
+}
+
+function BusinessHomeTab({
+  profileDraft,
+  payoutTotal,
+  reachedEmployees,
+  routedPayments,
+  onOpenProfile,
+  onSelectTransaction,
+  onSeeAllTransactions
+}: {
+  profileDraft: { businessName: string };
+  payoutTotal: number;
+  reachedEmployees: number;
+  routedPayments: Array<{ request: SelectionRequest; benefit: Benefit }>;
+  onOpenProfile: () => void;
+  onSelectTransaction: (data: { request: SelectionRequest; benefit: Benefit }) => void;
+  onSeeAllTransactions: () => void;
+}) {
+  const heroTagline = routedPayments.length > 0
+    ? `Your business ecosystem at a glance. ${reachedEmployees} ${reachedEmployees === 1 ? "person" : "people"} reached this period.`
+    : `Your business ecosystem at a glance. Publish your first offer to start tracking redemptions, ${profileDraft.businessName.split(" ")[0]}.`;
+
+  const growthTrend = routedPayments.length > 0
+    ? `+${Math.min(48, routedPayments.length * 8)}%`
+    : "+0%";
+
+  const recentTransactions = routedPayments.slice(0, 6);
+
+  return (
+    <>
+      <View style={styles.adminHeader}>
+        <View style={styles.adminHeaderCopy}>
+          <Text style={styles.greetingText}>Insights</Text>
+          <Text style={styles.insightsTagline}>{heroTagline}</Text>
+        </View>
+        <Pressable onPress={onOpenProfile} style={styles.searchPill}>
+          <AppIcon name="magnify" size={18} color={colors.soft} />
+        </Pressable>
       </View>
 
-      <View style={styles.bentoGrid}>
+      <View style={styles.bentoRow}>
         <BentoMetricCard
           title="Revenue"
           value={currency(payoutTotal)}
-          trend={growthSignal}
+          trend={growthTrend}
           accent={colors.primary}
           Icon={Wallet}
         />
@@ -252,20 +908,20 @@ export function BusinessExperience({
         <BentoMetricCard
           title="Growth"
           value={`${Math.min(99, routedPayments.length * 4)}%`}
-          trend={growthSignal}
+          trend={growthTrend}
           accent={colors.secondary}
           Icon={TrendingUp}
         />
       </View>
 
-      <GlassPanel style={styles.activityCard} intensity={36}>
+      <GlassPanel style={styles.activityPanel} intensity={36}>
         <View style={styles.activityHeader}>
-          <View style={styles.activityHeaderText}>
-            <Text style={styles.sectionTitle}>Activity Heatmap</Text>
+          <View>
+            <Text style={styles.cardTitle}>Activity Heatmap</Text>
             <Text style={styles.bodyText}>Live redemption signal across your offers.</Text>
           </View>
-          <Pressable style={styles.exportButton} onPress={() => { /* export hook */ }}>
-            <Text style={styles.exportButtonText}>Export</Text>
+          <Pressable style={styles.exportPill} onPress={() => undefined}>
+            <Text style={styles.exportPillText}>Export</Text>
           </Pressable>
         </View>
         <View style={styles.activityStage}>
@@ -278,136 +934,389 @@ export function BusinessExperience({
         </View>
       </GlassPanel>
 
-      <Section title="Recent Transactions" meta={transactions.length ? `${transactions.length}` : undefined}>
-        <GlassPanel style={styles.transactionList} intensity={32}>
-          {transactions.length ? transactions.map((row, index) => {
-            const Icon = categoryIcons[row.category] ?? Store;
-            const lastRow = index === transactions.length - 1;
-            return (
-              <View
-                key={row.id}
-                style={[styles.transactionRow, lastRow && styles.transactionRowLast]}
-              >
-                <View style={[styles.transactionAvatar, categoryAvatarStyle[row.category]]}>
-                  <Icon size={20} color={categoryAvatarColor[row.category]} />
-                </View>
-                <View style={styles.transactionBody}>
-                  <Text style={styles.transactionTitle}>{row.title}</Text>
-                  <Text style={styles.transactionMeta}>{row.meta}</Text>
-                </View>
-                <View style={styles.transactionAmounts}>
-                  <Text
-                    style={[
-                      styles.transactionAmount,
-                      row.inflow ? styles.transactionAmountInflow : styles.transactionAmountOutflow
-                    ]}
-                  >
-                    {row.inflow ? "+" : ""}{currency(row.amount)}
-                  </Text>
-                  <Text style={styles.transactionStatus}>{row.status}</Text>
-                </View>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Recent Transactions</Text>
+        {recentTransactions.length ? (
+          <Pressable onPress={onSeeAllTransactions}>
+            <Text style={styles.sectionMeta}>{recentTransactions.length} · See all</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      <GlassPanel style={styles.txList} intensity={32}>
+        {recentTransactions.length ? recentTransactions.map(({ request, benefit }, index) => {
+          const Icon = businessCategoryIcons[benefit.category] ?? Store;
+          const avatar = businessCategoryAvatar[benefit.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
+          const last = index === recentTransactions.length - 1;
+          return (
+            <Pressable
+              key={`${request.id}-${benefit.id}`}
+              onPress={() => onSelectTransaction({ request, benefit })}
+              style={[styles.txRow, last && styles.txRowLast]}
+            >
+              <View style={[styles.txAvatar, { backgroundColor: avatar.background }]}>
+                <Icon size={20} color={avatar.color} />
               </View>
-            );
-          }) : (
-            <View style={styles.transactionEmpty}>
-              <View style={styles.smallIcon}>
-                <Store size={18} color={colors.text} />
+              <View style={styles.txBody}>
+                <Text style={styles.txTitle}>{benefit.title}</Text>
+                <Text style={styles.txMeta}>
+                  {request.employeeName.split(" ")[0]} · Paid out
+                </Text>
               </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>No routed payments yet</Text>
-                <Text style={styles.listSub}>Approved employee packages will appear here.</Text>
+              <View style={styles.txAmounts}>
+                <Text style={styles.txAmount}>+{currency(benefit.price)}</Text>
+                <Text style={styles.txStatus}>Settled</Text>
               </View>
+            </Pressable>
+          );
+        }) : (
+          <View style={styles.txEmpty}>
+            <View style={styles.smallIcon}>
+              <Store size={18} color={colors.text} />
             </View>
-          )}
-        </GlassPanel>
-      </Section>
-
-      <View style={styles.manageDivider} />
-
-      <Section title="Provider profile" meta="Merchant">
-        <GlassPanel style={styles.businessProfile} intensity={34}>
-          <Image source={{ uri: profileDraft.logoUrl }} style={styles.businessLogoImage} />
-          <Text style={styles.greetingText}>{profileDraft.businessName}</Text>
-          <Text style={styles.greetingSub}>{profileDraft.description}</Text>
-        </GlassPanel>
-        <GlassPanel style={styles.formPanel}>
-          <TextInput
-            value={profileDraft.businessName}
-            onChangeText={(businessName) => setProfileDraft((c) => ({ ...c, businessName }))}
-            placeholder="Business name" placeholderTextColor={colors.muted} style={styles.input}
-          />
-          <TextInput
-            value={profileDraft.description}
-            onChangeText={(description) => setProfileDraft((c) => ({ ...c, description }))}
-            placeholder="Description" placeholderTextColor={colors.muted} style={styles.input} multiline
-          />
-          <View style={styles.categoryWrap}>
-            {benefitCategoryOptions.map((category) => {
-              const selected = profileDraft.category === category;
-              return (
-                <Pressable
-                  key={category}
-                  onPress={() => setProfileDraft((c) => ({ ...c, category }))}
-                  style={[styles.categoryChip, selected && styles.categoryChipActive]}
-                >
-                  <Text style={[styles.categoryChipText, selected && styles.categoryChipTextActive]}>
-                    {category}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <TextInput
-            value={profileDraft.logoUrl}
-            onChangeText={(logoUrl) => setProfileDraft((c) => ({ ...c, logoUrl }))}
-            placeholder="Logo image URL" placeholderTextColor={colors.muted} style={styles.input}
-          />
-          <TextInput
-            value={profileDraft.city}
-            onChangeText={(city) => setProfileDraft((c) => ({ ...c, city }))}
-            placeholder="City" placeholderTextColor={colors.muted} style={styles.input}
-          />
-          <CapsuleButton label="Save profile" onPress={() => void saveProviderProfile()} />
-        </GlassPanel>
-      </Section>
-
-      <Section title="Add offer" meta="Provider">
-        <GlassPanel style={styles.formPanel}>
-          <TextInput value={draft.title} onChangeText={(title) => setDraft((c) => ({ ...c, title }))} placeholder="Offer title" placeholderTextColor={colors.muted} style={styles.input} />
-          <TextInput value={draft.discount} onChangeText={(discount) => setDraft((c) => ({ ...c, discount }))} placeholder="Discount value" placeholderTextColor={colors.muted} style={styles.input} />
-          <TextInput value={draft.price} onChangeText={(price) => setDraft((c) => ({ ...c, price }))} placeholder={`Price in ${market.currency}`} placeholderTextColor={colors.muted} style={styles.input} keyboardType="numeric" />
-          <TextInput value={draft.pointsPrice} onChangeText={(pointsPrice) => setDraft((c) => ({ ...c, pointsPrice }))} placeholder="Points price for employer" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numeric" />
-          <TextInput value={draft.imageUrl} onChangeText={(imageUrl) => setDraft((c) => ({ ...c, imageUrl }))} placeholder="Product image URL" placeholderTextColor={colors.muted} style={styles.input} />
-          <TextInput value={draft.description} onChangeText={(description) => setDraft((c) => ({ ...c, description }))} placeholder="Description" placeholderTextColor={colors.muted} style={styles.input} multiline />
-          <View style={styles.segmented}>
-            {(["QR", "NFC"] as const).map((type) => (
-              <Pressable key={type} onPress={() => setDraft((c) => ({ ...c, redemptionType: type }))} style={[styles.segment, draft.redemptionType === type && styles.segmentActive]}>
-                <Text style={[styles.segmentText, draft.redemptionType === type && styles.segmentTextActive]}>{type}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <CapsuleButton label="Publish offer" onPress={() => void addOffer()} icon={<Plus size={16} color={colors.background} />} />
-        </GlassPanel>
-      </Section>
-
-      <Section title="Live offers" meta={`${offers.length}`}>
-        {offers.map((offer) => (
-          <GlassPanel key={offer.id} style={styles.offerCard} intensity={14}>
-            <Image source={{ uri: offer.imageUrl }} style={styles.offerImage} />
-            <View style={styles.offerTop}>
-              <View style={styles.smallIcon}>
-                <Check size={18} color={colors.text} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>{offer.title}</Text>
-                <Text style={styles.listSub}>{offer.discount} · {currency(offer.price)} · {offer.pointsPrice} pts · {offer.redemptionType}</Text>
-              </View>
-              <Text style={styles.listSub}>{offer.validUntil}</Text>
+            <View style={styles.listText}>
+              <Text style={styles.listTitle}>No routed payments yet</Text>
+              <Text style={styles.listSub}>Employee redemptions will land here automatically.</Text>
             </View>
-            <Text style={styles.bodyText}>{offer.description}</Text>
-          </GlassPanel>
-        ))}
-      </Section>
-    </ScrollView>
+          </View>
+        )}
+      </GlassPanel>
+    </>
+  );
+}
+
+function BusinessOffersTab({
+  offers,
+  statsForOffer,
+  onAdd,
+  onSelect
+}: {
+  offers: Benefit[];
+  statsForOffer: (offerId: string) => { redemptions: number; revenue: number };
+  onAdd: () => void;
+  onSelect: (offer: Benefit) => void;
+}) {
+  return (
+    <>
+      <View style={styles.offersHeader}>
+        <View>
+          <Text style={styles.greetingText}>Offers</Text>
+          <Text style={styles.insightsTagline}>
+            {offers.length ? `${offers.length} live offer${offers.length === 1 ? "" : "s"}` : "Publish your first offer to start earning."}
+          </Text>
+        </View>
+        <Pressable style={styles.offersHeaderAction} onPress={onAdd}>
+          <Plus size={16} color={colors.onPrimary} />
+          <Text style={styles.offersHeaderActionText}>New</Text>
+        </Pressable>
+      </View>
+
+      {offers.length ? offers.map((offer) => {
+        const stats = statsForOffer(offer.id);
+        return (
+          <Pressable key={offer.id} onPress={() => onSelect(offer)}>
+            <GlassPanel style={styles.offerListCard} intensity={20}>
+              <Image source={{ uri: offer.imageUrl }} style={styles.offerListThumb} />
+              <View style={styles.offerListBody}>
+                <Text style={styles.offerListTitle}>{offer.title}</Text>
+                <Text style={styles.offerListMeta}>
+                  {offer.discount} · {offer.category}
+                </Text>
+                <View style={styles.offerListSubRow}>
+                  <View style={styles.offerListPriceChip}>
+                    <Text style={styles.offerListPriceText}>{currency(offer.price)}</Text>
+                  </View>
+                  <Text style={styles.offerListMeta}>{stats.redemptions} redemptions</Text>
+                </View>
+              </View>
+              <ChevronRight size={18} color={colors.muted} />
+            </GlassPanel>
+          </Pressable>
+        );
+      }) : (
+        <GlassPanel style={styles.txList} intensity={32}>
+          <View style={styles.txEmpty}>
+            <View style={styles.smallIcon}>
+              <LayoutGrid size={18} color={colors.text} />
+            </View>
+            <View style={styles.listText}>
+              <Text style={styles.listTitle}>No offers yet</Text>
+              <Text style={styles.listSub}>Tap "New" to publish your first offer.</Text>
+            </View>
+          </View>
+        </GlassPanel>
+      )}
+    </>
+  );
+}
+
+function BusinessProfileTab({
+  user,
+  profile,
+  offerCount,
+  customerCount,
+  payoutTotal,
+  onEdit
+}: {
+  user: User;
+  profile: {
+    businessName: string;
+    description: string;
+    category: BenefitCategory;
+    logoUrl: string;
+    city: string;
+  };
+  offerCount: number;
+  customerCount: number;
+  payoutTotal: number;
+  onEdit: () => void;
+}) {
+  const Icon = businessCategoryIcons[profile.category] ?? Store;
+  const tint = businessCategoryAvatar[profile.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
+  return (
+    <>
+      <GlassPanel style={styles.profileHeroCard} intensity={34}>
+        <Pressable style={styles.profileHeroLogoWrap} onPress={onEdit}>
+          <Image source={{ uri: profile.logoUrl }} style={styles.profileHeroLogo} />
+          <View style={styles.profileHeroLogoEdit}>
+            <Camera size={14} color={colors.onPrimary} />
+          </View>
+        </Pressable>
+        <Text style={styles.profileHeroName}>{profile.businessName}</Text>
+        <View style={styles.profileHeroMetaRow}>
+          <View style={[styles.detailCategoryBadge, { backgroundColor: tint.background }]}>
+            <Icon size={14} color={tint.color} />
+            <Text style={[styles.detailCategoryText, { color: tint.color }]}>{profile.category}</Text>
+          </View>
+          <View style={styles.detailMetaPill}>
+            <MapPin size={14} color={colors.muted} />
+            <Text style={styles.detailMetaText}>{profile.city}</Text>
+          </View>
+          <View style={styles.profileVerifiedBadge}>
+            <BadgeCheck size={14} color={colors.secondary} />
+            <Text style={styles.profileVerifiedText}>Verified</Text>
+          </View>
+        </View>
+        <Text style={styles.profileHeroDescription}>{profile.description}</Text>
+        <CapsuleButton label="Edit profile" onPress={onEdit} icon={<Pencil size={16} color={colors.onPrimary} />} />
+      </GlassPanel>
+
+      <View style={styles.bentoRow}>
+        <BentoMetricCard
+          title="Offers"
+          value={`${offerCount}`}
+          accent={colors.secondary}
+          Icon={Store}
+        />
+        <BentoMetricCard
+          title="Customers"
+          value={`${customerCount}`}
+          accent={colors.tertiary}
+          Icon={UsersRound}
+        />
+        <BentoMetricCard
+          title="Revenue"
+          value={currency(payoutTotal)}
+          accent={colors.primary}
+          Icon={Wallet}
+        />
+      </View>
+
+      <GlassPanel style={styles.profileSection} intensity={32}>
+        <Text style={styles.profileSectionTitle}>Account</Text>
+        <View style={styles.profileRow}>
+          <View style={styles.profileRowIcon}>
+            <UserRound size={18} color={colors.primary} />
+          </View>
+          <View style={styles.profileRowBody}>
+            <Text style={styles.profileRowLabel}>Owner</Text>
+            <Text style={styles.profileRowValue}>{user.name}</Text>
+          </View>
+        </View>
+        <View style={[styles.profileRow, styles.profileRowDivider]}>
+          <View style={styles.profileRowIcon}>
+            <Building2 size={18} color={colors.primary} />
+          </View>
+          <View style={styles.profileRowBody}>
+            <Text style={styles.profileRowLabel}>Email</Text>
+            <Text style={styles.profileRowValue}>{user.email}</Text>
+          </View>
+        </View>
+        <View style={[styles.profileRow, styles.profileRowDivider]}>
+          <View style={styles.profileRowIcon}>
+            <MapPin size={18} color={colors.primary} />
+          </View>
+          <View style={styles.profileRowBody}>
+            <Text style={styles.profileRowLabel}>City</Text>
+            <Text style={styles.profileRowValue}>{profile.city}</Text>
+          </View>
+        </View>
+      </GlassPanel>
+    </>
+  );
+}
+
+function BusinessAccountTab({
+  user,
+  profile,
+  onOpenProfile
+}: {
+  user: User;
+  profile: { businessName: string };
+  onOpenProfile: () => void;
+}) {
+  const tiles: Array<{ label: string; sub: string; Icon: typeof Settings; onPress?: () => void }> = [
+    { label: "Account", sub: "Personal details and password", Icon: UserRound, onPress: onOpenProfile },
+    { label: "Notifications", sub: "Get pinged on every redemption", Icon: ShieldCheck },
+    { label: "Payouts", sub: "Bank account, IBAN, settlement cycle", Icon: Wallet },
+    { label: "Help & support", sub: "FAQs, contact a human", Icon: Settings }
+  ];
+  return (
+    <>
+      <View style={styles.adminHeader}>
+        <View style={styles.adminHeaderCopy}>
+          <Text style={styles.greetingText}>Account</Text>
+          <Text style={styles.insightsTagline}>
+            Signed in as {profile.businessName}. Manage how PERX works for you.
+          </Text>
+        </View>
+      </View>
+      {tiles.map((tile) => (
+        <Pressable
+          key={tile.label}
+          style={styles.accountTile}
+          onPress={tile.onPress ?? (() => Alert.alert(tile.label, "Coming soon."))}
+        >
+          <View style={styles.accountTileIcon}>
+            <tile.Icon size={18} color={colors.primary} />
+          </View>
+          <View style={styles.accountTileBody}>
+            <Text style={styles.accountTileTitle}>{tile.label}</Text>
+            <Text style={styles.accountTileSub}>{tile.sub}</Text>
+          </View>
+          <ChevronRight size={18} color={colors.muted} />
+        </Pressable>
+      ))}
+      <View style={{ height: 6 }} />
+      <Text style={styles.accountTileSub}>Logged in as {user.email}</Text>
+    </>
+  );
+}
+
+function ProfileEditModal({
+  visible,
+  initial,
+  onClose,
+  onSubmit
+}: {
+  visible: boolean;
+  initial: {
+    businessName: string;
+    description: string;
+    category: BenefitCategory;
+    logoUrl: string;
+    city: string;
+  };
+  onClose: () => void;
+  onSubmit: (next: typeof initial) => Promise<void> | void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (visible) setDraft(initial);
+  }, [visible, initial]);
+
+  const handlePickLogo = async () => {
+    const uri = await pickImageFromDevice();
+    if (uri) setDraft((c) => ({ ...c, logoUrl: uri }));
+  };
+
+  const handleSave = async () => {
+    setSubmitting(true);
+    try {
+      await onSubmit(draft);
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>Edit profile</Text>
+              <Text style={styles.modalSub}>How customers see your business.</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.modalClose}>
+              <X size={18} color={colors.text} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <Pressable onPress={handlePickLogo} style={styles.imagePicker}>
+              {draft.logoUrl ? (
+                <Image source={{ uri: draft.logoUrl }} style={styles.imagePickerPreview} />
+              ) : (
+                <View style={styles.imagePickerPlaceholder}>
+                  <Camera size={26} color={colors.muted} />
+                  <Text style={styles.imagePickerLabel}>Upload a logo</Text>
+                </View>
+              )}
+              {draft.logoUrl ? (
+                <View style={styles.imagePickerOverlay}>
+                  <Camera size={16} color={colors.onPrimary} />
+                  <Text style={styles.imagePickerOverlayText}>Replace logo</Text>
+                </View>
+              ) : null}
+            </Pressable>
+
+            <Text style={styles.modalFieldLabel}>Business name</Text>
+            <TextInput
+              value={draft.businessName}
+              onChangeText={(businessName) => setDraft((c) => ({ ...c, businessName }))}
+              placeholder="Business name"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+            />
+
+            <Text style={styles.modalFieldLabel}>Description</Text>
+            <TextInput
+              value={draft.description}
+              onChangeText={(description) => setDraft((c) => ({ ...c, description }))}
+              placeholder="One-liner that sells your business."
+              placeholderTextColor={colors.muted}
+              style={[styles.input, { minHeight: 84, textAlignVertical: "top" }]}
+              multiline
+            />
+
+            <Text style={styles.modalFieldLabel}>Category</Text>
+            <CategoryGrid
+              options={benefitCategoryOptions}
+              value={draft.category}
+              onChange={(category) => setDraft((c) => ({ ...c, category }))}
+            />
+
+            <Text style={styles.modalFieldLabel}>City</Text>
+            <TextInput
+              value={draft.city}
+              onChangeText={(city) => setDraft((c) => ({ ...c, city }))}
+              placeholder="Tirana"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+            />
+
+            <View style={{ height: 8 }} />
+            <CapsuleButton
+              label={submitting ? "Saving..." : "Save profile"}
+              onPress={() => void handleSave()}
+              icon={<Check size={16} color={colors.onPrimary} />}
+            />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
