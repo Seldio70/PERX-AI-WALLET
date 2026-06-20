@@ -837,6 +837,7 @@ export default function App() {
                 }}
                 employeeHealthMetrics={employeeHealthMetrics}
                 onConnectAppleHealth={handleConnectAppleHealth}
+                onSubmitChallenge={(definitionId) => handleSubmitChallenge(definitionId, session.user)}
               />
             ) : (
               <LoginScreen
@@ -1247,7 +1248,8 @@ function RoleRouter({
   onPayForPerk,
   onPayForPerks,
   employeeHealthMetrics = {},
-  onConnectAppleHealth
+  onConnectAppleHealth,
+  onSubmitChallenge
 }: {
   session: Session;
   appData: AppData;
@@ -1260,6 +1262,7 @@ function RoleRouter({
   onSubmitSelection: (request: SelectionRequest) => void;
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
   onAddOffer: (offer: Benefit) => void;
+  onSubmitChallenge?: (definitionId: string) => void | Promise<void>;
   onCreateChallenge: (input: {
     employerId: string;
     title: string;
@@ -1351,7 +1354,7 @@ function RoleRouter({
       onConnectAppleHealth={
         onConnectAppleHealth ? () => onConnectAppleHealth(session.user.id) : undefined
       }
-      onSubmitChallenge={(definitionId) => handleSubmitChallenge(definitionId, session.user)}
+      onSubmitChallenge={onSubmitChallenge}
       onPayForPerk={onPayForPerk}
       onPayForPerks={onPayForPerks}
     />

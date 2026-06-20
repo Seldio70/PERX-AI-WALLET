@@ -423,12 +423,12 @@ export function EmployerExperience({
         visible={challengeModalOpen}
         employerId={user.id}
         onClose={() => setChallengeModalOpen(false)}
-        onCreate={(input) => {
+        onCreate={async (input) => {
           if (!onCreateChallenge) {
             Alert.alert("Unavailable", "Challenge creation is not available right now.");
-            return Promise.resolve(false);
+            return false;
           }
-          return onCreateChallenge(input);
+          return (await onCreateChallenge(input)) ?? false;
         }}
       />
 
@@ -1579,8 +1579,8 @@ function CreateChallengeModal({
       rewardPoints: points,
       criterion: { kind: "manual" },
       target: "everyone",
-      dueDate: parsedDue,
-      startDate: parsedStart,
+      dueDate: parsedDue ?? undefined,
+      startDate: parsedStart ?? undefined,
       maxAwards: parsedMaxAwards,
       pointCap: points
     });

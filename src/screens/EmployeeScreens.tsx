@@ -1,11 +1,14 @@
 import {
   ChevronRight,
+  Check,
+  Flame,
   Heart,
   MapPin,
   Send,
   Sparkles,
   Star,
   Store,
+  Sword,
   Tag,
   Trash2,
   Trophy,
@@ -15,6 +18,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Image,
   Modal,
   NativeScrollEvent,
@@ -22,6 +26,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   useWindowDimensions,
   View
 } from "react-native";
@@ -481,6 +486,350 @@ function resolveEmployerId(appData: AppData, user: User): string | undefined {
   );
 }
 
+const DUEL_ROUNDS = 5;
+
+const categoryEmoji: Partial<Record<BenefitCategory, string>> = {
+  Food: "🍽️",
+  Fitness: "💪",
+  Health: "❤️",
+  Family: "👨‍👩‍👧",
+  Learning: "📚",
+  Mobility: "🚲",
+  Wellness: "🧘"
+};
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildPairs(benefits: Benefit[]): [Benefit, Benefit][] {
+  const shuffled = shuffleArray(benefits);
+  const pairs: [Benefit, Benefit][] = [];
+  for (let i = 0; i + 1 < shuffled.length && pairs.length < DUEL_ROUNDS; i += 2) {
+    if (shuffled[i].id !== shuffled[i + 1].id) pairs.push([shuffled[i], shuffled[i + 1]]);
+  }
+  while (pairs.length < DUEL_ROUNDS && benefits.length >= 2) {
+    const s = shuffleArray(benefits);
+    pairs.push([s[0], s[1]]);
+  }
+  return pairs.slice(0, DUEL_ROUNDS);
+}
+
+function PerkDuelModal({
+  visible,
+  benefits,
+  pointsBalance,
+  onClose,
+  onPayForPerk
+}: {
+  visible: boolean;
+  benefits: Benefit[];
+  pointsBalance: number;
+  onClose: () => void;
+  onPayForPerk?: (benefit: Benefit) => boolean;
+}) {
+  type Phase = "intro" | "duel" | "results";
+  const [phase, setPhase] = useState<Phase>("intro");
+  const [round, setRound] = useState(0);
+  const [pairs, setPairs] = useState<[Benefit, Benefit][]>([]);
+  const [choices, setChoices] = useState<Benefit[]>([]);
+  const [picked, setPicked] = useState<"left" | "right" | null>(null);
+
+  const leftScale = useRef(new Animated.Value(1)).current;
+  const rightScale = useRef(new Animated.Value(1)).current;
+  const leftOpacity = useRef(new Animated.Value(1)).current;
+  const rightOpacity = useRef(new Animated.Value(1)).current;
+  const screenFade = useRef(new Animated.Value(1)).current;
+  const barAnims = useRef(
+    Array.from({ length: 7 }, () => new Animated.Value(0))
+  ).current;
+
+  const resetAnims = () => {
+    leftScale.setValue(1);
+    rightScale.setValue(1);
+    leftOpacity.setValue(1);
+    rightOpacity.setValue(1);
+  };
+
+  const startDuel = () => {
+    const newPairs = buildPairs(benefits);
+    setPairs(newPairs);
+    setChoices([]);
+    setRound(0);
+    setPicked(null);
+    resetAnims();
+    screenFade.setValue(1);
+    setPhase("duel");
+  };
+
+  const pickCard = (side: "left" | "right") => {
+    if (picked || !pairs[round]) return;
+    setPicked(side);
+
+    const winScale = side === "left" ? leftScale : rightScale;
+    const loseOpacity = side === "left" ? rightOpacity : leftOpacity;
+
+    Animated.parallel([
+      Animated.sequence([
+        Animated.spring(winScale, { toValue: 1.07, useNativeDriver: true, speed: 80, bounciness: 12 }),
+        Animated.spring(winScale, { toValue: 1, useNativeDriver: true, speed: 20 }),
+      ]),
+      Animated.timing(loseOpacity, { toValue: 0.18, duration: 280, useNativeDriver: true }),
+    ]).start(() => {
+      const winner = side === "left" ? pairs[round][0] : pairs[round][1];
+      const nextChoices = [...choices, winner];
+
+      setTimeout(() => {
+        Animated.timing(screenFade, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
+          const nextRound = round + 1;
+          if (nextRound >= DUEL_ROUNDS) {
+            setChoices(nextChoices);
+            barAnims.forEach((a) => a.setValue(0));
+            setPhase("results");
+          } else {
+            setChoices(nextChoices);
+            setRound(nextRound);
+            setPicked(null);
+            resetAnims();
+          }
+          Animated.timing(screenFade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+        });
+      }, 350);
+    });
+  };
+
+  const categoryWins = useMemo(() => {
+    const wins: Record<string, number> = {};
+    choices.forEach((b) => { wins[b.category] = (wins[b.category] ?? 0) + 1; });
+    return Object.entries(wins)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, count]) => ({ cat, count, pct: count / DUEL_ROUNDS }));
+  }, [choices]);
+
+  const topPicks = useMemo(() => {
+    const topCats = categoryWins.slice(0, 2).map((c) => c.cat);
+    if (!topCats.length) return benefits.slice(0, 3);
+    return benefits
+      .filter((b) => topCats.includes(b.category))
+      .sort((a, b) => a.pointsPrice - b.pointsPrice)
+      .slice(0, 3);
+  }, [categoryWins, benefits]);
+
+  const topCat = categoryWins[0]?.cat ?? "";
+  const profileLabel =
+    topCat === "Food" ? "The Foodie" :
+    topCat === "Fitness" ? "The Athlete" :
+    topCat === "Health" ? "The Health Nerd" :
+    topCat === "Family" ? "The Family Hero" :
+    topCat === "Learning" ? "The Learner" :
+    topCat === "Mobility" ? "The Explorer" :
+    topCat === "Wellness" ? "The Zen Master" : "The Explorer";
+
+  const handleClose = () => {
+    setPhase("intro");
+    setRound(0);
+    setChoices([]);
+    setPicked(null);
+    onClose();
+  };
+
+  const currentPair = pairs[round] ?? null;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleClose}>
+      <View style={styles.duelShell}>
+
+        {/* INTRO */}
+        {phase === "intro" && (
+          <View style={styles.duelIntro}>
+            <Pressable onPress={handleClose} style={styles.duelCloseBtn} hitSlop={12}>
+              <X size={22} color={colors.text} />
+            </Pressable>
+            <View style={styles.duelIntroIcon}>
+              <Sword size={48} color={colors.onPrimary} />
+            </View>
+            <Text style={styles.duelIntroTitle}>Perk Duel</Text>
+            <Text style={styles.duelIntroSub}>
+              Two perks enter. You pick one.{"\n"}5 rounds later, we know your taste.
+            </Text>
+            <View style={styles.duelRoundPips}>
+              {Array.from({ length: DUEL_ROUNDS }).map((_, i) => (
+                <View key={i} style={styles.duelPip} />
+              ))}
+            </View>
+            {benefits.length >= 2 ? (
+              <CapsuleButton label="Start Duel" onPress={startDuel} style={styles.duelStartBtn} />
+            ) : (
+              <Text style={styles.duelNoPerks}>No perks available to duel yet.</Text>
+            )}
+          </View>
+        )}
+
+        {/* DUEL */}
+        {phase === "duel" && currentPair && (
+          <Animated.View style={[styles.duelRoundWrap, { opacity: screenFade }]}>
+            <View style={styles.duelTopBar}>
+              <Pressable onPress={handleClose} hitSlop={12}>
+                <X size={20} color={colors.muted} />
+              </Pressable>
+              <View style={styles.duelProgress}>
+                {Array.from({ length: DUEL_ROUNDS }).map((_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.duelProgressDot, i <= round && styles.duelProgressDotActive]}
+                  />
+                ))}
+              </View>
+              <Text style={styles.duelRoundLabel}>{round + 1}/{DUEL_ROUNDS}</Text>
+            </View>
+
+            <Text style={styles.duelPickPrompt}>Which perk would you choose?</Text>
+
+            <View style={styles.duelCards}>
+              {/* LEFT */}
+              <Animated.View style={{ flex: 1, transform: [{ scale: leftScale }], opacity: leftOpacity }}>
+                <Pressable onPress={() => pickCard("left")} style={styles.duelCard}>
+                  <Image source={{ uri: currentPair[0].imageUrl }} style={styles.duelCardImg} />
+                  {picked === "left" && (
+                    <View style={styles.duelWinBadge}>
+                      <Check size={18} color="#fff" />
+                    </View>
+                  )}
+                  <View style={[styles.duelCardBody, picked === "left" && styles.duelCardBodyWin]}>
+                    <Text style={styles.duelCardCat}>{currentPair[0].category}</Text>
+                    <Text style={styles.duelCardTitle} numberOfLines={2}>{currentPair[0].title}</Text>
+                    <Text style={styles.duelCardProvider} numberOfLines={1}>{currentPair[0].providerName}</Text>
+                    <Text style={styles.duelCardPrice}>{currentPair[0].pointsPrice} pts</Text>
+                  </View>
+                </Pressable>
+              </Animated.View>
+
+              <View style={styles.duelVsWrap}>
+                <Text style={styles.duelVs}>VS</Text>
+              </View>
+
+              {/* RIGHT */}
+              <Animated.View style={{ flex: 1, transform: [{ scale: rightScale }], opacity: rightOpacity }}>
+                <Pressable onPress={() => pickCard("right")} style={styles.duelCard}>
+                  <Image source={{ uri: currentPair[1].imageUrl }} style={styles.duelCardImg} />
+                  {picked === "right" && (
+                    <View style={styles.duelWinBadge}>
+                      <Check size={18} color="#fff" />
+                    </View>
+                  )}
+                  <View style={[styles.duelCardBody, picked === "right" && styles.duelCardBodyWin]}>
+                    <Text style={styles.duelCardCat}>{currentPair[1].category}</Text>
+                    <Text style={styles.duelCardTitle} numberOfLines={2}>{currentPair[1].title}</Text>
+                    <Text style={styles.duelCardProvider} numberOfLines={1}>{currentPair[1].providerName}</Text>
+                    <Text style={styles.duelCardPrice}>{currentPair[1].pointsPrice} pts</Text>
+                  </View>
+                </Pressable>
+              </Animated.View>
+            </View>
+
+            <Text style={styles.duelHint}>Tap a card to choose</Text>
+          </Animated.View>
+        )}
+
+        {/* RESULTS */}
+        {phase === "results" && (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.duelResults}
+            showsVerticalScrollIndicator={false}
+          >
+            <Pressable onPress={handleClose} style={styles.duelCloseBtn} hitSlop={12}>
+              <X size={22} color={colors.text} />
+            </Pressable>
+
+            <View style={styles.duelResultIcon}>
+              <Flame size={36} color={colors.onPrimary} />
+            </View>
+            <Text style={styles.duelResultProfile}>{profileLabel}</Text>
+            <Text style={styles.duelResultSub}>
+              Based on your {DUEL_ROUNDS} choices
+            </Text>
+
+            {/* Category bars */}
+            <View style={styles.duelCatBars}>
+              {categoryWins.map(({ cat, pct }, idx) => {
+                const anim = barAnims[idx];
+                Animated.timing(anim, {
+                  toValue: pct,
+                  duration: 600 + idx * 120,
+                  delay: 200,
+                  useNativeDriver: false,
+                }).start();
+                return (
+                  <View key={cat} style={styles.duelCatRow}>
+                    <Text style={styles.duelCatLabel}>
+                      {categoryEmoji[cat as BenefitCategory] ?? "•"} {cat}
+                    </Text>
+                    <View style={styles.duelCatTrack}>
+                      <Animated.View
+                        style={[
+                          styles.duelCatFill,
+                          {
+                            width: anim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ["0%", "100%"]
+                            }),
+                            backgroundColor: idx === 0 ? colors.primary : colors.tertiary
+                          }
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.duelCatCount}>{Math.round(pct * 100)}%</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Top picks */}
+            {topPicks.length > 0 && (
+              <>
+                <Text style={styles.duelPicksTitle}>Your top picks</Text>
+                {topPicks.map((benefit) => (
+                  <View key={benefit.id} style={styles.duelPickRow}>
+                    <Image source={{ uri: benefit.imageUrl }} style={styles.duelPickThumb} />
+                    <View style={styles.listText}>
+                      <Text style={styles.listTitle} numberOfLines={1}>{benefit.title}</Text>
+                      <Text style={styles.listSub}>{benefit.providerName} · {benefit.pointsPrice} pts</Text>
+                    </View>
+                    {canAffordPerk(pointsBalance, benefit) ? (
+                      <CapsuleButton
+                        label="Use"
+                        onPress={() => {
+                          if (onPayForPerk?.(benefit)) {
+                            Alert.alert("Perk ready!", `${benefit.title} added to My Cards.`);
+                          }
+                        }}
+                        style={styles.duelUseBtn}
+                      />
+                    ) : (
+                      <Text style={styles.duelPickPts}>{benefit.pointsPrice} pts</Text>
+                    )}
+                  </View>
+                ))}
+              </>
+            )}
+
+            <View style={styles.duelResultActions}>
+              <CapsuleButton label="Duel again" onPress={startDuel} variant="soft" style={{ flex: 1 }} />
+              <CapsuleButton label="Close" onPress={handleClose} style={{ flex: 1 }} />
+            </View>
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
 function EmployeeHome({
   user,
   companyName,
@@ -497,7 +846,16 @@ function EmployeeHome({
   onConnectAppleHealth,
   onSubmitChallenge,
   onGoToChallenges,
-  milestoneMessage
+  milestoneMessage,
+  planItems,
+  planTotal,
+  packageOpen,
+  sent,
+  onPackageOpenChange,
+  onAddToPackage,
+  onRemoveFromPackage,
+  onSendToEmployer,
+  onShufflePackage
 }: {
   user: User;
   companyName: string;
@@ -534,6 +892,7 @@ function EmployeeHome({
 
   const primary = ranked[0];
   const [aiOfferDetail, setAiOfferDetail] = useState<Benefit | null>(null);
+  const [duelOpen, setDuelOpen] = useState(false);
 
   const useNow = (benefit: Benefit) => {
     if (!canAffordPerk(pointsBalance, benefit)) {
@@ -628,6 +987,25 @@ function EmployeeHome({
           </Text>
         )}
       </GlassPanel>
+
+      <Pressable onPress={() => setDuelOpen(true)} style={styles.duelBanner}>
+        <View style={styles.duelBannerIcon}>
+          <Sword size={22} color={colors.onPrimary} />
+        </View>
+        <View style={styles.listText}>
+          <Text style={styles.duelBannerTitle}>Perk Duel</Text>
+          <Text style={styles.duelBannerSub}>5 rounds · find your perk style</Text>
+        </View>
+        <ChevronRight size={18} color={colors.onPrimary} />
+      </Pressable>
+
+      <PerkDuelModal
+        visible={duelOpen}
+        benefits={benefits}
+        pointsBalance={pointsBalance}
+        onClose={() => setDuelOpen(false)}
+        onPayForPerk={onPayForPerk}
+      />
 
       {milestoneMessage ? (
         <View style={styles.challengeMilestoneBanner}>

@@ -3226,5 +3226,319 @@ export const styles = StyleSheet.create({
     color: colors.soft,
     fontSize: 10,
     fontWeight: "700"
+  },
+
+  // ── Perk Duel ─────────────────────────────────────────────────────────────
+  duelBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: colors.tertiary,
+    borderRadius: radius.card,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 8
+  },
+  duelBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  duelBannerTitle: {
+    color: colors.onPrimary,
+    fontSize: 15,
+    fontWeight: "700"
+  },
+  duelBannerSub: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12,
+    marginTop: 1
+  },
+  duelShell: {
+    flex: 1,
+    backgroundColor: colors.background
+  },
+  // Intro
+  duelIntro: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32
+  },
+  duelCloseBtn: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 56 : 24,
+    right: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceContainerHigh,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  duelIntroIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.tertiary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+    ...shadow
+  },
+  duelIntroTitle: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: colors.text,
+    marginBottom: 10,
+    letterSpacing: -0.5
+  },
+  duelIntroSub: {
+    fontSize: 15,
+    color: colors.muted,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 28
+  },
+  duelRoundPips: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 36
+  },
+  duelPip: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  duelStartBtn: {
+    width: 200
+  },
+  duelNoPerks: {
+    color: colors.muted,
+    fontSize: 14,
+    textAlign: "center"
+  },
+  // Round
+  duelRoundWrap: {
+    flex: 1,
+    paddingTop: Platform.OS === "ios" ? 56 : 24,
+    paddingHorizontal: 16,
+    paddingBottom: 24
+  },
+  duelTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+    paddingHorizontal: 4
+  },
+  duelProgress: {
+    flexDirection: "row",
+    gap: 6
+  },
+  duelProgressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  duelProgressDotActive: {
+    backgroundColor: colors.tertiary
+  },
+  duelRoundLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.muted
+  },
+  duelPickPrompt: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.text,
+    textAlign: "center",
+    marginBottom: 20,
+    letterSpacing: -0.3
+  },
+  duelCards: {
+    flexDirection: "row",
+    gap: 10,
+    flex: 1,
+    maxHeight: 440
+  },
+  duelCard: {
+    flex: 1,
+    borderRadius: radius.card,
+    overflow: "hidden",
+    backgroundColor: colors.panelStrong,
+    ...shadow
+  },
+  duelCardImg: {
+    width: "100%",
+    height: 180
+  },
+  duelWinBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.secondary,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  duelCardBody: {
+    padding: 12,
+    flex: 1
+  },
+  duelCardBodyWin: {
+    backgroundColor: "rgba(111,251,133,0.12)"
+  },
+  duelCardCat: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4
+  },
+  duelCardTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+    lineHeight: 18,
+    marginBottom: 4
+  },
+  duelCardProvider: {
+    fontSize: 11,
+    color: colors.muted,
+    marginBottom: 6
+  },
+  duelCardPrice: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.tertiary
+  },
+  duelVsWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 30
+  },
+  duelVs: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.muted,
+    letterSpacing: 1
+  },
+  duelHint: {
+    textAlign: "center",
+    color: colors.soft,
+    fontSize: 12,
+    marginTop: 16
+  },
+  // Results
+  duelResults: {
+    paddingTop: Platform.OS === "ios" ? 56 : 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    alignItems: "center"
+  },
+  duelResultIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.tertiary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    ...shadow
+  },
+  duelResultProfile: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: colors.text,
+    marginBottom: 4,
+    letterSpacing: -0.4
+  },
+  duelResultSub: {
+    fontSize: 13,
+    color: colors.muted,
+    marginBottom: 28
+  },
+  duelCatBars: {
+    width: "100%",
+    gap: 12,
+    marginBottom: 28
+  },
+  duelCatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  duelCatLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.text,
+    width: 100
+  },
+  duelCatTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceContainerHigh,
+    overflow: "hidden"
+  },
+  duelCatFill: {
+    height: "100%",
+    borderRadius: 4
+  },
+  duelCatCount: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.muted,
+    width: 36,
+    textAlign: "right"
+  },
+  duelPicksTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: colors.text,
+    alignSelf: "flex-start",
+    marginBottom: 12
+  },
+  duelPickRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    backgroundColor: colors.panelStrong,
+    borderRadius: radius.card,
+    padding: 12,
+    marginBottom: 8,
+    ...shadow
+  },
+  duelPickThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 10
+  },
+  duelPickPts: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.muted
+  },
+  duelUseBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    minWidth: 60
+  },
+  duelResultActions: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+    marginTop: 24
   }
 });
