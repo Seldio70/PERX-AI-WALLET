@@ -3,9 +3,12 @@ import {
   Check,
   ChevronRight,
   CircleDollarSign,
+  Gift,
   Mail,
   Send,
   ShieldCheck,
+  Sparkles,
+  Star,
   Store,
   Trophy,
   UserPlus,
@@ -30,6 +33,7 @@ import {
   defaultRewardAutomations,
   formatDateLabel,
   generateInviteCode,
+  rewardKindLabel,
   yearsSince
 } from "../lib/rewardsDemo";
 import { PerxLiveData } from "../lib/perxRepository";
@@ -327,8 +331,12 @@ export function EmployerExperience({
 
       <ChallengesPage
         challenges={appData.challenges.filter((challenge) => challenge.employerId === user.id)}
+        employees={employees}
+        rewardEvents={rewardEvents}
+        employeePoints={employeePoints}
         onOpenCreate={() => setChallengeModalOpen(true)}
         onCompleteChallenge={onCompleteChallenge}
+        onGrantReward={onGrantReward}
       />
           </>
         ) : null}
@@ -964,21 +972,60 @@ function RecentRedemptionsSection({
 
 function ChallengesPage({
   challenges,
+  employees = [],
+  rewardEvents = [],
+  employeePoints = {},
   onOpenCreate,
-  onCompleteChallenge
+  onCompleteChallenge,
+  onGrantReward
 }: {
   challenges: Challenge[];
+  employees?: User[];
+  rewardEvents?: RewardEvent[];
+  employeePoints?: Record<string, number>;
   onOpenCreate: () => void;
   onCompleteChallenge?: (challengeId: string) => void;
+  onGrantReward?: (input: {
+    employeeId: string;
+    employeeName: string;
+    kind: RewardEvent["kind"];
+    points: number;
+    note: string;
+  }) => void;
 }) {
   const [automations, setAutomations] = useState<RewardAutomation[]>(defaultRewardAutomations);
+  const [spotEmployeeId, setSpotEmployeeId] = useState<"all" | string>(employees[0]?.id ?? "all");
+  const [spotPoints, setSpotPoints] = useState("50");
+  const [spotNote, setSpotNote] = useState("Great work this week");
 
   const openChallenges = challenges.filter((challenge) => challenge.status === "open");
+  const fireAutomation = (automation: RewardAutomation) => {
+    if (!onGrantReward || !employees.length) return;
+    employees.forEach((employee) => {
+      const points =
+        automation.kind === "anniversary"
+          ? automation.points * Math.max(1, yearsSince(employee.startDate) || employee.yearsEmployed || 1)
+          : automation.points;
+      onGrantReward({
+        employeeId: employee.id,
+        employeeName: employee.name,
+        kind: automation.kind === "seasonal" ? "seasonal" : automation.kind,
+        points,
+        note: automation.label
+      });
+    });
+  };
 
   const toggleAutomation = (kind: RewardAutomation["kind"]) => {
-    setAutomations((current) =>
-      current.map((item) => (item.kind === kind ? { ...item, enabled: !item.enabled } : item))
-    );
+    setAutomations((current) => {
+      const next = current.map((item) => (item.kind === kind ? { ...item, enabled: !item.enabled } : item));
+      const toggled = next.find((item) => item.kind === kind);
+      if (toggled?.enabled) {
+        fireAutomation(toggled);
+        Alert.alert("Auto-granted", `${toggled.label} applied to ${employees.length} employee(s).`);
+      }
+      return next;
+    });
   };
 
   const updateAutomationPoints = (kind: RewardAutomation["kind"], points: string) => {
@@ -988,6 +1035,44 @@ function ChallengesPage({
         item.kind === kind ? { ...item, points: Number.isFinite(parsed) ? parsed : item.points } : item
       )
     );
+  };
+
+  const grantSpotBonus = () => {
+    const points = Number(spotPoints.replace(/\D/g, ""));
+    if (!onGrantReward || !points) {
+      Alert.alert("Enter points", "Choose a valid points amount.");
+      return;
+    }
+    if (spotEmployeeId === "all") {
+      if (!employees.length) {
+        Alert.alert("No employees", "Add employees first.");
+        return;
+      }
+      employees.forEach((employee) =>
+        onGrantReward({
+          employeeId: employee.id,
+          employeeName: employee.name,
+          kind: "spot",
+          points,
+          note: spotNote.trim() || "Spot bonus"
+        })
+      );
+      Alert.alert("Spot bonus sent", `${points} points added to all ${employees.length} employees.`);
+    } else {
+      const employee = employees.find((item) => item.id === spotEmployeeId);
+      if (!employee) {
+        Alert.alert("Pick employee", "Select an employee first.");
+        return;
+      }
+      onGrantReward({
+        employeeId: employee.id,
+        employeeName: employee.name,
+        kind: "spot",
+        points,
+        note: spotNote.trim() || "Spot bonus"
+      });
+      Alert.alert("Spot bonus sent", `${points} points added to ${employee.name}.`);
+    }
   };
 
   return (
@@ -1064,6 +1149,91 @@ function ChallengesPage({
           </GlassPanel>
         ))}
       </Section>
+
+      <Section title="Spot bonus" meta="One-off">
+        <GlassPanel style={styles.challengeCard} intensity={18}>
+          <Text style={styles.modalFieldLabel}>Employee</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+            <Pressable
+              onPress={() => setSpotEmployeeId("all")}
+              style={[styles.filterChip, spotEmployeeId === "all" && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterChipText, spotEmployeeId === "all" && styles.filterChipTextActive]}>
+                All
+              </Text>
+            </Pressable>
+            {employees.map((employee) => {
+              const selected = spotEmployeeId === employee.id;
+              return (
+                <Pressable
+                  key={employee.id}
+                  onPress={() => setSpotEmployeeId(employee.id)}
+                  style={[styles.filterChip, selected && styles.filterChipActive]}
+                >
+                  <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
+                    {employee.name.split(" ")[0]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.modalFieldLabel}>Points</Text>
+          <TextInput
+            value={spotPoints}
+            onChangeText={setSpotPoints}
+            style={styles.input}
+            keyboardType="number-pad"
+          />
+          <Text style={styles.modalFieldLabel}>Note</Text>
+          <TextInput value={spotNote} onChangeText={setSpotNote} style={styles.input} />
+          <CapsuleButton label="Send spot bonus" onPress={grantSpotBonus} icon={<Gift size={16} color={colors.onPrimary} />} />
+        </GlassPanel>
+      </Section>
+
+      <Section title="Points feed" meta={`${rewardEvents.length}`}>
+        {rewardEvents.length ? (
+          rewardEvents.slice(0, 8).map((event) => (
+            <View key={event.id} style={styles.pointsFeedRow}>
+              <View style={styles.pointsFeedIcon}>
+                <Star size={16} color={colors.primary} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>{event.employeeName ?? "Employee"}</Text>
+                <Text style={styles.listSub}>
+                  {rewardKindLabel(event.kind)} · {event.note}
+                </Text>
+              </View>
+              <Text style={styles.challengePoints}>+{event.points}</Text>
+            </View>
+          ))
+        ) : (
+          <View style={styles.listRow}>
+            <View style={styles.smallIcon}>
+              <Sparkles size={18} color={colors.text} />
+            </View>
+            <View style={styles.listText}>
+              <Text style={styles.listTitle}>No rewards yet</Text>
+              <Text style={styles.listSub}>Complete challenges or grant recognition to populate the feed.</Text>
+            </View>
+          </View>
+        )}
+      </Section>
+
+      {employees.length ? (
+        <Section title="Team balances" meta="Points">
+          {employees.map((employee) => (
+            <View key={employee.id} style={styles.listRow}>
+              <View style={styles.smallIcon}>
+                <Gift size={18} color={colors.primary} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>{employee.name}</Text>
+                <Text style={styles.listSub}>{employeePoints[employee.id] ?? 0} PerX Points</Text>
+              </View>
+            </View>
+          ))}
+        </Section>
+      ) : null}
     </>
   );
 }

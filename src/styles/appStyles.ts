@@ -787,6 +787,10 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10
   },
+  adminActionsRow: {
+    flexDirection: "row",
+    gap: 10
+  },
   adminActionCard: {
     padding: 18,
     flexDirection: "row",
@@ -795,6 +799,9 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: radius.cardLg,
     ...shadow
+  },
+  adminActionCardHalf: {
+    flex: 1
   },
   adminActionIcon: {
     width: 40,

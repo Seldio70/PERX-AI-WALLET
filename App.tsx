@@ -27,7 +27,8 @@ import {
   setEmployerBenefitEnabled,
   setEmployerBenefitsEnabled,
   signInPlatformUser,
-  signInOrSignUpPlatformAuth
+  signInOrSignUpPlatformAuth,
+  updateUserPointsBalance
 } from "./src/lib/perxRepository";
 import { BusinessExperience } from "./src/screens/BusinessScreen";
 import { EmployeeExperience } from "./src/screens/EmployeeScreens";
@@ -49,7 +50,6 @@ import {
 } from "./src/types";
 import {
   createDemoChallenges,
-  createDemoEmployeePoints,
   createDemoInvites,
   createDemoRewardEvents,
   defaultRewardAutomations
@@ -139,6 +139,13 @@ export default function App() {
 
       const enabledMap = await fetchEmployerEnabledBenefits();
       if (active) setEmployerEnabledBenefits(enabledMap);
+
+      // Seed employee points from DB so balances survive reload
+      const dbPoints: Record<string, number> = {};
+      for (const u of data.users) {
+        if (u.role === "employee") dbPoints[u.id] = u.pointsBalance ?? 0;
+      }
+      if (active) setEmployeePoints(dbPoints);
     });
 
     return () => {
@@ -158,7 +165,6 @@ export default function App() {
     const employee = employees[0];
 
     if (employee) {
-      setEmployeePoints(createDemoEmployeePoints(employees.map((item) => item.id)));
       setRewardEvents(createDemoRewardEvents(employee.id, employee.name));
       if (!challengeItems.length) {
         setChallengeItems(createDemoChallenges(employerId, employee.id, employee.name));
@@ -270,10 +276,11 @@ export default function App() {
     points: number;
     note: string;
   }) => {
-    setEmployeePoints((current) => ({
-      ...current,
-      [input.employeeId]: (current[input.employeeId] ?? 0) + input.points
-    }));
+    setEmployeePoints((current) => {
+      const next = { ...current, [input.employeeId]: (current[input.employeeId] ?? 0) + input.points };
+      updateUserPointsBalance(input.employeeId, next[input.employeeId]);
+      return next;
+    });
     setRewardEvents((current) => [
       {
         id: `reward_${input.kind}_${input.employeeId}_${Date.now()}`,
@@ -367,10 +374,12 @@ export default function App() {
     const totalPoints = input.benefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
     if (balance < totalPoints) return false;
 
+    const newBalance = balance - totalPoints;
     setEmployeePoints((current) => ({
       ...current,
-      [input.employee.id]: balance - totalPoints
+      [input.employee.id]: newBalance
     }));
+    updateUserPointsBalance(input.employee.id, newBalance);
 
     const now = new Date().toISOString();
     const request: SelectionRequest = {

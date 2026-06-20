@@ -11,6 +11,7 @@ type DbUser = {
   company_id: string | null;
   invited_by_user_id: string | null;
   years_employed: number | null;
+  points_balance: number | null;
 };
 
 type DbCompany = {
@@ -134,7 +135,8 @@ function mapUser(row: DbUser): User {
     companyId: row.company_id ?? undefined,
     invitedByUserId: row.invited_by_user_id ?? undefined,
     yearsEmployed: row.years_employed ?? undefined,
-    businessId: row.role === "business" ? row.id : undefined
+    businessId: row.role === "business" ? row.id : undefined,
+    pointsBalance: row.points_balance ?? 0
   };
 }
 
@@ -233,7 +235,7 @@ export async function fetchPerxLiveData(): Promise<PerxLiveData | null> {
     challengesResult
   ] = await Promise.all([
     client.from("companies").select("id,name,employer_id,monthly_budget_per_employee"),
-    client.from("users").select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed"),
+    client.from("users").select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed,points_balance"),
     client.from("provider_profiles").select("id,user_id,business_name,logo_url,description,category,city,is_approved"),
     client
       .from("benefits")
@@ -413,7 +415,7 @@ export async function createPlatformUser(input: {
       invited_by_user_id: input.invitedByUserId,
       points_balance: input.role === "employer" ? 1000 : 0
     }, { onConflict: "email" })
-    .select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed")
+    .select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed,points_balance")
     .single();
 
   if (result.error || !result.data) return null;
@@ -460,7 +462,7 @@ export async function signInPlatformUser(input: {
 
   const byAuthId = await client
     .from("users")
-    .select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed")
+    .select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed,points_balance")
     .eq("auth_user_id", auth.data.user.id)
     .maybeSingle();
 
@@ -469,7 +471,7 @@ export async function signInPlatformUser(input: {
     (
       await client
         .from("users")
-        .select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed")
+        .select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed,points_balance")
         .eq("email", input.email)
         .maybeSingle()
     ).data;
@@ -815,4 +817,10 @@ export async function setEmployerBenefitsEnabled(
     .eq("employer_id", employerId)
     .in("benefit_id", benefitIds);
   return !result.error;
+}
+
+export async function updateUserPointsBalance(userId: string, newBalance: number): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) return;
+  await client.from("users").update({ points_balance: Math.max(0, newBalance) }).eq("id", userId);
 }
