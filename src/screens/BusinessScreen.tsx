@@ -330,9 +330,6 @@ function OfferFormModal({
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>{mode === "edit" ? "Edit offer" : "New offer"}</Text>
-              <Text style={styles.modalSub}>
-                {mode === "edit" ? "Update the details and republish." : "Fill in the basics, add a photo, and publish."}
-              </Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose}>
               <X size={18} color={colors.text} />
@@ -374,7 +371,7 @@ function OfferFormModal({
               autoCorrect={false}
             />
             <Text style={styles.imagePickerHint}>
-              Direct image links work best. Avoid Google thumbnail links like encrypted-tbn0.
+              JPG or PNG, 4:3 looks best
             </Text>
 
             <Text style={styles.modalFieldLabel}>Title</Text>
@@ -506,7 +503,6 @@ function OfferDetailModal({
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>{offer.title}</Text>
-              <Text style={styles.modalSub}>{offer.providerName} · {offer.category}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose}>
               <X size={18} color={colors.text} />
@@ -608,7 +604,6 @@ function TransactionDetailModal({
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>Transaction</Text>
-              <Text style={styles.modalSub}>{formattedDate}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose}>
               <X size={18} color={colors.text} />
@@ -627,6 +622,10 @@ function TransactionDetailModal({
             </View>
 
             <GlassPanel style={styles.txDetailCard} intensity={32}>
+              <View style={styles.detailKeyValueRow}>
+                <Text style={styles.detailKeyLabel}>Date</Text>
+                <Text style={styles.detailKeyValue}>{formattedDate}</Text>
+              </View>
               <View style={styles.detailKeyValueRow}>
                 <Text style={styles.detailKeyLabel}>Customer</Text>
                 <Text style={styles.detailKeyValue}>{request.employeeName}</Text>
@@ -1436,11 +1435,6 @@ function ProfileEditModal({
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>
                 {isOnboarding ? "Set up your business profile" : "Edit profile"}
-              </Text>
-              <Text style={styles.modalSub}>
-                {isOnboarding
-                  ? "Complete every field below before you start publishing offers."
-                  : "How customers see your business."}
               </Text>
             </View>
             {isOnboarding ? null : (

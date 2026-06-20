@@ -32,15 +32,25 @@ import {
   defaultRewardAutomations,
   formatDateLabel,
   generateInviteCode,
-  rewardKindLabel,
-  yearsSince
+  rewardKindLabel
 } from "../lib/rewardsDemo";
+import { buildEmployerChallengeStats, employerDefinitionSummary } from "../lib/challengeEvaluator";
+import {
+  awardsUsedForDefinition,
+  canAwardMore,
+  computeChallengeAnalytics
+} from "../lib/challengeService";
+import {
+  PlatformTemplateKey
+} from "../lib/challengePlatformTemplates";
 import { PerxLiveData } from "../lib/perxRepository";
 import { styles } from "../styles/appStyles";
 import { colors } from "../theme";
 import {
   Benefit,
-  Challenge,
+  ChallengeCriterion,
+  ChallengeDefinition,
+  ChallengeProgress,
   EmployeeInvite,
   ProviderProfile,
   RewardAutomation,
@@ -70,7 +80,10 @@ export function EmployerExperience({
   rewardEvents = [],
   employeeInvites = [],
   onCreateChallenge,
+  onArchiveChallenge,
   onCompleteChallenge,
+  onCompleteChallengeForEmployee,
+  onToggleChallengeTemplate,
   onGrantReward,
   onSendEmployeeInvite,
   enabledBenefitIds = [],
@@ -84,8 +97,26 @@ export function EmployerExperience({
   employeePoints?: Record<string, number>;
   rewardEvents?: RewardEvent[];
   employeeInvites?: EmployeeInvite[];
-  onCreateChallenge?: (challenge: Omit<Challenge, "id" | "status">) => void;
-  onCompleteChallenge?: (challengeId: string) => void;
+  onCreateChallenge?: (input: {
+    employerId: string;
+    title: string;
+    description: string;
+    rewardPoints: number;
+    criterion: ChallengeCriterion;
+    target: "everyone" | string;
+    dueDate?: string;
+    startDate?: string;
+    maxAwards?: number;
+    pointCap?: number;
+  }) => void | Promise<boolean>;
+  onArchiveChallenge?: (definitionId: string) => void | Promise<void>;
+  onCompleteChallenge?: (definitionId: string, employerId: string) => void | Promise<void>;
+  onCompleteChallengeForEmployee?: (
+    definitionId: string,
+    employerId: string,
+    employeeId: string
+  ) => void | Promise<void>;
+  onToggleChallengeTemplate?: (employerId: string, templateKey: string, enabled: boolean) => void;
   onGrantReward?: (input: {
     employeeId: string;
     employeeName: string;
@@ -137,9 +168,21 @@ export function EmployerExperience({
   const detailEmployee = employees.find((employee) => employee.id === detailEmployeeId) ?? null;
   const companyInvites = employeeInvites.filter((invite) => invite.companyId === company.id);
   const enabledPerksCount = enabledBenefitIds.length;
-  const openChallenges = appData.challenges.filter(
-    (challenge) => challenge.employerId === user.id && challenge.status === "open"
-  ).length;
+  const employerDefinitions = useMemo(
+    () =>
+      appData.challengeDefinitions.filter(
+        (definition) => definition.active && definition.employerId === user.id
+      ),
+    [appData.challengeDefinitions, user.id]
+  );
+  const openChallengeCount = useMemo(() => {
+    const openIds = new Set(
+      appData.challengeProgress
+        .filter((row) => row.status === "open")
+        .map((row) => row.definitionId)
+    );
+    return employerDefinitions.filter((definition) => openIds.has(definition.id)).length;
+  }, [appData.challengeProgress, employerDefinitions]);
   const providerGroups = useMemo(
     () => groupProvidersWithOffers(appData.providerProfiles, appData.benefits),
     [appData.providerProfiles, appData.benefits]
@@ -201,9 +244,11 @@ export function EmployerExperience({
           <Text style={styles.employerStatLabel}>Perks</Text>
         </View>
         <View style={styles.employerStatCapsule}>
-          <Trophy size={14} color={colors.accent} />
-          <Text style={styles.employerStatValue}>{openChallenges}</Text>
-          <Text style={styles.employerStatLabel}>Challenges</Text>
+          <Pressable onPress={() => setTab("activity")} style={styles.employerStatPressable}>
+            <Trophy size={14} color={colors.accent} />
+            <Text style={styles.employerStatValue}>{openChallengeCount}</Text>
+            <Text style={styles.employerStatLabel}>Challenges</Text>
+          </Pressable>
         </View>
         <View style={styles.employerStatCapsule}>
           <Sparkles size={14} color={colors.primary} />
@@ -250,7 +295,11 @@ export function EmployerExperience({
           </Pressable>
           <Pressable onPress={() => setTab("activity")} style={styles.employerActionCapsule}>
             <Trophy size={15} color={colors.accent} />
-            <Text style={styles.employerActionCapsuleText}>Activity</Text>
+            <Text style={styles.employerActionCapsuleText}>Challenges</Text>
+          </Pressable>
+          <Pressable onPress={() => { setTab("activity"); setChallengeModalOpen(true); }} style={styles.employerActionCapsule}>
+            <Sparkles size={15} color={colors.primary} />
+            <Text style={styles.employerActionCapsuleText}>New challenge</Text>
           </Pressable>
           <Pressable onPress={() => setInviteOpen(true)} style={styles.employerActionCapsule}>
             <UserPlus size={15} color={colors.tertiary} />
@@ -313,14 +362,20 @@ export function EmployerExperience({
       </View>
 
       <ChallengesPage
-        challenges={appData.challenges.filter((challenge) => challenge.employerId === user.id)}
+        employerId={user.id}
+        definitions={employerDefinitions}
+        progressRows={appData.challengeProgress}
+        disabledTemplateKeys={appData.disabledChallengeTemplates[user.id] ?? []}
         employees={employees}
         rewardEvents={rewardEvents}
         employeePoints={employeePoints}
         selectionRequests={selectionRequests}
         benefits={appData.benefits}
         onOpenCreate={() => setChallengeModalOpen(true)}
+        onArchiveChallenge={onArchiveChallenge}
         onCompleteChallenge={onCompleteChallenge}
+        onCompleteChallengeForEmployee={onCompleteChallengeForEmployee}
+        onToggleChallengeTemplate={onToggleChallengeTemplate}
         onGrantReward={onGrantReward}
         onSelectEmployee={(id) => setDetailEmployeeId(id)}
       />
@@ -366,15 +421,14 @@ export function EmployerExperience({
 
       <CreateChallengeModal
         visible={challengeModalOpen}
-        employees={employees}
         employerId={user.id}
         onClose={() => setChallengeModalOpen(false)}
-        onCreate={(challenge) => {
+        onCreate={(input) => {
           if (!onCreateChallenge) {
             Alert.alert("Unavailable", "Challenge creation is not available right now.");
-            return;
+            return Promise.resolve(false);
           }
-          onCreateChallenge(challenge);
+          return onCreateChallenge(input);
         }}
       />
 
@@ -384,6 +438,8 @@ export function EmployerExperience({
         stats={detailEmployee ? statsFor(detailEmployee.id) : null}
         benefits={appData.benefits}
         pointsBalance={detailEmployee ? employeePoints[detailEmployee.id] ?? 0 : 0}
+        challengeDefinitions={employerDefinitions}
+        challengeProgress={appData.challengeProgress}
         onClose={() => setDetailEmployeeId(null)}
       />
     </View>
@@ -549,7 +605,6 @@ function InviteEmployeeModal({
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>Invite employee</Text>
-              <Text style={styles.modalSub}>They'll get access to {companyName}'s wallet and perks.</Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose}>
               <X size={18} color={colors.text} />
@@ -562,9 +617,6 @@ function InviteEmployeeModal({
                   <Mail size={22} color={colors.onPrimary} />
                 </View>
                 <Text style={styles.cardTitle}>Invite sent</Text>
-                <Text style={styles.bodyText}>
-                  Share this code with {sentInvite.email}. They enter it when joining PerX.
-                </Text>
                 <View style={styles.inviteCodeBox}>
                   <Text style={styles.inviteCodeText}>{sentInvite.code}</Text>
                   <Text style={styles.listSub}>Work start: {formatDateLabel(sentInvite.startDate)}</Text>
@@ -612,6 +664,8 @@ function EmployeeDetailModal({
   stats,
   benefits,
   pointsBalance,
+  challengeDefinitions = [],
+  challengeProgress = [],
   onClose
 }: {
   visible: boolean;
@@ -619,12 +673,21 @@ function EmployeeDetailModal({
   stats: EmployeeStats | null;
   benefits: Benefit[];
   pointsBalance: number;
+  challengeDefinitions?: ChallengeDefinition[];
+  challengeProgress?: ChallengeProgress[];
   onClose: () => void;
 }) {
   if (!employee || !stats) return null;
 
   const recent = stats.reqs.slice(0, 5);
-  const tenureYears = yearsSince(employee.startDate) || employee.yearsEmployed || 0;
+  const employeeChallenges = challengeDefinitions
+    .map((definition) => {
+      const row = challengeProgress.find(
+        (item) => item.definitionId === definition.id && item.employeeId === employee.id
+      );
+      return { definition, row };
+    })
+    .filter(({ row }) => row);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -634,9 +697,6 @@ function EmployeeDetailModal({
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>{employee.name}</Text>
-              <Text style={styles.modalSub}>
-                Employee · {tenureYears} years · {employee.email}
-              </Text>
               <View style={styles.employeeMetaRow}>
                 <View style={styles.employeeMetaPill}>
                   <Text style={styles.employeeMetaPillText}>Birthday {formatDateLabel(employee.birthDate)}</Text>
@@ -668,6 +728,29 @@ function EmployeeDetailModal({
                 <Text style={styles.detailStatValue}>{currency(stats.pending)}</Text>
               </GlassPanel>
             </View>
+
+            {employeeChallenges.length ? (
+              <>
+                <Text style={styles.modalFieldLabel}>Challenges</Text>
+                {employeeChallenges.map(({ definition, row }) => (
+                  <View key={definition.id} style={styles.listRow}>
+                    <View style={styles.smallIcon}>
+                      <Trophy size={18} color={colors.accent} />
+                    </View>
+                    <View style={styles.listText}>
+                      <Text style={styles.listTitle}>{definition.title}</Text>
+                      <Text style={styles.listSub}>
+                        {row?.status === "completed"
+                          ? "Points awarded"
+                          : row?.submittedAt
+                            ? "Ready for review"
+                            : "In progress"}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </>
+            ) : null}
 
             <Text style={styles.modalFieldLabel}>Recent activity</Text>
             {recent.length ? (
@@ -926,25 +1009,41 @@ function RecentRedemptionsPreview({
 }
 
 function ChallengesPage({
-  challenges,
+  employerId,
+  definitions,
+  progressRows = [],
+  disabledTemplateKeys = [],
   employees = [],
   rewardEvents = [],
   employeePoints = {},
   selectionRequests = [],
   benefits = [],
   onOpenCreate,
+  onArchiveChallenge,
   onCompleteChallenge,
+  onCompleteChallengeForEmployee,
+  onToggleChallengeTemplate,
   onGrantReward,
   onSelectEmployee
 }: {
-  challenges: Challenge[];
+  employerId: string;
+  definitions: ChallengeDefinition[];
+  progressRows?: ChallengeProgress[];
+  disabledTemplateKeys?: string[];
   employees?: User[];
   rewardEvents?: RewardEvent[];
   employeePoints?: Record<string, number>;
   selectionRequests?: SelectionRequest[];
   benefits?: Benefit[];
   onOpenCreate: () => void;
-  onCompleteChallenge?: (challengeId: string) => void;
+  onArchiveChallenge?: (definitionId: string) => void | Promise<void>;
+  onCompleteChallenge?: (definitionId: string, employerId: string) => void | Promise<void>;
+  onCompleteChallengeForEmployee?: (
+    definitionId: string,
+    employerId: string,
+    employeeId: string
+  ) => void | Promise<void>;
+  onToggleChallengeTemplate?: (employerId: string, templateKey: string, enabled: boolean) => void;
   onGrantReward?: (input: {
     employeeId: string;
     employeeName: string;
@@ -958,35 +1057,55 @@ function ChallengesPage({
   const [spotEmployeeId, setSpotEmployeeId] = useState<"all" | string>(employees[0]?.id ?? "all");
   const [spotPoints, setSpotPoints] = useState("50");
   const [spotNote, setSpotNote] = useState("Great work this week");
+  const [employerFilter, setEmployerFilter] = useState<"active" | "completed">("active");
+  const [expandedPlatformId, setExpandedPlatformId] = useState<string | null>(null);
 
-  const openChallenges = challenges.filter((challenge) => challenge.status === "open");
-  const fireAutomation = (automation: RewardAutomation) => {
-    if (!onGrantReward || !employees.length) return;
-    employees.forEach((employee) => {
-      const points =
-        automation.kind === "anniversary"
-          ? automation.points * Math.max(1, yearsSince(employee.startDate) || employee.yearsEmployed || 1)
-          : automation.points;
-      onGrantReward({
-        employeeId: employee.id,
-        employeeName: employee.name,
-        kind: automation.kind === "seasonal" ? "seasonal" : automation.kind,
-        points,
-        note: automation.label
-      });
-    });
+  const employerCreated = definitions.filter((definition) => definition.source === "employer");
+  const platformDefinitions = definitions.filter((definition) => definition.source === "platform");
+  const analytics = computeChallengeAnalytics({
+    definitions,
+    progressRows,
+    rewardEvents,
+    employees
+  });
+
+  const filteredEmployerChallenges = employerCreated.filter((definition) => {
+    const hasOpen = progressRows.some(
+      (row) => row.definitionId === definition.id && row.status === "open"
+    );
+    return employerFilter === "active" ? definition.active && hasOpen : !hasOpen || !definition.active;
+  });
+
+  const openEmployerChallenges = employerCreated.filter((definition) =>
+    progressRows.some((row) => row.definitionId === definition.id && row.status === "open")
+  );
+
+  const confirmAwardAll = (definition: ChallengeDefinition) => {
+    if (!onCompleteChallenge) return;
+    const pendingCount = employees.filter((employee) => {
+      const row = progressRows.find(
+        (item) => item.definitionId === definition.id && item.employeeId === employee.id
+      );
+      return row?.status !== "completed";
+    }).length;
+
+    Alert.alert(
+      "Award all employees?",
+      `Grant ${definition.rewardPoints} points to ${pendingCount} employee${pendingCount === 1 ? "" : "s"} for "${definition.title}".`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Award all",
+          onPress: () => void onCompleteChallenge(definition.id, employerId)
+        }
+      ]
+    );
   };
 
   const toggleAutomation = (kind: RewardAutomation["kind"]) => {
-    setAutomations((current) => {
-      const next = current.map((item) => (item.kind === kind ? { ...item, enabled: !item.enabled } : item));
-      const toggled = next.find((item) => item.kind === kind);
-      if (toggled?.enabled) {
-        fireAutomation(toggled);
-        Alert.alert("Auto-granted", `${toggled.label} applied to ${employees.length} employee(s).`);
-      }
-      return next;
-    });
+    setAutomations((current) =>
+      current.map((item) => (item.kind === kind ? { ...item, enabled: !item.enabled } : item))
+    );
   };
 
   const updateAutomationPoints = (kind: RewardAutomation["kind"], points: string) => {
@@ -1042,7 +1161,7 @@ function ChallengesPage({
         <View style={styles.adminHeaderCopy}>
           <Text style={styles.greetingText}>Challenges</Text>
           <Text style={styles.greetingSub}>
-            {openChallenges.length} active · visible to all employees
+            {openEmployerChallenges.length} employer · {platformDefinitions.length} platform templates
           </Text>
         </View>
         <Pressable onPress={onOpenCreate} style={styles.inviteButton}>
@@ -1051,35 +1170,192 @@ function ChallengesPage({
         </Pressable>
       </View>
 
-      <Section title="Active challenges" meta={`${openChallenges.length}`}>
-        {openChallenges.length ? (
-          openChallenges.map((challenge) => (
-            <GlassPanel key={challenge.id} style={styles.challengeCard} intensity={24}>
+      <Section title="Challenge analytics" meta="This period">
+        <GlassPanel style={styles.compactPanel} intensity={18}>
+          <Text style={styles.listSub}>
+            Platform completion: {analytics.platformCompletionRate}% · Employer awards: {analytics.employerAwardsGiven}
+          </Text>
+          <Text style={styles.listSub}>
+            Challenge points: {analytics.challengePointsGranted.toLocaleString()} · Spot bonuses:{" "}
+            {analytics.spotPointsGranted.toLocaleString()}
+          </Text>
+        </GlassPanel>
+      </Section>
+
+      <Section title="PerX platform challenges" meta={`${platformDefinitions.length}`}>
+        {platformDefinitions.map((definition) => {
+          const templateKey = definition.templateKey as PlatformTemplateKey | undefined;
+          const enabled = templateKey ? !disabledTemplateKeys.includes(templateKey) : definition.active;
+          const stats = buildEmployerChallengeStats({ definition, progressRows, employees });
+          const expanded = expandedPlatformId === definition.id;
+          const employeeRows = employees.map((employee) => {
+            const row = progressRows.find(
+              (item) => item.definitionId === definition.id && item.employeeId === employee.id
+            );
+            return { employee, row };
+          });
+
+          return (
+            <GlassPanel key={definition.id} style={styles.challengeCard} intensity={20}>
               <View style={styles.challengeMeta}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.listTitle}>{challenge.title}</Text>
-                  <Text style={styles.listSub}>{challenge.description}</Text>
+                  <Text style={styles.listTitle}>{definition.title}</Text>
+                  <Text style={styles.listSub}>{definition.description}</Text>
                   <Text style={styles.listSub}>
-                    All employees · +{challenge.rewardPoints} pts
-                    {challenge.dueDate ? ` · due ${formatDateLabel(challenge.dueDate)}` : ""}
+                    Auto-tracked · +{definition.rewardPoints} pts
+                    {definition.pointCap ? ` · cap ${definition.pointCap}` : ""}
+                  </Text>
+                  <Text style={styles.listSub}>
+                    {stats.completedCount}/{stats.totalEmployees} completed
+                    {stats.inProgressCount ? ` · ${stats.inProgressCount} in progress` : ""}
                   </Text>
                 </View>
-                <CapsuleButton
-                  label="Complete"
-                  onPress={() => onCompleteChallenge?.(challenge.id)}
-                  variant="soft"
-                />
+                {templateKey && onToggleChallengeTemplate ? (
+                  <Pressable
+                    onPress={() => onToggleChallengeTemplate(employerId, templateKey, !enabled)}
+                    style={[styles.automationToggle, enabled && styles.automationToggleOn]}
+                  >
+                    <View style={[styles.automationKnob, enabled && styles.automationKnobOn]} />
+                  </Pressable>
+                ) : null}
               </View>
+              <Pressable onPress={() => setExpandedPlatformId(expanded ? null : definition.id)}>
+                <Text style={styles.challengeLinkText}>
+                  {expanded ? "Hide team progress" : "View team progress"}
+                </Text>
+              </Pressable>
+              {expanded ? (
+                <View style={styles.challengeEmployeeList}>
+                  {employeeRows.map(({ employee, row }) => (
+                    <View key={employee.id} style={styles.challengeEmployeeRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.listTitle}>{employee.name}</Text>
+                        <Text style={styles.listSub}>
+                          {row?.status === "completed"
+                            ? "Completed"
+                            : row
+                              ? `${row.current} / ${row.target} progress`
+                              : "Not started"}
+                        </Text>
+                      </View>
+                      {row?.status === "completed" ? (
+                        <Check size={18} color={colors.secondary} />
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </GlassPanel>
-          ))
+          );
+        })}
+      </Section>
+
+      <Section title="Employer challenges" meta={`${openEmployerChallenges.length} active`}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {(["active", "completed"] as const).map((filter) => {
+            const selected = employerFilter === filter;
+            return (
+              <Pressable
+                key={filter}
+                onPress={() => setEmployerFilter(filter)}
+                style={[styles.filterChip, selected && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
+                  {filter === "active" ? "Active" : "Completed"}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {filteredEmployerChallenges.length ? (
+          filteredEmployerChallenges.map((definition) => {
+            const stats = buildEmployerChallengeStats({ definition, progressRows, employees });
+            const awardsUsed = awardsUsedForDefinition(definition.id, progressRows);
+            const budgetLeft = definition.maxAwards ? definition.maxAwards - awardsUsed : null;
+            const employeeProgress = employees.map((employee) => {
+              const row = progressRows.find(
+                (item) => item.definitionId === definition.id && item.employeeId === employee.id
+              );
+              return { employee, row };
+            });
+            const hasOpen = employeeProgress.some(({ row }) => row?.status === "open" || !row);
+            const canAward = canAwardMore(definition, progressRows);
+
+            return (
+              <GlassPanel key={definition.id} style={styles.challengeCard} intensity={24}>
+                <View style={styles.challengeMeta}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.listTitle}>{definition.title}</Text>
+                    <Text style={styles.listSub}>{definition.description}</Text>
+                    <Text style={styles.listSub}>
+                      {employerDefinitionSummary(definition)} · +{definition.rewardPoints} pts · all employees
+                    </Text>
+                    <Text style={styles.listSub}>
+                      {stats.completedCount}/{stats.totalEmployees} awarded
+                      {budgetLeft != null ? ` · ${awardsUsed}/${definition.maxAwards} budget used` : ""}
+                    </Text>
+                  </View>
+                  <View style={{ gap: 8, alignItems: "flex-end" }}>
+                    {hasOpen && onCompleteChallenge && canAward ? (
+                      <CapsuleButton
+                        label="Award all"
+                        onPress={() => confirmAwardAll(definition)}
+                        variant="soft"
+                      />
+                    ) : hasOpen && !canAward ? (
+                      <Text style={styles.listSub}>Budget full</Text>
+                    ) : (
+                      <Text style={[styles.challengePoints, { color: colors.secondary }]}>Done</Text>
+                    )}
+                    {definition.active && onArchiveChallenge ? (
+                      <Pressable onPress={() => void onArchiveChallenge(definition.id)}>
+                        <Text style={styles.challengeLinkText}>Archive</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+                <View style={styles.challengeEmployeeList}>
+                  {employeeProgress.map(({ employee, row }) => {
+                    const completed = row?.status === "completed";
+                    const readyForReview = Boolean(row?.submittedAt) && !completed;
+                    return (
+                      <View key={employee.id} style={styles.challengeEmployeeRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.listTitle}>{employee.name}</Text>
+                          <Text style={styles.listSub}>
+                            {completed
+                              ? "Points awarded"
+                              : readyForReview
+                                ? "Ready for review"
+                                : "Not awarded yet"}
+                          </Text>
+                        </View>
+                        {!completed && onCompleteChallengeForEmployee && canAward ? (
+                          <CapsuleButton
+                            label="Award"
+                            variant="soft"
+                            onPress={() =>
+                              onCompleteChallengeForEmployee(definition.id, employerId, employee.id)
+                            }
+                          />
+                        ) : completed ? (
+                          <Check size={18} color={colors.secondary} />
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              </GlassPanel>
+            );
+          })
         ) : (
           <View style={styles.listRow}>
             <View style={styles.smallIcon}>
               <Trophy size={18} color={colors.text} />
             </View>
             <View style={styles.listText}>
-              <Text style={styles.listTitle}>No open challenges</Text>
-              <Text style={styles.listSub}>Create one to motivate your team.</Text>
+              <Text style={styles.listTitle}>No employer challenges</Text>
+              <Text style={styles.listSub}>Create a goal and award points when employees complete it.</Text>
             </View>
           </View>
         )}
@@ -1137,7 +1413,7 @@ function ChallengesPage({
 
       <Section title="Recognition automations">
         <Text style={styles.automationNote}>
-          Toggle rules and set reward amounts. Points grant automatically when each rule triggers.
+          Enable rules for future scheduled recognition. Toggles no longer grant points immediately.
         </Text>
         {automations.map((automation) => (
           <GlassPanel key={automation.kind} style={styles.automationRowCompact} intensity={18}>
@@ -1220,21 +1496,33 @@ function ChallengesPage({
 
 function CreateChallengeModal({
   visible,
-  employees,
   employerId,
   onClose,
   onCreate
 }: {
   visible: boolean;
-  employees: User[];
   employerId: string;
   onClose: () => void;
-  onCreate: (challenge: Omit<Challenge, "id" | "status">) => void;
+  onCreate: (input: {
+    employerId: string;
+    title: string;
+    description: string;
+    rewardPoints: number;
+    criterion: ChallengeCriterion;
+    target: "everyone" | string;
+    dueDate?: string;
+    startDate?: string;
+    maxAwards?: number;
+    pointCap?: number;
+  }) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [rewardPoints, setRewardPoints] = useState("75");
   const [dueDate, setDueDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [maxAwards, setMaxAwards] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -1242,10 +1530,21 @@ function CreateChallengeModal({
       setDescription("");
       setRewardPoints("75");
       setDueDate("");
+      setStartDate("");
+      setMaxAwards("");
+      setSaving(false);
     }
   }, [visible]);
 
-  const handleCreate = () => {
+  const parseDate = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : trimmed;
+  };
+
+  const handleCreate = async () => {
     const trimmedTitle = title.trim();
     const points = Number(rewardPoints.replace(/\D/g, ""));
     if (!trimmedTitle || !points) {
@@ -1253,18 +1552,50 @@ function CreateChallengeModal({
       return;
     }
 
-    onCreate({
-      employeeId: employees[0]?.id ?? "all",
-      employeeName: "All employees",
+    const parsedDue = parseDate(dueDate);
+    if (dueDate.trim() && parsedDue === null) {
+      Alert.alert("Invalid due date", "Use YYYY-MM-DD format.");
+      return;
+    }
+    const parsedStart = parseDate(startDate);
+    if (startDate.trim() && parsedStart === null) {
+      Alert.alert("Invalid start date", "Use YYYY-MM-DD format.");
+      return;
+    }
+
+    const parsedMaxAwards = maxAwards.trim()
+      ? Number(maxAwards.replace(/\D/g, ""))
+      : undefined;
+    if (maxAwards.trim() && (!parsedMaxAwards || parsedMaxAwards < 1)) {
+      Alert.alert("Invalid budget", "Max awards must be at least 1.");
+      return;
+    }
+
+    setSaving(true);
+    const ok = await onCreate({
       employerId,
       title: trimmedTitle,
       description: description.trim(),
       rewardPoints: points,
+      criterion: { kind: "manual" },
       target: "everyone",
-      dueDate: dueDate.trim() || undefined
+      dueDate: parsedDue,
+      startDate: parsedStart,
+      maxAwards: parsedMaxAwards,
+      pointCap: points
     });
+    setSaving(false);
+
+    if (!ok) {
+      Alert.alert("Could not save", "Try again in a moment.");
+      return;
+    }
+
     onClose();
-    Alert.alert("Challenge created", "All employees can see this challenge in their app.");
+    Alert.alert(
+      "Challenge created",
+      "All employees can see this goal. Award points individually when someone completes it."
+    );
   };
 
   return (
@@ -1275,28 +1606,46 @@ function CreateChallengeModal({
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>New challenge</Text>
-              <Text style={styles.modalSub}>Employees earn PerX Points when you mark it complete.</Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose}>
               <X size={18} color={colors.text} />
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <Text style={styles.modalFieldLabel}>Title</Text>
-            <TextInput value={title} onChangeText={setTitle} style={styles.input} placeholder="Friday wellness walk" />
-            <Text style={styles.modalFieldLabel}>Description</Text>
+            <Text style={styles.modalFieldLabel}>Goal</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              style={styles.input}
+              placeholder="Complete the Q2 wellness survey"
+            />
+            <Text style={styles.modalFieldLabel}>Instructions (optional)</Text>
             <TextInput
               value={description}
               onChangeText={setDescription}
               style={styles.input}
-              placeholder="What should employees do?"
+              placeholder="What should employees do to complete this?"
+              multiline
             />
             <Text style={styles.modalFieldLabel}>Reward points</Text>
             <TextInput value={rewardPoints} onChangeText={setRewardPoints} style={styles.input} keyboardType="number-pad" />
-            <Text style={styles.listSub}>This challenge is visible to all employees on your team.</Text>
+            <Text style={styles.modalFieldLabel}>Start date (optional)</Text>
+            <TextInput value={startDate} onChangeText={setStartDate} style={styles.input} placeholder="YYYY-MM-DD" />
             <Text style={styles.modalFieldLabel}>Due date (optional)</Text>
             <TextInput value={dueDate} onChangeText={setDueDate} style={styles.input} placeholder="YYYY-MM-DD" />
-            <CapsuleButton label="Create challenge" onPress={handleCreate} icon={<Trophy size={16} color={colors.onPrimary} />} />
+            <Text style={styles.modalFieldLabel}>Max awards (optional)</Text>
+            <TextInput
+              value={maxAwards}
+              onChangeText={setMaxAwards}
+              style={styles.input}
+              placeholder="e.g. 20"
+              keyboardType="number-pad"
+            />
+            <CapsuleButton
+              label={saving ? "Creating..." : "Create challenge"}
+              onPress={() => void handleCreate()}
+              icon={<Trophy size={16} color={colors.onPrimary} />}
+            />
           </ScrollView>
         </View>
       </View>

@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { Building2, Store, UserRound } from "lucide-react-native";
-import { ComponentProps, ReactNode, useEffect, useState } from "react";
+import { ComponentProps, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { AppIcon } from "./src/components/AppIcon";
 import { CapsuleButton } from "./src/components/CapsuleButton";
-import { GlassPanel } from "./src/components/GlassPanel";
 import { LogoutButton } from "./src/components/LogoutButton";
 import { MeshBackground } from "./src/components/MeshBackground";
 import { ScreenTransition } from "./src/components/ScreenTransition";
@@ -21,16 +20,38 @@ import { getSupabaseClient } from "./src/lib/supabase";
 import {
   createPlatformUser,
   createSelectionRequest,
+  createChallengeDefinition,
+  archiveChallengeDefinition,
+  submitChallengeProgress,
+  grantSpotReward,
   fetchEmployerEnabledBenefits,
   fetchPerxLiveData,
   PerxLiveData,
+  recordEmployeeLoginDay,
   requestPasswordReset,
+  seedPlatformChallengeDefinitions,
   setEmployerBenefitEnabled,
   setEmployerBenefitsEnabled,
+  setEmployerChallengeTemplateEnabled,
   signInPlatformUser,
   signInOrSignUpPlatformAuth,
   updateUserPointsBalance
 } from "./src/lib/perxRepository";
+import {
+  employeesForEmployer,
+  collectEmployerIds,
+  ensureProgressForDefinitions,
+  evaluateAndCompleteChallenges,
+  resolveEmployerIdForUser,
+  targetEmployeeIdsForDefinition
+} from "./src/lib/challengeService";
+import { defaultPlatformDefinitions } from "./src/lib/challengePlatformTemplates";
+import {
+  requestAppleHealthAccess,
+  syncEmployeeHealthData,
+  EmployeeHealthSnapshot
+} from "./src/lib/healthDataService";
+import { notify, registerForPushNotifications } from "./src/lib/notifications";
 import { BusinessExperience } from "./src/screens/BusinessScreen";
 import { EmployeeExperience } from "./src/screens/EmployeeScreens";
 import { EmployerExperience } from "./src/screens/EmployerScreen";
@@ -39,7 +60,9 @@ import { styles } from "./src/styles/appStyles";
 import { colors } from "./src/theme";
 import {
   Benefit,
-  Challenge,
+  ChallengeCriterion,
+  ChallengeDefinition,
+  ChallengeProgress,
   EmployeeInvite,
   EmployerWalletCard,
   EmployerInvite,
@@ -50,7 +73,6 @@ import {
   User
 } from "./src/types";
 import {
-  createDemoChallenges,
   createDemoInvites,
   createDemoRewardEvents,
   defaultRewardAutomations
@@ -71,6 +93,10 @@ const emptyAppData: AppData = {
   employerInvites: [],
   selectionRequests: [],
   employerWalletCards: [],
+  challengeDefinitions: [],
+  challengeProgress: [],
+  disabledChallengeTemplates: {},
+  employeeLoginDays: {},
   challenges: []
 };
 
@@ -99,7 +125,13 @@ function createSessionToken(role: Role) {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [selectionRequests, setSelectionRequests] = useState<SelectionRequest[]>([]);
-  const [challengeItems, setChallengeItems] = useState<Challenge[]>([]);
+  const [challengeDefinitions, setChallengeDefinitions] = useState<ChallengeDefinition[]>([]);
+  const [challengeProgress, setChallengeProgress] = useState<ChallengeProgress[]>([]);
+  const [disabledChallengeTemplates, setDisabledChallengeTemplates] = useState<Record<string, string[]>>({});
+  const [employeeLoginDays, setEmployeeLoginDays] = useState<Record<string, string[]>>({});
+  const [employeeHealthMetrics, setEmployeeHealthMetrics] = useState<
+    Record<string, EmployeeHealthSnapshot>
+  >({});
   const [inviteItems, setInviteItems] = useState<EmployerInvite[]>([]);
   const [walletCardItems, setWalletCardItems] = useState<EmployerWalletCard[]>([]);
   const [providerProfileItems, setProviderProfileItems] = useState<ProviderProfile[]>([]);
@@ -122,7 +154,11 @@ export default function App() {
     employerInvites: inviteItems,
     selectionRequests,
     employerWalletCards: walletCardItems,
-    challenges: challengeItems
+    challengeDefinitions,
+    challengeProgress,
+    disabledChallengeTemplates,
+    employeeLoginDays,
+    challenges: []
   };
 
   useEffect(() => {
@@ -132,7 +168,21 @@ export default function App() {
       if (!active || !data) return;
       setLiveData(data);
       setSelectionRequests(data.selectionRequests);
-      setChallengeItems(data.challenges);
+      let definitions = data.challengeDefinitions;
+      const employerIds = collectEmployerIds(data.users, data.companies);
+      for (const employerId of employerIds) {
+        const seeded = await seedPlatformChallengeDefinitions(employerId);
+        definitions = [
+          ...definitions.filter(
+            (item) => !(item.employerId === employerId && item.source === "platform")
+          ),
+          ...seeded
+        ];
+      }
+      setChallengeDefinitions(definitions);
+      setChallengeProgress(data.challengeProgress);
+      setDisabledChallengeTemplates(data.disabledChallengeTemplates);
+      setEmployeeLoginDays(data.employeeLoginDays);
       setInviteItems(data.employerInvites);
       setWalletCardItems(data.employerWalletCards);
       setProviderProfileItems(data.providerProfiles);
@@ -167,15 +217,31 @@ export default function App() {
 
     if (employee) {
       setRewardEvents(createDemoRewardEvents(employee.id, employee.name));
-      if (!challengeItems.length) {
-        setChallengeItems(createDemoChallenges(employerId, employee.id, employee.name));
-      }
     }
+
+    void (async () => {
+      if (employerId && !challengeDefinitions.some((item) => item.employerId === employerId)) {
+        const seeded = await seedPlatformChallengeDefinitions(employerId);
+        setChallengeDefinitions((current) => {
+          const withoutEmployer = current.filter((item) => item.employerId !== employerId);
+          return [...seeded, ...withoutEmployer];
+        });
+      } else if (employerId && !challengeDefinitions.length) {
+        setChallengeDefinitions(defaultPlatformDefinitions(employerId));
+      }
+    })();
+
     if (!employeeInvites.length) {
       setEmployeeInvites(createDemoInvites(employerId, companyId, companyName));
     }
     setDemoSeeded(true);
-  }, [appData.companies, appData.users, challengeItems.length, demoSeeded, employeeInvites.length]);
+  }, [
+    appData.companies,
+    appData.users,
+    challengeDefinitions,
+    demoSeeded,
+    employeeInvites.length
+  ]);
 
   const loginWithCredentials = async (email: string, password: string) => {
     const user = await signInPlatformUser({ email, password });
@@ -224,63 +290,331 @@ export default function App() {
     }
 
     setSession({ user: sessionUser, jwt: createSessionToken(sessionUser.role) });
+
+    if (sessionUser.role === "employee") {
+      const employerId = resolveEmployerIdForUser(
+        [...mergedUsers, sessionUser],
+        appData.companies,
+        sessionUser
+      );
+      if (employerId) {
+        const companyId = sessionUser.companyId ?? appData.companies[0]?.id ?? "";
+        const employees = employeesForEmployer([...mergedUsers, sessionUser], companyId, employerId);
+        const definitions = challengeDefinitions.filter(
+          (definition) =>
+            definition.active &&
+            (definition.source === "platform" || definition.employerId === employerId)
+        );
+        const progress = await ensureProgressForDefinitions({
+          definitions,
+          employees: [sessionUser],
+          existingProgress: challengeProgress
+        });
+        setChallengeProgress((current) => {
+          const merged = [...current];
+          for (const row of progress) {
+            const idx = merged.findIndex(
+              (item) => item.definitionId === row.definitionId && item.employeeId === row.employeeId
+            );
+            if (idx >= 0) merged[idx] = row;
+            else merged.push(row);
+          }
+          return merged;
+        });
+      }
+    }
   };
 
-  const handleCreateChallenge = (input: Omit<Challenge, "id" | "status">) => {
-    setChallengeItems((current) => [
-      {
-        ...input,
-        id: `challenge_${Date.now()}`,
-        status: "open"
-      },
-      ...current
-    ]);
-  };
+  const challengeDefinitionFingerprint = useMemo(
+    () =>
+      challengeDefinitions
+        .map((definition) => definition.id)
+        .sort()
+        .join(","),
+    [challengeDefinitions]
+  );
 
-  const handleCompleteChallenge = (challengeId: string) => {
-    const challenge = challengeItems.find((item) => item.id === challengeId);
-    if (!challenge || challenge.status === "completed") return;
+  useEffect(() => {
+    if (!session?.user || session.user.role !== "employee") return;
 
-    const targets =
-      challenge.target === "everyone"
-        ? mergedUsers.filter((user) => user.role === "employee")
-        : mergedUsers.filter((user) => user.id === challenge.target || user.id === challenge.employeeId);
+    void recordEmployeeLoginDay(session.user.id).then((dates) => {
+      setEmployeeLoginDays((current) => ({ ...current, [session.user.id]: dates }));
+    });
 
-    setChallengeItems((current) =>
-      current.map((item) => (item.id === challengeId ? { ...item, status: "completed" } : item))
+    void syncEmployeeHealthData().then(async (snapshot) => {
+      setEmployeeHealthMetrics((current) => ({ ...current, [session.user.id]: snapshot }));
+      await runChallengeEvaluation({ employee: session.user });
+    });
+
+    void registerForPushNotifications();
+  }, [session?.user?.id, session?.user?.role]);
+
+  useEffect(() => {
+    if (!session?.user || session.user.role !== "employee") return;
+    if (!challengeDefinitions.length) return;
+
+    const employerId = resolveEmployerIdForUser(mergedUsers, appData.companies, session.user);
+    if (!employerId) return;
+
+    const hasRelevantDefinitions = challengeDefinitions.some(
+      (definition) =>
+        definition.active &&
+        (definition.source === "platform" || definition.employerId === employerId)
+    );
+    if (!hasRelevantDefinitions) return;
+
+    void runChallengeEvaluation({ employee: session.user });
+  }, [session?.user?.id, session?.user?.role, challengeDefinitionFingerprint]);
+
+  const runChallengeEvaluation = async (input: {
+    employee: User;
+    completedBy?: "auto" | "employer_override";
+    forceDefinitionId?: string;
+  }) => {
+    const employerId = resolveEmployerIdForUser(mergedUsers, appData.companies, input.employee);
+    if (!employerId || input.employee.role !== "employee") return;
+
+    const companyId = input.employee.companyId ?? appData.companies[0]?.id ?? "";
+    const employees = employeesForEmployer(mergedUsers, companyId, employerId);
+    const definitions = challengeDefinitions.filter(
+      (definition) =>
+        definition.active &&
+        (definition.source === "platform" || definition.employerId === employerId)
     );
 
-    targets.forEach((employee) => {
-      setEmployeePoints((current) => ({
-        ...current,
-        [employee.id]: (current[employee.id] ?? 0) + challenge.rewardPoints
-      }));
-      setRewardEvents((current) => [
-        {
-          id: `reward_challenge_${challengeId}_${employee.id}`,
-          employeeId: employee.id,
-          employeeName: employee.name,
-          kind: "challenge",
-          points: challenge.rewardPoints,
-          note: challenge.title,
-          createdAt: new Date().toISOString()
-        },
-        ...current
-      ]);
+    const progress = await ensureProgressForDefinitions({
+      definitions,
+      employees: [input.employee],
+      existingProgress: challengeProgress
+    });
+    setChallengeProgress(progress);
+
+    const loginDates =
+      employeeLoginDays[input.employee.id] ??
+      (await recordEmployeeLoginDay(input.employee.id));
+
+    const healthMetrics = employeeHealthMetrics[input.employee.id];
+
+    const result = await evaluateAndCompleteChallenges({
+      definitions,
+      progressRows: progress,
+      employee: input.employee,
+      employerId,
+      employees,
+      disabledTemplateKeys: disabledChallengeTemplates[employerId] ?? [],
+      selectionRequests,
+      benefits: benefitItems,
+      loginDates,
+      healthMetrics,
+      employeePoints,
+      completedBy: input.completedBy,
+      forceDefinitionId: input.forceDefinitionId
+    });
+
+    setChallengeProgress(result.progressRows);
+
+    if (result.expiredDefinitionIds.length) {
+      setChallengeDefinitions((current) =>
+        current.map((definition) =>
+          result.expiredDefinitionIds.includes(definition.id)
+            ? { ...definition, active: false }
+            : definition
+        )
+      );
+    }
+
+    const employeeId = input.employee.id;
+    const delta = result.employeePointsDelta[employeeId];
+    if (delta !== undefined) {
+      setEmployeePoints((current) => {
+        const next = { ...current, [employeeId]: (current[employeeId] ?? 0) + delta };
+        return next;
+      });
+    }
+
+    if (result.rewardEvents.length) {
+      setRewardEvents((current) => [...result.rewardEvents, ...current]);
+      if (input.employee.id === session?.user?.id) {
+        for (const event of result.rewardEvents) {
+          void notify.challengeCompleted(event.note, event.points);
+        }
+      }
+    }
+  };
+
+  const handleCreateChallenge = async (input: {
+    employerId: string;
+    title: string;
+    description: string;
+    rewardPoints: number;
+    criterion: ChallengeCriterion;
+    target: "everyone" | string;
+    dueDate?: string;
+    startDate?: string;
+    maxAwards?: number;
+    pointCap?: number;
+  }): Promise<boolean> => {
+    const definition = await createChallengeDefinition(input);
+    if (!definition) return false;
+
+    setChallengeDefinitions((current) => [definition, ...current]);
+
+    const company = appData.companies.find((item) => item.employerId === input.employerId);
+    const employees = employeesForEmployer(
+      mergedUsers,
+      company?.id ?? "",
+      input.employerId
+    );
+    const employeeIds = targetEmployeeIdsForDefinition(definition, employees);
+    const progress = await ensureProgressForDefinitions({
+      definitions: [definition],
+      employees: employees.filter((employee) => employeeIds.includes(employee.id)),
+      existingProgress: challengeProgress
+    });
+    setChallengeProgress((current) => {
+      const merged = [...current];
+      for (const row of progress) {
+        const idx = merged.findIndex(
+          (item) => item.definitionId === row.definitionId && item.employeeId === row.employeeId
+        );
+        if (idx >= 0) merged[idx] = row;
+        else merged.push(row);
+      }
+      return merged;
+    });
+
+    for (const employee of employees) {
+      void notify.challengeCreated(definition.title);
+    }
+
+    return true;
+  };
+
+  const handleArchiveChallenge = async (definitionId: string) => {
+    const ok = await archiveChallengeDefinition(definitionId);
+    if (!ok) return;
+    setChallengeDefinitions((current) =>
+      current.map((definition) =>
+        definition.id === definitionId ? { ...definition, active: false } : definition
+      )
+    );
+  };
+
+  const handleSubmitChallenge = async (definitionId: string, employee: User) => {
+    const progressRow = challengeProgress.find(
+      (row) => row.definitionId === definitionId && row.employeeId === employee.id && row.status === "open"
+    );
+    if (!progressRow) return;
+
+    const updated = await submitChallengeProgress({ progressId: progressRow.id });
+    if (!updated) return;
+
+    setChallengeProgress((current) =>
+      current.map((row) => (row.id === updated.id ? updated : row))
+    );
+  };
+
+  const handleCompleteChallenge = async (definitionId: string, employerId: string) => {
+    const definition = challengeDefinitions.find((item) => item.id === definitionId);
+    if (!definition) return;
+
+    const company = appData.companies.find((item) => item.employerId === employerId);
+    const allEmployees = employeesForEmployer(mergedUsers, company?.id ?? "", employerId);
+
+    const progress = await ensureProgressForDefinitions({
+      definitions: [definition],
+      employees: allEmployees,
+      existingProgress: challengeProgress
+    });
+    setChallengeProgress((current) => {
+      const merged = [...current];
+      for (const row of progress) {
+        const idx = merged.findIndex(
+          (item) => item.definitionId === row.definitionId && item.employeeId === row.employeeId
+        );
+        if (idx >= 0) merged[idx] = row;
+        else merged.push(row);
+      }
+      return merged;
+    });
+
+    for (const employee of allEmployees) {
+      await runChallengeEvaluation({
+        employee,
+        completedBy: "employer_override",
+        forceDefinitionId: definitionId
+      });
+    }
+  };
+
+  const handleCompleteChallengeForEmployee = async (
+    definitionId: string,
+    employerId: string,
+    employeeId: string
+  ) => {
+    const definition = challengeDefinitions.find((item) => item.id === definitionId);
+    const employee = mergedUsers.find((user) => user.id === employeeId);
+    if (!definition || !employee) return;
+
+    const progress = await ensureProgressForDefinitions({
+      definitions: [definition],
+      employees: [employee],
+      existingProgress: challengeProgress
+    });
+    setChallengeProgress((current) => {
+      const merged = [...current];
+      for (const row of progress) {
+        const idx = merged.findIndex(
+          (item) => item.definitionId === row.definitionId && item.employeeId === row.employeeId
+        );
+        if (idx >= 0) merged[idx] = row;
+        else merged.push(row);
+      }
+      return merged;
+    });
+
+    await runChallengeEvaluation({
+      employee,
+      completedBy: "employer_override",
+      forceDefinitionId: definitionId
     });
   };
 
-  const handleGrantReward = (input: {
+  const handleConnectAppleHealth = async (employeeId: string) => {
+    const snapshot = await requestAppleHealthAccess();
+    setEmployeeHealthMetrics((current) => ({ ...current, [employeeId]: snapshot }));
+    const employee = mergedUsers.find((user) => user.id === employeeId);
+    if (employee) {
+      await runChallengeEvaluation({ employee });
+    }
+  };
+
+  const handleToggleChallengeTemplate = (employerId: string, templateKey: string, enabled: boolean) => {
+    setDisabledChallengeTemplates((current) => {
+      const existing = current[employerId] ?? [];
+      const next = enabled
+        ? existing.filter((key) => key !== templateKey)
+        : Array.from(new Set([...existing, templateKey]));
+      return { ...current, [employerId]: next };
+    });
+    void setEmployerChallengeTemplateEnabled(employerId, templateKey, enabled);
+  };
+
+  const handleGrantReward = async (input: {
     employeeId: string;
     employeeName: string;
     kind: RewardEvent["kind"];
     points: number;
     note: string;
   }) => {
-    setEmployeePoints((current) => {
-      const next = { ...current, [input.employeeId]: (current[input.employeeId] ?? 0) + input.points };
-      updateUserPointsBalance(input.employeeId, next[input.employeeId]);
-      return next;
+    const currentBalance = employeePoints[input.employeeId] ?? 0;
+    const newBalance = currentBalance + input.points;
+    setEmployeePoints((current) => ({ ...current, [input.employeeId]: newBalance }));
+    await grantSpotReward({
+      employeeId: input.employeeId,
+      rewardPoints: input.points,
+      note: input.note,
+      newBalance
     });
     setRewardEvents((current) => [
       {
@@ -406,6 +740,8 @@ export default function App() {
       benefits: input.benefits
     });
 
+    void runChallengeEvaluation({ employee: input.employee });
+
     return true;
   };
 
@@ -421,6 +757,7 @@ export default function App() {
           {session ? (
             <AppHeader
               session={session}
+              appData={appData}
               onLogout={() => setSession(null)}
             />
           ) : null}
@@ -456,7 +793,10 @@ export default function App() {
                   ])
                 }
                 onCreateChallenge={handleCreateChallenge}
+                onArchiveChallenge={handleArchiveChallenge}
                 onCompleteChallenge={handleCompleteChallenge}
+                onCompleteChallengeForEmployee={handleCompleteChallengeForEmployee}
+                onToggleChallengeTemplate={handleToggleChallengeTemplate}
                 onGrantReward={handleGrantReward}
                 onSendEmployeeInvite={handleSendEmployeeInvite}
                 employerEnabledBenefits={employerEnabledBenefits}
@@ -495,6 +835,8 @@ export default function App() {
                     benefits
                   });
                 }}
+                employeeHealthMetrics={employeeHealthMetrics}
+                onConnectAppleHealth={handleConnectAppleHealth}
               />
             ) : (
               <LoginScreen
@@ -512,26 +854,36 @@ export default function App() {
   );
 }
 
+function headerDisplayName(session: Session, appData: AppData): string {
+  const { user } = session;
+  if (user.role === "business") {
+    const profile = appData.providerProfiles.find((item) => item.userId === user.id);
+    return profile?.businessName ?? user.name;
+  }
+  return user.name;
+}
+
 function AppHeader({
   session,
+  appData,
   onLogout
 }: {
-  session: Session | null;
+  session: Session;
+  appData: AppData;
   onLogout: () => void;
 }) {
+  const displayName = headerDisplayName(session, appData);
+
   return (
     <View style={styles.header}>
       <View style={styles.headerBrand}>
-        <AppIcon name="view-grid-outline" size={22} color={colors.primary} />
-        <View>
-          <Text style={styles.brand}>PerX</Text>
-          <Text style={styles.headerSub}>
-            {session ? `${session.user.role} access` : "AI wallet & perks"}
-          </Text>
-        </View>
+        <Text style={styles.brand}>PerX</Text>
+        <Text style={styles.headerUserName} numberOfLines={1}>
+          {displayName}
+        </Text>
       </View>
       <View style={styles.headerActions}>
-        {session ? <LogoutButton onPress={onLogout} /> : null}
+        <LogoutButton onPress={onLogout} />
       </View>
     </View>
   );
@@ -692,7 +1044,7 @@ function LoginScreen({
         <Text style={styles.loginTitle}>{isLogin ? "Log in" : "Sign up"}</Text>
       </View>
 
-      <GlassPanel style={styles.loginCard} intensity={40}>
+      <View style={styles.loginCard}>
         {!isLogin ? (
           <View style={styles.loginRoleStack}>
             {roleOptions.map((option) => {
@@ -801,7 +1153,7 @@ function LoginScreen({
 
         {message ? <Text style={styles.errorText}>{message}</Text> : null}
         {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
-      </GlassPanel>
+      </View>
 
       <Pressable
         onPress={() => {
@@ -858,10 +1210,11 @@ function LoginField({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.soft}
-        style={styles.loginFieldInput}
+        style={[styles.loginFieldInput, Platform.OS === "web" && styles.loginFieldInputWeb]}
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize ?? "sentences"}
+        underlineColorAndroid="transparent"
       />
       {trailing}
     </View>
@@ -881,7 +1234,10 @@ function RoleRouter({
   onUpdateProviderProfile,
   onAddOffer,
   onCreateChallenge,
+  onArchiveChallenge,
   onCompleteChallenge,
+  onCompleteChallengeForEmployee,
+  onToggleChallengeTemplate,
   onGrantReward,
   onSendEmployeeInvite,
   employerEnabledBenefits,
@@ -889,7 +1245,9 @@ function RoleRouter({
   onToggleBenefit,
   onToggleProvider,
   onPayForPerk,
-  onPayForPerks
+  onPayForPerks,
+  employeeHealthMetrics = {},
+  onConnectAppleHealth
 }: {
   session: Session;
   appData: AppData;
@@ -902,8 +1260,26 @@ function RoleRouter({
   onSubmitSelection: (request: SelectionRequest) => void;
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
   onAddOffer: (offer: Benefit) => void;
-  onCreateChallenge: (challenge: Omit<Challenge, "id" | "status">) => void;
-  onCompleteChallenge: (challengeId: string) => void;
+  onCreateChallenge: (input: {
+    employerId: string;
+    title: string;
+    description: string;
+    rewardPoints: number;
+    criterion: ChallengeCriterion;
+    target: "everyone" | string;
+    dueDate?: string;
+    startDate?: string;
+    maxAwards?: number;
+    pointCap?: number;
+  }) => void | Promise<boolean>;
+  onArchiveChallenge?: (definitionId: string) => void | Promise<void>;
+  onCompleteChallenge: (definitionId: string, employerId: string) => void | Promise<void>;
+  onCompleteChallengeForEmployee?: (
+    definitionId: string,
+    employerId: string,
+    employeeId: string
+  ) => void | Promise<void>;
+  onToggleChallengeTemplate: (employerId: string, templateKey: string, enabled: boolean) => void;
   onGrantReward: (input: {
     employeeId: string;
     employeeName: string;
@@ -918,6 +1294,8 @@ function RoleRouter({
   onToggleProvider: (benefitIds: string[], selected: boolean) => void;
   onPayForPerk: (benefit: Benefit) => boolean;
   onPayForPerks: (benefits: Benefit[]) => boolean;
+  employeeHealthMetrics?: Record<string, EmployeeHealthSnapshot>;
+  onConnectAppleHealth?: (employeeId: string) => void | Promise<void>;
 }) {
   if (session.user.role === "employer") {
     return (
@@ -930,7 +1308,10 @@ function RoleRouter({
         rewardEvents={rewardEvents}
         employeeInvites={employeeInvites}
         onCreateChallenge={onCreateChallenge}
+        onArchiveChallenge={onArchiveChallenge}
         onCompleteChallenge={onCompleteChallenge}
+        onCompleteChallengeForEmployee={onCompleteChallengeForEmployee}
+        onToggleChallengeTemplate={onToggleChallengeTemplate}
         onGrantReward={onGrantReward}
         onSendEmployeeInvite={onSendEmployeeInvite}
         enabledBenefitIds={enabledBenefitIds}
@@ -962,13 +1343,15 @@ function RoleRouter({
       onLogout={onLogout}
       pointsBalance={employeePoints[session.user.id] ?? 0}
       rewardEvents={rewardEvents.filter((event) => event.employeeId === session.user.id)}
-      openChallenges={appData.challenges.filter(
-        (challenge) =>
-          challenge.status === "open" &&
-          (challenge.target === "everyone" ||
-            challenge.target === session.user.id ||
-            challenge.employeeId === session.user.id)
-      )}
+      challengeDefinitions={appData.challengeDefinitions}
+      challengeProgress={appData.challengeProgress}
+      disabledChallengeTemplates={appData.disabledChallengeTemplates}
+      employeeLoginDays={appData.employeeLoginDays}
+      employeeHealthMetrics={employeeHealthMetrics[session.user.id]}
+      onConnectAppleHealth={
+        onConnectAppleHealth ? () => onConnectAppleHealth(session.user.id) : undefined
+      }
+      onSubmitChallenge={(definitionId) => handleSubmitChallenge(definitionId, session.user)}
       onPayForPerk={onPayForPerk}
       onPayForPerks={onPayForPerks}
     />

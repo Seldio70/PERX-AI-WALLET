@@ -100,6 +100,66 @@ export type EmployerWalletCard = {
   accent: string;
 };
 
+export type ChallengeCriterion =
+  | { kind: "redeem_count"; count: number; period: "month" | "week" | "all_time" }
+  | { kind: "redeem_category"; category: BenefitCategory; count: number; period: "month" }
+  | { kind: "redeem_new_category"; count: number; period: "month" }
+  | { kind: "login_streak"; days: number }
+  | { kind: "health_steps"; count: number; period: "day" | "week" }
+  | { kind: "health_sleep"; hours: number; period: "day" }
+  | { kind: "manual" };
+
+export type ChallengeDefinition = {
+  id: string;
+  source: "platform" | "employer";
+  employerId?: string;
+  templateKey?: string;
+  title: string;
+  description: string;
+  rewardPoints: number;
+  criterion: ChallengeCriterion;
+  target: "everyone" | string;
+  dueDate?: string;
+  startDate?: string;
+  maxAwards?: number;
+  pointCap?: number;
+  active: boolean;
+  createdAt?: string;
+};
+
+export type ChallengeProgress = {
+  id: string;
+  definitionId: string;
+  employeeId: string;
+  current: number;
+  target: number;
+  status: "open" | "completed";
+  submittedAt?: string;
+  completedAt?: string;
+  completedBy?: "auto" | "employer_override";
+};
+
+/** Unified view for employee/employer UI */
+export type ChallengeView = ChallengeDefinition & {
+  progressId?: string;
+  employeeId?: string;
+  current: number;
+  progressTarget: number;
+  status: "open" | "completed";
+  progressLabel: string;
+  submittedAt?: string;
+  completedAt?: string;
+  completedBy?: "auto" | "employer_override";
+};
+
+export type ChallengeEmployerStats = {
+  definitionId: string;
+  totalEmployees: number;
+  completedCount: number;
+  inProgressCount: number;
+};
+
+/** @deprecated Use ChallengeDefinition + ChallengeProgress */
 export type Challenge = {
   id: string;
   employeeId: string;

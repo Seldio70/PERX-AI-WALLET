@@ -14,9 +14,9 @@ export const styles = StyleSheet.create({
     backgroundColor: "transparent"
   },
   headerBrand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10
+    flex: 1,
+    minWidth: 0,
+    gap: 1
   },
   header: {
     paddingHorizontal: 20,
@@ -36,6 +36,12 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     textTransform: "capitalize"
+  },
+  headerUserName: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: -0.2
   },
   headerActions: {
     flexDirection: "row",
@@ -549,23 +555,27 @@ export const styles = StyleSheet.create({
     textAlign: "center"
   },
   loginCard: {
-    padding: 24,
-    gap: 12
+    gap: 16
   },
   loginFieldWrap: {
-    minHeight: 56,
-    borderRadius: radius.capsule,
-    backgroundColor: "rgba(0,0,0,0.03)",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    gap: 12
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.strokeSubtle,
+    paddingBottom: 10,
+    paddingTop: 6
   },
   loginFieldInput: {
     flex: 1,
     color: colors.text,
-    fontSize: 15,
-    paddingVertical: 12
+    fontSize: 16,
+    paddingVertical: 8
+  },
+  loginFieldInputWeb: {
+    outlineStyle: "solid",
+    outlineWidth: 0,
+    outlineColor: "transparent"
   },
   loginForgotLink: {
     alignSelf: "flex-end",
@@ -1088,15 +1098,15 @@ export const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(15,23,42,0.36)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "flex-end"
   },
   modalSheet: {
-    backgroundColor: colors.glassStrong,
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderWidth: 0.8,
-    borderColor: colors.glassEdge,
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerHigh,
     maxHeight: "92%",
     paddingTop: 8,
     paddingHorizontal: 20,
@@ -1137,9 +1147,9 @@ export const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 0.8,
-    borderColor: colors.glassEdge,
-    backgroundColor: colors.glass
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainer
   },
   modalContent: {
     gap: 14,
@@ -2532,6 +2542,49 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8
   },
+  challengeEmployeeList: {
+    gap: 10,
+    marginTop: 4
+  },
+  challengeEmployeeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,88,188,0.08)"
+  },
+  challengeLinkText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 4
+  },
+  challengeSourceBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,88,188,0.1)",
+    marginBottom: 6
+  },
+  challengeSourceBadgeText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase"
+  },
+  challengeMilestoneBanner: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,88,188,0.08)"
+  },
+  challengeMilestoneText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "700"
+  },
   challengePoints: {
     color: colors.primary,
     fontSize: 14,
@@ -2782,7 +2835,7 @@ export const styles = StyleSheet.create({
   },
   accountHero: {
     alignItems: "center",
-    marginBottom: 4
+    marginBottom: 20
   },
   accountAvatarRing: {
     borderRadius: radius.capsule,
@@ -2815,6 +2868,10 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 8,
     textAlign: "center"
+  },
+  accountSettingsList: {
+    gap: 12,
+    marginBottom: 20
   },
   accountSettingsRow: {
     padding: 16,
@@ -2861,7 +2918,7 @@ export const styles = StyleSheet.create({
     marginTop: 10
   },
   accountSubpage: {
-    gap: 14
+    gap: 18
   },
   accountBackRow: {
     flexDirection: "row",
@@ -2899,6 +2956,9 @@ export const styles = StyleSheet.create({
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
+    gap: 12
+  },
+  accountToggleList: {
     gap: 12
   },
   accountCycleRow: {
@@ -2991,6 +3051,11 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.glass,
     borderWidth: 0.8,
     borderColor: colors.glassEdge
+  },
+  employerStatPressable: {
+    alignItems: "center",
+    gap: 3,
+    width: "100%"
   },
   employerStatValue: {
     color: colors.text,

@@ -27,7 +27,15 @@ import {
 } from "react-native";
 import { BottomNav, NavTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
-import { EmployeePointChallenges } from "../components/EmployeePointChallenges";
+import { EmployeePointChallenges, ChallengeListCard } from "../components/EmployeePointChallenges";
+import { ConfettiBurst } from "../components/ConfettiBurst";
+import {
+  mergeChallengeViewsForEmployee,
+  openChallengeViews,
+  completedChallengeViews,
+  resolveEmployerIdForUser
+} from "../lib/challengeService";
+import { EmployeeHealthSnapshot } from "../lib/healthDataService";
 import { GlassPanel } from "../components/GlassPanel";
 import { PointsHealthRing } from "../components/PointsHealthRing";
 import { ScreenTransition } from "../components/ScreenTransition";
@@ -51,7 +59,7 @@ import {
 import { PerxLiveData } from "../lib/perxRepository";
 import { styles } from "../styles/appStyles";
 import { colors } from "../theme";
-import { Benefit, BenefitCategory, Challenge, RewardEvent, SelectionRequest, User } from "../types";
+import { Benefit, BenefitCategory, ChallengeDefinition, ChallengeProgress, ChallengeView, RewardEvent, SelectionRequest, User } from "../types";
 import {
   formatDateLabel,
   rewardKindLabel
@@ -79,13 +87,27 @@ const employeeTabs: Array<NavTab<EmployeeTab>> = [
   { id: "profile", label: "Profile", icon: "account-circle-outline", iconActive: "account-circle" }
 ];
 
-function challengesForEmployee(challenges: Challenge[], userId: string) {
-  return challenges.filter(
-    (challenge) =>
-      challenge.target === "everyone" ||
-      challenge.target === userId ||
-      challenge.employeeId === userId
-  );
+function useEmployeeChallengeViews(input: {
+  user: User;
+  appData: AppData;
+  employeeLoginDays: Record<string, string[]>;
+  employeeHealthMetrics?: EmployeeHealthSnapshot;
+}) {
+  return useMemo(() => {
+    const employerId = resolveEmployerIdForUser(input.appData.users, input.appData.companies, input.user);
+    if (!employerId) return [];
+    return mergeChallengeViewsForEmployee({
+      definitions: input.appData.challengeDefinitions,
+      progressRows: input.appData.challengeProgress,
+      employee: input.user,
+      employerId,
+      disabledTemplateKeys: input.appData.disabledChallengeTemplates[employerId] ?? [],
+      selectionRequests: input.appData.selectionRequests,
+      benefits: input.appData.benefits,
+      loginDates: input.employeeLoginDays[input.user.id] ?? [],
+      healthMetrics: input.employeeHealthMetrics
+    });
+  }, [input.user, input.appData, input.employeeLoginDays, input.employeeHealthMetrics]);
 }
 
 function shufflePackageWithinBudget(benefits: Benefit[], pointsBudget: number, maxItems = 4) {
@@ -127,7 +149,13 @@ export function EmployeeExperience({
   onLogout,
   pointsBalance = 0,
   rewardEvents = [],
-  openChallenges = [],
+  challengeDefinitions = [],
+  challengeProgress = [],
+  disabledChallengeTemplates = {},
+  employeeLoginDays = {},
+  employeeHealthMetrics,
+  onConnectAppleHealth,
+  onSubmitChallenge,
   onPayForPerk,
   onPayForPerks
 }: {
@@ -137,11 +165,19 @@ export function EmployeeExperience({
   onLogout: () => void;
   pointsBalance?: number;
   rewardEvents?: RewardEvent[];
-  openChallenges?: Challenge[];
+  challengeDefinitions?: ChallengeDefinition[];
+  challengeProgress?: ChallengeProgress[];
+  disabledChallengeTemplates?: Record<string, string[]>;
+  employeeLoginDays?: Record<string, string[]>;
+  employeeHealthMetrics?: EmployeeHealthSnapshot;
+  onConnectAppleHealth?: () => void | Promise<void>;
+  onSubmitChallenge?: (definitionId: string) => void | Promise<void>;
   onPayForPerk?: (benefit: Benefit) => boolean;
   onPayForPerks?: (benefits: Benefit[]) => boolean;
 }) {
   const [tab, setTab] = useState<EmployeeTab>("home");
+  const [celebrateKey, setCelebrateKey] = useState(0);
+  const completedCountRef = useRef(0);
 
   const company =
     appData.companies.find((item) => item.id === user.companyId) ??
@@ -160,10 +196,39 @@ export function EmployeeExperience({
       }),
     [user, pointsBalance, appData.selectionRequests]
   );
-  const employeeChallenges = useMemo(
-    () => challengesForEmployee(appData.challenges, user.id),
-    [appData.challenges, user.id]
-  );
+  const challengeViews = useEmployeeChallengeViews({
+    user,
+    appData: {
+      ...appData,
+      challengeDefinitions,
+      challengeProgress,
+      disabledChallengeTemplates
+    },
+    employeeLoginDays,
+    employeeHealthMetrics
+  });
+  const activeChallenges = useMemo(() => openChallengeViews(challengeViews), [challengeViews]);
+  const completedChallenges = useMemo(() => completedChallengeViews(challengeViews), [challengeViews]);
+
+  useEffect(() => {
+    if (completedChallenges.length > completedCountRef.current) {
+      setCelebrateKey((value) => value + 1);
+    }
+    completedCountRef.current = completedChallenges.length;
+  }, [completedChallenges.length]);
+
+  const milestoneMessage = useMemo(() => {
+    const candidate = activeChallenges.find(
+      (challenge) =>
+        challenge.source === "platform" &&
+        challenge.progressTarget > 0 &&
+        challenge.current / challenge.progressTarget >= 0.5 &&
+        challenge.current < challenge.progressTarget
+    );
+    if (!candidate) return null;
+    const remaining = candidate.progressTarget - candidate.current;
+    return `Almost there — ${remaining} more step${remaining === 1 ? "" : "s"} to earn ${candidate.rewardPoints} pts on "${candidate.title}".`;
+  }, [activeChallenges]);
   const now = useMemo(() => new Date(), []);
   const benefits = appData.benefits;
   const basePlan = useMemo(
@@ -255,6 +320,7 @@ export function EmployeeExperience({
 
   return (
     <View style={styles.roleShell}>
+      {celebrateKey > 0 ? <ConfettiBurst key={celebrateKey} /> : null}
       <ScrollView
         contentContainerStyle={[styles.screenContent, styles.employeeContent]}
         showsVerticalScrollIndicator={false}
@@ -270,9 +336,14 @@ export function EmployeeExperience({
               onSubmitSelection={onSubmitSelection}
               pointsBalance={pointsBalance}
               rewardEvents={rewardEvents}
-              openChallenges={openChallenges}
+              challengeViews={challengeViews}
               onPayForPerk={onPayForPerk}
               onPayForPerks={onPayForPerks}
+              healthConnected={employeeHealthMetrics?.connected}
+              onConnectAppleHealth={onConnectAppleHealth}
+              onSubmitChallenge={onSubmitChallenge}
+              onGoToChallenges={() => setTab("challenges")}
+              milestoneMessage={milestoneMessage}
               planItems={planItems}
               planTotal={planTotal}
               packageOpen={packageOpen}
@@ -293,10 +364,12 @@ export function EmployeeExperience({
           ) : null}
           {tab === "challenges" ? (
             <EmployeeChallenges
-              openChallenges={openChallenges}
-              allChallenges={employeeChallenges}
+              challengeViews={challengeViews}
               pointsBalance={pointsBalance}
               rewardEvents={rewardEvents}
+              healthConnected={employeeHealthMetrics?.connected}
+              onConnectAppleHealth={onConnectAppleHealth}
+              onSubmitChallenge={onSubmitChallenge}
             />
           ) : null}
           {tab === "alerts" ? (
@@ -320,27 +393,32 @@ export function EmployeeExperience({
 }
 
 function EmployeeChallenges({
-  openChallenges,
-  allChallenges,
+  challengeViews,
   pointsBalance,
-  rewardEvents
+  rewardEvents,
+  healthConnected,
+  onConnectAppleHealth,
+  onSubmitChallenge
 }: {
-  openChallenges: Challenge[];
-  allChallenges: Challenge[];
+  challengeViews: ChallengeView[];
   pointsBalance: number;
   rewardEvents: RewardEvent[];
+  healthConnected?: boolean;
+  onConnectAppleHealth?: () => void | Promise<void>;
+  onSubmitChallenge?: (definitionId: string) => void | Promise<void>;
 }) {
-  const completedChallenges = allChallenges.filter((challenge) => challenge.status === "completed");
-  const availablePoints = openChallenges.reduce((sum, challenge) => sum + challenge.rewardPoints, 0);
+  const active = openChallengeViews(challengeViews);
+  const completed = completedChallengeViews(challengeViews);
+  const availablePoints = active.reduce((sum, challenge) => sum + challenge.rewardPoints, 0);
 
   return (
     <>
       <View style={styles.greeting}>
         <Text style={styles.greetingText}>Challenges</Text>
         <Text style={styles.greetingSub}>
-          {openChallenges.length
-            ? `${openChallenges.length} active from your employer · ${availablePoints.toLocaleString()} pts to earn`
-            : "New employer challenges will show up here as soon as they go live."}
+          {active.length
+            ? `${active.length} active · ${availablePoints.toLocaleString()} pts to earn`
+            : "Complete platform and employer challenges to earn PerX Points."}
         </Text>
       </View>
 
@@ -349,64 +427,28 @@ function EmployeeChallenges({
           <View style={{ flex: 1 }}>
             <Text style={styles.pointsHeroValue}>{pointsBalance.toLocaleString()}</Text>
             <Text style={styles.pointsHeroSub}>
-              Complete challenges to earn more PerX Points.
+              Platform goals track automatically. Employer goals are awarded by your manager.
             </Text>
           </View>
           <Trophy size={28} color={colors.primary} />
         </View>
       </GlassPanel>
 
-      <Section title="Active challenges" meta={`${openChallenges.length}`}>
-        {openChallenges.length ? (
-          openChallenges.map((challenge) => (
-            <GlassPanel key={challenge.id} style={styles.challengeCard} intensity={24}>
-              <View style={styles.challengeMeta}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.listTitle}>{challenge.title}</Text>
-                  <Text style={styles.listSub}>{challenge.description}</Text>
-                  <Text style={styles.listSub}>
-                    {challenge.target === "everyone" ? "Everyone at your company" : "Assigned to you"}
-                    {challenge.dueDate ? ` · due ${formatDateLabel(challenge.dueDate)}` : ""}
-                  </Text>
-                </View>
-                <Text style={styles.challengePoints}>+{challenge.rewardPoints}</Text>
-              </View>
-            </GlassPanel>
-          ))
-        ) : (
-          <View style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <Trophy size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>No active challenges</Text>
-              <Text style={styles.listSub}>
-                When your employer launches a challenge, it will appear here right away.
-              </Text>
-            </View>
-          </View>
-        )}
-      </Section>
+      <EmployeePointChallenges
+        challenges={active}
+        title="Active challenges"
+        healthConnected={healthConnected}
+        onConnectAppleHealth={onConnectAppleHealth}
+        onSubmitChallenge={onSubmitChallenge}
+      />
 
-      {completedChallenges.length ? (
-        <Section title="Completed" meta={`${completedChallenges.length}`}>
-          {completedChallenges.map((challenge) => (
-            <GlassPanel key={challenge.id} style={styles.challengeCard} intensity={18}>
-              <View style={styles.challengeMeta}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.listTitle}>{challenge.title}</Text>
-                  <Text style={styles.listSub}>{challenge.description}</Text>
-                </View>
-                <Text style={[styles.challengePoints, { color: colors.secondary }]}>
-                  +{challenge.rewardPoints}
-                </Text>
-              </View>
-            </GlassPanel>
+      {completed.length ? (
+        <Section title="Completed" meta={`${completed.length}`}>
+          {completed.map((challenge) => (
+            <ChallengeListCard key={challenge.id} challenge={challenge} />
           ))}
         </Section>
       ) : null}
-
-      <EmployeePointChallenges />
 
       {rewardEvents.length ? (
         <Section title="Recent rewards" meta={`${rewardEvents.length}`}>
@@ -448,18 +490,14 @@ function EmployeeHome({
   onSubmitSelection,
   pointsBalance = 0,
   rewardEvents = [],
-  openChallenges = [],
+  challengeViews = [],
   onPayForPerk,
   onPayForPerks,
-  planItems,
-  planTotal,
-  packageOpen,
-  sent,
-  onPackageOpenChange,
-  onAddToPackage,
-  onRemoveFromPackage,
-  onSendToEmployer,
-  onShufflePackage
+  healthConnected,
+  onConnectAppleHealth,
+  onSubmitChallenge,
+  onGoToChallenges,
+  milestoneMessage
 }: {
   user: User;
   companyName: string;
@@ -469,9 +507,14 @@ function EmployeeHome({
   onSubmitSelection: (request: SelectionRequest) => void;
   pointsBalance?: number;
   rewardEvents?: RewardEvent[];
-  openChallenges?: Challenge[];
+  challengeViews?: ChallengeView[];
   onPayForPerk?: (benefit: Benefit) => boolean;
   onPayForPerks?: (benefits: Benefit[]) => boolean;
+  healthConnected?: boolean;
+  onConnectAppleHealth?: () => void | Promise<void>;
+  onSubmitChallenge?: (definitionId: string) => void | Promise<void>;
+  onGoToChallenges?: () => void;
+  milestoneMessage?: string | null;
   planItems: Benefit[];
   planTotal: number;
   packageOpen: boolean;
@@ -586,7 +629,26 @@ function EmployeeHome({
         )}
       </GlassPanel>
 
-      <EmployeePointChallenges />
+      {milestoneMessage ? (
+        <View style={styles.challengeMilestoneBanner}>
+          <Text style={styles.challengeMilestoneText}>{milestoneMessage}</Text>
+        </View>
+      ) : null}
+
+      <EmployeePointChallenges
+        challenges={openChallengeViews(challengeViews)}
+        limit={3}
+        healthConnected={healthConnected}
+        onConnectAppleHealth={onConnectAppleHealth}
+        onSubmitChallenge={onSubmitChallenge}
+        footerAction={
+          onGoToChallenges ? (
+            <Pressable onPress={onGoToChallenges} style={{ marginTop: 8 }}>
+              <Text style={styles.challengeLinkText}>See all challenges</Text>
+            </Pressable>
+          ) : null
+        }
+      />
 
       <Section title="Points health" meta={monthLabel}>
         <PointsHealthRing health={pointsHealth} />
@@ -1169,9 +1231,6 @@ function PackageModal({
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>My package</Text>
-              <Text style={styles.modalSub}>
-                {planItems.length} perk{planItems.length === 1 ? "" : "s"} · {planTotal} pts total
-              </Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose}>
               <X size={18} color={colors.text} />
@@ -1269,7 +1328,6 @@ function OfferDetailModal({
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>{benefit.title}</Text>
-              <Text style={styles.modalSub}>{benefit.providerName} · {benefit.city}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose}>
               <X size={18} color={colors.text} />

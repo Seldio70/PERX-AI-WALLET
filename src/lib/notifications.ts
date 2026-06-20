@@ -116,5 +116,29 @@ export const notify = {
       `You have ${points.toLocaleString()} points expiring in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}. Use them before they're gone.`,
       recipientToken
     );
+  },
+
+  challengeCompleted(title: string, points: number, recipientToken?: string | null) {
+    return dispatch(
+      "Challenge completed!",
+      `You earned ${points.toLocaleString()} points for "${title}".`,
+      recipientToken
+    );
+  },
+
+  challengeCreated(title: string, recipientToken?: string | null) {
+    return dispatch(
+      "New team challenge",
+      `Your employer posted: ${title}`,
+      recipientToken
+    );
+  },
+
+  challengeDueSoon(title: string, daysLeft: number, recipientToken?: string | null) {
+    return dispatch(
+      "Challenge due soon",
+      `"${title}" is due in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}.`,
+      recipientToken
+    );
   }
 };

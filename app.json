@@ -11,7 +11,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSUserNotificationUsageDescription": "PERX sends you perk approvals, points expiry warnings, and new perk alerts."
+        "NSUserNotificationUsageDescription": "PERX sends you perk approvals, points expiry warnings, and new perk alerts.",
+        "NSHealthShareUsageDescription": "PerX reads your steps and sleep from Apple Health to track wellness challenges.",
+        "NSHealthUpdateUsageDescription": "PerX does not write health data."
       }
     },
     "plugins": [
@@ -27,7 +29,11 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#050816"
-      }
+      },
+      "permissions": [
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_SLEEP"
+      ]
     },
     "web": {
       "bundler": "metro"

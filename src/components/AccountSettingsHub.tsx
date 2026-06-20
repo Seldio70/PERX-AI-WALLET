@@ -74,26 +74,28 @@ export function AccountSettingsHub({ user, onLogout, subtitle, showHero = true }
           <>
             <Text style={appStyles.accountSubpageTitle}>Notifications</Text>
             <Text style={appStyles.accountSubpageSub}>{notificationCopy(user.role)}</Text>
-            <NotificationToggle
-              label="Perk updates"
-              sub="New offers and catalog changes"
-              value={notifyPerks}
-              onChange={setNotifyPerks}
-            />
-            <NotificationToggle
-              label="Approvals"
-              sub={user.role === "business" ? "Redemption and payout alerts" : "Selection and redemption updates"}
-              value={notifyApprovals}
-              onChange={setNotifyApprovals}
-            />
-            {user.role !== "employer" ? (
+            <View style={appStyles.accountToggleList}>
               <NotificationToggle
-                label="Wallet alerts"
-                sub={user.role === "employee" ? "Points earned and budget changes" : "Settlement and payout notices"}
-                value={notifyWallet}
-                onChange={setNotifyWallet}
+                label="Perk updates"
+                sub="New offers and catalog changes"
+                value={notifyPerks}
+                onChange={setNotifyPerks}
               />
-            ) : null}
+              <NotificationToggle
+                label="Approvals"
+                sub={user.role === "business" ? "Redemption and payout alerts" : "Selection and redemption updates"}
+                value={notifyApprovals}
+                onChange={setNotifyApprovals}
+              />
+              {user.role !== "employer" ? (
+                <NotificationToggle
+                  label="Wallet alerts"
+                  sub={user.role === "employee" ? "Points earned and budget changes" : "Settlement and payout notices"}
+                  value={notifyWallet}
+                  onChange={setNotifyWallet}
+                />
+              ) : null}
+            </View>
           </>
         ) : null}
 
@@ -199,6 +201,7 @@ export function AccountSettingsHub({ user, onLogout, subtitle, showHero = true }
         </View>
       ) : null}
 
+      <View style={appStyles.accountSettingsList}>
       {tiles.map((tile) => (
         <Pressable key={tile.id} onPress={() => setPage(tile.id)}>
           <GlassPanel style={appStyles.accountSettingsRow} intensity={36}>
@@ -213,11 +216,7 @@ export function AccountSettingsHub({ user, onLogout, subtitle, showHero = true }
           </GlassPanel>
         </Pressable>
       ))}
-
-      <GlassPanel style={appStyles.accountFieldPanel} intensity={32}>
-        <Text style={appStyles.accountFieldLabel}>Email</Text>
-        <Text style={appStyles.accountFieldValue}>{user.email}</Text>
-      </GlassPanel>
+      </View>
 
       <CapsuleButton
         label="Log out"

@@ -1,4 +1,18 @@
-import { Benefit, Challenge, Company, EmployerInvite, EmployerWalletCard, ProviderProfile, SelectionRequest, User } from "../types";
+import {
+  Benefit,
+  Challenge,
+  ChallengeCriterion,
+  ChallengeDefinition,
+  ChallengeProgress,
+  Company,
+  EmployerInvite,
+  EmployerWalletCard,
+  ProviderProfile,
+  SelectionRequest,
+  User
+} from "../types";
+import { defaultPlatformDefinitions, RETIRED_PLATFORM_TEMPLATE_KEYS } from "./challengePlatformTemplates";
+import { targetFromCriterion } from "./challengeEvaluator";
 import { isLocalImageUri } from "./imageUpload";
 import { getSupabaseClient } from "./supabase";
 
@@ -79,6 +93,42 @@ type DbWalletCard = {
   accent: string | null;
 };
 
+const CHALLENGE_DEFINITION_SELECT =
+  "id,source,employer_id,template_key,title,description,reward_points,criterion,target_type,target_employee_id,due_date,start_date,max_awards,point_cap,active,created_at";
+const CHALLENGE_PROGRESS_SELECT =
+  "id,definition_id,employee_id,current_value,target_value,status,submitted_at,completed_at,completed_by";
+
+type DbChallengeDefinition = {
+  id: string;
+  source: "platform" | "employer";
+  employer_id: string | null;
+  template_key: string | null;
+  title: string;
+  description: string | null;
+  reward_points: number;
+  criterion: ChallengeCriterion;
+  target_type: "everyone" | "employee";
+  target_employee_id: string | null;
+  due_date: string | null;
+  start_date: string | null;
+  max_awards: number | null;
+  point_cap: number | null;
+  active: boolean;
+  created_at: string | null;
+};
+
+type DbChallengeProgress = {
+  id: string;
+  definition_id: string;
+  employee_id: string;
+  current_value: number;
+  target_value: number;
+  status: "open" | "completed";
+  submitted_at: string | null;
+  completed_at: string | null;
+  completed_by: "auto" | "employer_override" | null;
+};
+
 type DbChallenge = {
   id: string;
   employee_id: string;
@@ -98,6 +148,11 @@ export type PerxLiveData = {
   employerInvites: EmployerInvite[];
   selectionRequests: SelectionRequest[];
   employerWalletCards: EmployerWalletCard[];
+  challengeDefinitions: ChallengeDefinition[];
+  challengeProgress: ChallengeProgress[];
+  disabledChallengeTemplates: Record<string, string[]>;
+  employeeLoginDays: Record<string, string[]>;
+  /** @deprecated Legacy rows; prefer challengeDefinitions */
   challenges: Challenge[];
 };
 
@@ -207,6 +262,40 @@ function mapWalletCard(row: DbWalletCard): EmployerWalletCard {
   };
 }
 
+function mapChallengeDefinition(row: DbChallengeDefinition): ChallengeDefinition {
+  return {
+    id: row.id,
+    source: row.source,
+    employerId: row.employer_id ?? undefined,
+    templateKey: row.template_key ?? undefined,
+    title: row.title,
+    description: row.description ?? "",
+    rewardPoints: row.reward_points,
+    criterion: row.criterion ?? { kind: "manual" },
+    target: row.target_type === "everyone" ? "everyone" : row.target_employee_id ?? "everyone",
+    dueDate: row.due_date ?? undefined,
+    startDate: row.start_date ?? undefined,
+    maxAwards: row.max_awards ?? undefined,
+    pointCap: row.point_cap ?? undefined,
+    active: row.active,
+    createdAt: row.created_at ?? undefined
+  };
+}
+
+function mapChallengeProgress(row: DbChallengeProgress): ChallengeProgress {
+  return {
+    id: row.id,
+    definitionId: row.definition_id,
+    employeeId: row.employee_id,
+    current: row.current_value,
+    target: row.target_value,
+    status: row.status,
+    submittedAt: row.submitted_at ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    completedBy: row.completed_by ?? undefined
+  };
+}
+
 function mapChallenge(row: DbChallenge): Challenge {
   return {
     id: row.id,
@@ -232,6 +321,10 @@ export async function fetchPerxLiveData(): Promise<PerxLiveData | null> {
     invitesResult,
     selectionsResult,
     walletResult,
+    definitionsResult,
+    progressResult,
+    disabledTemplatesResult,
+    loginDaysResult,
     challengesResult
   ] = await Promise.all([
     client.from("companies").select("id,name,employer_id,monthly_budget_per_employee"),
@@ -247,6 +340,14 @@ export async function fetchPerxLiveData(): Promise<PerxLiveData | null> {
       .select("id,employee_id,employer_id,total,total_points,status,created_at,approved_at,users:employee_id(name),selection_items(benefit_id)"),
     client.from("employer_wallet_cards").select("id,title,points,description,accent"),
     client
+      .from("challenge_definitions")
+      .select(CHALLENGE_DEFINITION_SELECT),
+    client
+      .from("challenge_progress")
+      .select(CHALLENGE_PROGRESS_SELECT),
+    client.from("employer_disabled_challenge_templates").select("employer_id,template_key"),
+    client.from("employee_login_days").select("employee_id,login_date"),
+    client
       .from("challenges")
       .select("id,employee_id,employer_id,title,description,reward_points,status,users:employee_id(name)")
   ]);
@@ -259,13 +360,48 @@ export async function fetchPerxLiveData(): Promise<PerxLiveData | null> {
     invitesResult,
     selectionsResult,
     walletResult,
+    definitionsResult,
+    progressResult,
+    disabledTemplatesResult,
+    loginDaysResult,
     challengesResult
   ];
 
-  const firstError = results.find((result) => result.error)?.error;
+  const firstError = [
+    companiesResult,
+    usersResult,
+    providersResult,
+    benefitsResult,
+    invitesResult,
+    selectionsResult,
+    walletResult
+  ].find((result) => result.error)?.error;
+
   if (firstError) {
     console.warn(`Supabase live data unavailable: ${firstError.message}`);
     return null;
+  }
+
+  if (definitionsResult.error) {
+    console.warn(`Challenge definitions unavailable: ${definitionsResult.error.message}`);
+  }
+  if (progressResult.error) {
+    console.warn(`Challenge progress unavailable: ${progressResult.error.message}`);
+  }
+
+  const disabledChallengeTemplates: Record<string, string[]> = {};
+  for (const row of (disabledTemplatesResult.data ?? []) as Array<{
+    employer_id: string;
+    template_key: string;
+  }>) {
+    if (!disabledChallengeTemplates[row.employer_id]) disabledChallengeTemplates[row.employer_id] = [];
+    disabledChallengeTemplates[row.employer_id].push(row.template_key);
+  }
+
+  const employeeLoginDays: Record<string, string[]> = {};
+  for (const row of (loginDaysResult.data ?? []) as Array<{ employee_id: string; login_date: string }>) {
+    if (!employeeLoginDays[row.employee_id]) employeeLoginDays[row.employee_id] = [];
+    employeeLoginDays[row.employee_id].push(row.login_date);
   }
 
   return {
@@ -276,6 +412,10 @@ export async function fetchPerxLiveData(): Promise<PerxLiveData | null> {
     employerInvites: ((invitesResult.data ?? []) as DbInvite[]).map(mapInvite),
     selectionRequests: ((selectionsResult.data ?? []) as DbSelectionRequest[]).map(mapSelection),
     employerWalletCards: ((walletResult.data ?? []) as DbWalletCard[]).map(mapWalletCard),
+    challengeDefinitions: ((definitionsResult.data ?? []) as DbChallengeDefinition[]).map(mapChallengeDefinition),
+    challengeProgress: ((progressResult.data ?? []) as DbChallengeProgress[]).map(mapChallengeProgress),
+    disabledChallengeTemplates,
+    employeeLoginDays,
     challenges: ((challengesResult.data ?? []) as DbChallenge[]).map(mapChallenge)
   };
 }
@@ -670,6 +810,381 @@ export async function approveSelectionRequest(input: {
   return true;
 }
 
+export async function seedPlatformChallengeDefinitions(employerId: string): Promise<ChallengeDefinition[]> {
+  const client = getSupabaseClient();
+  const seeds = defaultPlatformDefinitions(employerId);
+
+  if (!client) return seeds;
+
+  for (const retiredKey of RETIRED_PLATFORM_TEMPLATE_KEYS) {
+    await client
+      .from("challenge_definitions")
+      .update({ active: false })
+      .eq("employer_id", employerId)
+      .eq("template_key", retiredKey);
+  }
+
+  const inserted: ChallengeDefinition[] = [];
+  for (const seed of seeds) {
+    const existing = await client
+      .from("challenge_definitions")
+      .select(CHALLENGE_DEFINITION_SELECT)
+      .eq("employer_id", employerId)
+      .eq("template_key", seed.templateKey ?? "")
+      .maybeSingle();
+
+    if (existing.data) {
+      inserted.push(mapChallengeDefinition(existing.data as DbChallengeDefinition));
+      continue;
+    }
+
+    const result = await client
+      .from("challenge_definitions")
+      .insert({
+        source: "platform",
+        employer_id: employerId,
+        template_key: seed.templateKey,
+        title: seed.title,
+        description: seed.description,
+        reward_points: seed.rewardPoints,
+        criterion: seed.criterion,
+        target_type: "everyone",
+        point_cap: seed.pointCap,
+        active: true
+      })
+      .select(CHALLENGE_DEFINITION_SELECT)
+      .single();
+
+    if (result.data) inserted.push(mapChallengeDefinition(result.data as DbChallengeDefinition));
+  }
+
+  return inserted.length ? inserted : seeds;
+}
+
+export async function createChallengeDefinition(input: {
+  employerId: string;
+  title: string;
+  description: string;
+  rewardPoints: number;
+  criterion: ChallengeCriterion;
+  target: "everyone" | string;
+  dueDate?: string;
+  startDate?: string;
+  maxAwards?: number;
+  pointCap?: number;
+}): Promise<ChallengeDefinition | null> {
+  const client = getSupabaseClient();
+  const localId = `challenge_def_${Date.now()}`;
+  const definition: ChallengeDefinition = {
+    id: localId,
+    source: "employer",
+    employerId: input.employerId,
+    title: input.title,
+    description: input.description,
+    rewardPoints: input.rewardPoints,
+    criterion: input.criterion,
+    target: input.target,
+    dueDate: input.dueDate,
+    startDate: input.startDate,
+    maxAwards: input.maxAwards,
+    pointCap: input.pointCap,
+    active: true,
+    createdAt: new Date().toISOString()
+  };
+
+  if (!client) return definition;
+
+  const result = await client
+    .from("challenge_definitions")
+    .insert({
+      source: "employer",
+      employer_id: input.employerId,
+      title: input.title,
+      description: input.description,
+      reward_points: input.rewardPoints,
+      criterion: input.criterion,
+      target_type: input.target === "everyone" ? "everyone" : "employee",
+      target_employee_id: input.target === "everyone" ? null : input.target,
+      due_date: input.dueDate ?? null,
+      start_date: input.startDate ?? null,
+      max_awards: input.maxAwards ?? null,
+      point_cap: input.pointCap ?? null,
+      active: true
+    })
+    .select(CHALLENGE_DEFINITION_SELECT)
+    .single();
+
+  if (result.error || !result.data) return definition;
+  return mapChallengeDefinition(result.data as DbChallengeDefinition);
+}
+
+export async function archiveChallengeDefinition(definitionId: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return true;
+
+  const result = await client
+    .from("challenge_definitions")
+    .update({ active: false })
+    .eq("id", definitionId);
+
+  return !result.error;
+}
+
+export async function submitChallengeProgress(input: {
+  progressId: string;
+}): Promise<ChallengeProgress | null> {
+  const client = getSupabaseClient();
+  const submittedAt = new Date().toISOString();
+
+  if (!client) {
+    return {
+      id: input.progressId,
+      definitionId: "",
+      employeeId: "",
+      current: 0,
+      target: 1,
+      status: "open",
+      submittedAt
+    };
+  }
+
+  const result = await client
+    .from("challenge_progress")
+    .update({ submitted_at: submittedAt })
+    .eq("id", input.progressId)
+    .eq("status", "open")
+    .select(CHALLENGE_PROGRESS_SELECT)
+    .maybeSingle();
+
+  if (!result.data) return null;
+  return mapChallengeProgress(result.data as DbChallengeProgress);
+}
+
+export async function grantSpotReward(input: {
+  employeeId: string;
+  rewardPoints: number;
+  note: string;
+  newBalance: number;
+}): Promise<boolean> {
+  const client = getSupabaseClient();
+  await updateUserPointsBalance(input.employeeId, input.newBalance);
+
+  if (!client) return true;
+
+  await client.from("points_ledger").insert({
+    user_id: input.employeeId,
+    source: "spot_bonus",
+    points_delta: input.rewardPoints,
+    description: input.note
+  });
+
+  return true;
+}
+
+export async function ensureChallengeProgressRows(input: {
+  definition: ChallengeDefinition;
+  employeeIds: string[];
+}): Promise<ChallengeProgress[]> {
+  const client = getSupabaseClient();
+  const target = targetFromCriterion(input.definition.criterion);
+  const rows: ChallengeProgress[] = [];
+
+  for (const employeeId of input.employeeIds) {
+    const local: ChallengeProgress = {
+      id: `progress_${input.definition.id}_${employeeId}`,
+      definitionId: input.definition.id,
+      employeeId,
+      current: 0,
+      target,
+      status: "open"
+    };
+
+    if (!client) {
+      rows.push(local);
+      continue;
+    }
+
+    const existing = await client
+      .from("challenge_progress")
+      .select("id,definition_id,employee_id,current_value,target_value,status,submitted_at,completed_at,completed_by")
+      .eq("definition_id", input.definition.id)
+      .eq("employee_id", employeeId)
+      .maybeSingle();
+
+    if (existing.data) {
+      rows.push(mapChallengeProgress(existing.data as DbChallengeProgress));
+      continue;
+    }
+
+    const inserted = await client
+      .from("challenge_progress")
+      .insert({
+        definition_id: input.definition.id,
+        employee_id: employeeId,
+        current_value: 0,
+        target_value: target,
+        status: "open"
+      })
+      .select("id,definition_id,employee_id,current_value,target_value,status,submitted_at,completed_at,completed_by")
+      .single();
+
+    if (inserted.data) rows.push(mapChallengeProgress(inserted.data as DbChallengeProgress));
+    else rows.push(local);
+  }
+
+  return rows;
+}
+
+export async function updateChallengeProgressRow(input: {
+  progressId: string;
+  current: number;
+  target: number;
+  status: "open" | "completed";
+  completedBy?: "auto" | "employer_override";
+}): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return true;
+
+  const result = await client
+    .from("challenge_progress")
+    .update({
+      current_value: input.current,
+      target_value: input.target,
+      status: input.status,
+      completed_at: input.status === "completed" ? new Date().toISOString() : null,
+      completed_by: input.completedBy ?? null
+    })
+    .eq("id", input.progressId);
+
+  return !result.error;
+}
+
+export async function grantChallengeReward(input: {
+  employeeId: string;
+  rewardPoints: number;
+  note: string;
+  newBalance: number;
+}): Promise<boolean> {
+  const client = getSupabaseClient();
+  await updateUserPointsBalance(input.employeeId, input.newBalance);
+
+  if (!client) return true;
+
+  await client.from("points_ledger").insert({
+    user_id: input.employeeId,
+    source: "challenge_completed",
+    points_delta: input.rewardPoints,
+    description: input.note
+  });
+
+  return true;
+}
+
+export async function completeChallengeProgressForEmployee(input: {
+  progress: ChallengeProgress;
+  definition: ChallengeDefinition;
+  completedBy: "auto" | "employer_override";
+  currentBalance: number;
+}): Promise<{ progress: ChallengeProgress; newBalance: number } | null> {
+  if (input.progress.status === "completed") return null;
+
+  const rewardPoints = Math.min(
+    input.definition.rewardPoints,
+    input.definition.pointCap ?? input.definition.rewardPoints
+  );
+  const newBalance = input.currentBalance + rewardPoints;
+  const completed: ChallengeProgress = {
+    ...input.progress,
+    current: input.progress.target,
+    status: "completed",
+    completedAt: new Date().toISOString(),
+    completedBy: input.completedBy
+  };
+
+  await updateChallengeProgressRow({
+    progressId: input.progress.id,
+    current: completed.current,
+    target: completed.target,
+    status: "completed",
+    completedBy: input.completedBy
+  });
+
+  await grantChallengeReward({
+    employeeId: input.progress.employeeId,
+    rewardPoints,
+    note: input.definition.title,
+    newBalance
+  });
+
+  return { progress: completed, newBalance };
+}
+
+export async function recordEmployeeLoginDay(employeeId: string, date = new Date()): Promise<string[]> {
+  const client = getSupabaseClient();
+  const loginDate = date.toISOString().slice(0, 10);
+
+  if (!client) return [loginDate];
+
+  await client
+    .from("employee_login_days")
+    .upsert({ employee_id: employeeId, login_date: loginDate }, { onConflict: "employee_id,login_date" });
+
+  const result = await client
+    .from("employee_login_days")
+    .select("login_date")
+    .eq("employee_id", employeeId)
+    .order("login_date", { ascending: true });
+
+  return ((result.data ?? []) as Array<{ login_date: string }>).map((row) => row.login_date);
+}
+
+export async function fetchEmployerDisabledChallengeTemplates(): Promise<Record<string, string[]>> {
+  const client = getSupabaseClient();
+  if (!client) return {};
+
+  const result = await client.from("employer_disabled_challenge_templates").select("employer_id,template_key");
+  if (result.error) return {};
+
+  const grouped: Record<string, string[]> = {};
+  for (const row of (result.data ?? []) as Array<{ employer_id: string; template_key: string }>) {
+    if (!grouped[row.employer_id]) grouped[row.employer_id] = [];
+    grouped[row.employer_id].push(row.template_key);
+  }
+  return grouped;
+}
+
+export async function setEmployerChallengeTemplateEnabled(
+  employerId: string,
+  templateKey: string,
+  enabled: boolean
+): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return true;
+
+  if (enabled) {
+    const result = await client
+      .from("employer_disabled_challenge_templates")
+      .delete()
+      .eq("employer_id", employerId)
+      .eq("template_key", templateKey);
+    return !result.error;
+  }
+
+  const result = await client.from("employer_disabled_challenge_templates").upsert(
+    { employer_id: employerId, template_key: templateKey },
+    { onConflict: "employer_id,template_key" }
+  );
+  return !result.error;
+}
+
+export async function archiveExpiredChallengeDefinitions(definitionIds: string[]): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client || !definitionIds.length) return;
+
+  await client.from("challenge_definitions").update({ active: false }).in("id", definitionIds);
+}
+
+/** @deprecated Use createChallengeDefinition */
 export async function createEmployeeChallenge(input: {
   employeeId: string;
   employerId: string;
@@ -677,75 +1192,37 @@ export async function createEmployeeChallenge(input: {
   description: string;
   rewardPoints: number;
 }) {
-  const client = getSupabaseClient();
-  if (!client) return null;
-
-  const result = await client
-    .from("challenges")
-    .insert({
-      employee_id: input.employeeId,
-      employer_id: input.employerId,
-      title: input.title,
-      description: input.description,
-      reward_points: input.rewardPoints,
-      status: "open"
-    })
-    .select("id,employee_id,employer_id,title,description,reward_points,status")
-    .single();
-
-  if (result.error || !result.data) return null;
+  const definition = await createChallengeDefinition({
+    employerId: input.employerId,
+    title: input.title,
+    description: input.description,
+    rewardPoints: input.rewardPoints,
+    criterion: { kind: "manual" },
+    target: input.employeeId
+  });
+  if (!definition) return null;
 
   return {
-    id: result.data.id,
-    employeeId: result.data.employee_id,
+    id: definition.id,
+    employeeId: input.employeeId,
     employeeName: "Employee",
-    employerId: result.data.employer_id,
-    title: result.data.title,
-    description: result.data.description ?? "",
-    rewardPoints: result.data.reward_points,
-    status: result.data.status === "completed" ? "completed" : "open"
+    employerId: input.employerId,
+    title: definition.title,
+    description: definition.description,
+    rewardPoints: definition.rewardPoints,
+    status: "open" as const
   } satisfies Challenge;
 }
 
+/** @deprecated Use completeChallengeProgressForEmployee */
 export async function completeEmployeeChallenge(input: {
   challengeId: string;
   employerId: string;
   rewardPoints: number;
   description: string;
 }) {
-  const client = getSupabaseClient();
-  if (!client) return false;
-
-  const challengeResult = await client
-    .from("challenges")
-    .update({ status: "completed", completed_at: new Date().toISOString() })
-    .eq("id", input.challengeId);
-
-  if (challengeResult.error) return false;
-
-  const walletResult = await client
-    .from("employer_wallet_cards")
-    .select("id,points")
-    .eq("employer_id", input.employerId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (!walletResult.error && walletResult.data) {
-    await client
-      .from("employer_wallet_cards")
-      .update({ points: Number(walletResult.data.points ?? 0) + input.rewardPoints })
-      .eq("id", walletResult.data.id);
-  }
-
-  await client.from("points_ledger").insert({
-    user_id: input.employerId,
-    source: "challenge_completed",
-    points_delta: input.rewardPoints,
-    description: input.description
-  });
-
-  return true;
+  void input;
+  return false;
 }
 
 type DbEmployerEnabledBenefit = {

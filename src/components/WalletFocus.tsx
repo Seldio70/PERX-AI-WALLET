@@ -1,4 +1,3 @@
-import { BlurView } from "expo-blur";
 import { Nfc, X } from "lucide-react-native";
 import { useEffect, useRef } from "react";
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
@@ -62,10 +61,7 @@ export function WalletFocus({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
-          <BlurView intensity={48} tint="light" style={StyleSheet.absoluteFill} />
-          <View style={styles.scrim} />
-        </Animated.View>
+        <View style={styles.scrim} />
 
         <View style={styles.content} pointerEvents="box-none">
           <Animated.View style={[styles.cardWrap, { opacity: anim, transform: [{ translateY }, { scale }] }]}>
@@ -118,11 +114,12 @@ export function WalletFocus({
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1
+    flex: 1,
+    backgroundColor: colors.background
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(20,22,30,0.28)"
+    backgroundColor: colors.background
   },
   content: {
     flex: 1,
@@ -184,8 +181,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.7)",
-    borderWidth: 0.5,
-    borderColor: colors.stroke
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerHigh
   }
 });

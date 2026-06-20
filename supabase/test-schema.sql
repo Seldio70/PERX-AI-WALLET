@@ -185,6 +185,66 @@ create unique index challenges_employee_title_unique
 create index challenges_employer_status_idx
   on public.challenges (employer_id, status, created_at desc);
 
+create table public.challenge_definitions (
+  id uuid primary key default gen_random_uuid(),
+  source text not null check (source in ('platform', 'employer')),
+  employer_id uuid references public.users(id) on delete cascade,
+  template_key text,
+  title text not null,
+  description text,
+  reward_points int not null default 0 check (reward_points >= 0),
+  criterion jsonb not null default '{"kind":"manual"}'::jsonb,
+  target_type text not null default 'everyone' check (target_type in ('everyone', 'employee')),
+  target_employee_id uuid references public.users(id) on delete cascade,
+  due_date date,
+  start_date date,
+  max_awards int check (max_awards is null or max_awards > 0),
+  point_cap int,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create index challenge_definitions_employer_active_idx
+  on public.challenge_definitions (employer_id, active, created_at desc);
+
+create unique index challenge_definitions_employer_template_unique
+  on public.challenge_definitions (employer_id, template_key)
+  where template_key is not null and employer_id is not null;
+
+create table public.challenge_progress (
+  id uuid primary key default gen_random_uuid(),
+  definition_id uuid not null references public.challenge_definitions(id) on delete cascade,
+  employee_id uuid not null references public.users(id) on delete cascade,
+  current_value int not null default 0 check (current_value >= 0),
+  target_value int not null default 1 check (target_value >= 1),
+  status text not null default 'open' check (status in ('open', 'completed')),
+  submitted_at timestamptz,
+  completed_at timestamptz,
+  completed_by text check (completed_by in ('auto', 'employer_override')),
+  created_at timestamptz not null default now(),
+  unique (definition_id, employee_id)
+);
+
+create index challenge_progress_employee_status_idx
+  on public.challenge_progress (employee_id, status);
+
+create index challenge_progress_definition_status_idx
+  on public.challenge_progress (definition_id, status);
+
+create table public.employee_login_days (
+  employee_id uuid not null references public.users(id) on delete cascade,
+  login_date date not null,
+  created_at timestamptz not null default now(),
+  primary key (employee_id, login_date)
+);
+
+create table public.employer_disabled_challenge_templates (
+  employer_id uuid not null references public.users(id) on delete cascade,
+  template_key text not null,
+  created_at timestamptz not null default now(),
+  primary key (employer_id, template_key)
+);
+
 create table public.redemptions (
   id uuid primary key default gen_random_uuid(),
   benefit_id uuid not null references public.benefits(id) on delete cascade,
@@ -230,6 +290,10 @@ alter table public.selection_items enable row level security;
 alter table public.employer_wallet_cards enable row level security;
 alter table public.points_ledger enable row level security;
 alter table public.challenges enable row level security;
+alter table public.challenge_definitions enable row level security;
+alter table public.challenge_progress enable row level security;
+alter table public.employee_login_days enable row level security;
+alter table public.employer_disabled_challenge_templates enable row level security;
 alter table public.redemptions enable row level security;
 alter table public.employer_enabled_benefits enable row level security;
 
@@ -243,6 +307,10 @@ create policy "demo read selection items" on public.selection_items for select u
 create policy "demo read wallet cards" on public.employer_wallet_cards for select using (true);
 create policy "demo read points ledger" on public.points_ledger for select using (true);
 create policy "demo read challenges" on public.challenges for select using (true);
+create policy "demo read challenge definitions" on public.challenge_definitions for select using (true);
+create policy "demo read challenge progress" on public.challenge_progress for select using (true);
+create policy "demo read employee login days" on public.employee_login_days for select using (true);
+create policy "demo read disabled templates" on public.employer_disabled_challenge_templates for select using (true);
 create policy "demo read redemptions" on public.redemptions for select using (true);
 create policy "demo read employer enabled benefits" on public.employer_enabled_benefits for select using (true);
 
@@ -256,6 +324,10 @@ create policy "demo insert selection items" on public.selection_items for insert
 create policy "demo insert wallet cards" on public.employer_wallet_cards for insert with check (true);
 create policy "demo insert points ledger" on public.points_ledger for insert with check (true);
 create policy "demo insert challenges" on public.challenges for insert with check (true);
+create policy "demo insert challenge definitions" on public.challenge_definitions for insert with check (true);
+create policy "demo insert challenge progress" on public.challenge_progress for insert with check (true);
+create policy "demo insert employee login days" on public.employee_login_days for insert with check (true);
+create policy "demo insert disabled templates" on public.employer_disabled_challenge_templates for insert with check (true);
 create policy "demo insert redemptions" on public.redemptions for insert with check (true);
 create policy "demo insert employer enabled benefits" on public.employer_enabled_benefits for insert with check (true);
 
@@ -265,5 +337,8 @@ create policy "demo update employer invites" on public.employer_invites for upda
 create policy "demo update selection requests" on public.selection_requests for update using (true) with check (true);
 create policy "demo update wallet cards" on public.employer_wallet_cards for update using (true) with check (true);
 create policy "demo update challenges" on public.challenges for update using (true) with check (true);
+create policy "demo update challenge definitions" on public.challenge_definitions for update using (true) with check (true);
+create policy "demo update challenge progress" on public.challenge_progress for update using (true) with check (true);
+create policy "demo delete disabled templates" on public.employer_disabled_challenge_templates for delete using (true);
 create policy "demo update redemptions" on public.redemptions for update using (true) with check (true);
 create policy "demo delete employer enabled benefits" on public.employer_enabled_benefits for delete using (true);
