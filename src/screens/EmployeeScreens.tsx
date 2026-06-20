@@ -17,6 +17,7 @@ import { Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { BottomNav, NavTab } from "../components/BottomNav";
 import { BudgetHealthRing } from "../components/BudgetHealthRing";
 import { CapsuleButton } from "../components/CapsuleButton";
+import { EmployeePointChallenges } from "../components/EmployeePointChallenges";
 import { GlassPanel } from "../components/GlassPanel";
 import { Section } from "../components/Section";
 import { UserProfileScreen } from "../components/UserProfileScreen";
@@ -386,6 +387,8 @@ function EmployeeHome({
           </Text>
         )}
       </GlassPanel>
+
+      <EmployeePointChallenges />
 
       <Section title="Wallet health" meta={monthLabel}>
         <BudgetHealthRing health={health} />

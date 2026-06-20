@@ -1,7 +1,7 @@
 import { BlurView } from "expo-blur";
 import { Nfc, X } from "lucide-react-native";
 import { useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Benefit, User } from "../types";
 import { colors } from "../theme";
 import { CapsuleButton } from "./CapsuleButton";
@@ -47,63 +47,66 @@ export function WalletFocus({
     }
   }, [visible, benefit?.id, anim]);
 
-  if (!visible || !benefit) return null;
+  if (!benefit) return null;
 
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [60, 0] });
   const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] });
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
-        <BlurView intensity={48} tint="light" style={StyleSheet.absoluteFill} />
-        <View style={styles.scrim} />
-      </Animated.View>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
+          <BlurView intensity={48} tint="light" style={StyleSheet.absoluteFill} />
+          <View style={styles.scrim} />
+        </Animated.View>
 
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={styles.content} pointerEvents="box-none">
+          <Animated.View style={[styles.cardWrap, { opacity: anim, transform: [{ translateY }, { scale }] }]}>
+            <WalletCard
+              user={user}
+              companyName={companyName}
+              balance={balance}
+              benefit={benefit}
+              variant={variant}
+              selected
+            />
+            <View style={styles.caption}>
+              <Text style={styles.captionTitle}>{benefit.title}</Text>
+              <Text style={styles.captionText} numberOfLines={2}>
+                {benefit.description}
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
 
-      <View style={styles.content} pointerEvents="box-none">
-        <Animated.View style={[styles.cardWrap, { opacity: anim, transform: [{ translateY }, { scale }] }]}>
-          <WalletCard
-            user={user}
-            companyName={companyName}
-            balance={balance}
-            benefit={benefit}
-            variant={variant}
-            selected
-          />
-          <View style={styles.caption}>
-            <Text style={styles.captionTitle}>{benefit.title}</Text>
-            <Text style={styles.captionText} numberOfLines={2}>
-              {benefit.description}
+        <View style={styles.bottom} pointerEvents="box-none">
+          <View style={styles.statusRow}>
+            <View style={[styles.dot, accepted && styles.dotActive]} />
+            <Text style={styles.statusText}>
+              {accepted ? "Payment accepted" : "Ready for the NFC reader"}
             </Text>
           </View>
-        </Animated.View>
-      </View>
-
-      <View style={styles.bottom} pointerEvents="box-none">
-        <View style={styles.statusRow}>
-          <View style={[styles.dot, accepted && styles.dotActive]} />
-          <Text style={styles.statusText}>
-            {accepted ? "Payment accepted" : "Ready for the NFC reader"}
-          </Text>
+          <CapsuleButton
+            label={accepted ? "Tap again" : "Simulate NFC tap"}
+            onPress={onTap}
+            icon={<Nfc size={16} color={colors.onPrimary} />}
+          />
         </View>
-        <CapsuleButton
-          label={accepted ? "Tap again" : "Simulate NFC tap"}
-          onPress={onTap}
-          icon={<Nfc size={16} color={colors.onPrimary} />}
-        />
+
+        <Pressable style={styles.closeBtn} onPress={onClose}>
+          <X size={18} color={colors.text} />
+        </Pressable>
+
+        {accepted ? <ConfettiBurst key={celebrateKey} /> : null}
       </View>
-
-      <Pressable style={styles.closeBtn} onPress={onClose}>
-        <X size={18} color={colors.text} />
-      </Pressable>
-
-      {accepted ? <ConfettiBurst key={celebrateKey} /> : null}
-    </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    flex: 1
+  },
   scrim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(20,22,30,0.28)"

@@ -1845,6 +1845,57 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900"
   },
+  pointChallengeCard: {
+    padding: 14,
+    gap: 12
+  },
+  pointChallengeHead: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10
+  },
+  pointChallengeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.panelStrong
+  },
+  pointChallengeCopy: {
+    flex: 1,
+    gap: 2
+  },
+  pointChallengeProgressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceContainerHigh,
+    overflow: "hidden"
+  },
+  pointChallengeProgressFill: {
+    height: "100%",
+    borderRadius: 4
+  },
+  pointChallengeProgressMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  pointChallengeProgressLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  pointChallengePct: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  pointChallengeComplete: {
+    color: colors.secondary,
+    fontSize: 12,
+    fontWeight: "800"
+  },
   automationRow: {
     padding: 14,
     flexDirection: "row",
