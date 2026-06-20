@@ -15,6 +15,7 @@ type Props = {
   compact?: boolean;
   selected?: boolean;
   redeemed?: boolean;
+  used?: boolean;
 };
 
 export function WalletCard({
@@ -25,12 +26,14 @@ export function WalletCard({
   variant = 0,
   compact = false,
   selected = false,
-  redeemed = false
+  redeemed = false,
+  used = false
 }: Props) {
   const scale = useRef(new Animated.Value(compact ? 1 : 0.96)).current;
   const gradient = cardGradients[variant % cardGradients.length];
   const cost = perkPointsCost(benefit);
   const affordable = redeemed || pointsBalance >= cost;
+  const disabled = used || (!affordable && !redeemed);
 
   useEffect(() => {
     if (compact) return;
@@ -43,7 +46,8 @@ export function WalletCard({
         styles.wrap,
         compact && styles.wrapCompact,
         selected && styles.wrapSelected,
-        !affordable && styles.wrapDisabled,
+        disabled && styles.wrapDisabled,
+        used && styles.wrapUsed,
         { transform: [{ scale }] }
       ]}
     >
@@ -51,10 +55,20 @@ export function WalletCard({
         colors={[...gradient]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.card, selected && styles.cardSelected, !affordable && styles.cardDisabled]}
+        style={[
+          styles.card,
+          selected && styles.cardSelected,
+          disabled && styles.cardDisabled,
+          used && styles.cardUsed
+        ]}
       >
         <View style={styles.overlay} />
-        {!affordable ? (
+        {used ? (
+          <View style={styles.usedOverlay}>
+            <Text style={styles.usedOverlayText}>Used</Text>
+          </View>
+        ) : null}
+        {!affordable && !redeemed ? (
           <View style={styles.lockedOverlay}>
             <Lock size={18} color={colors.onPrimary} />
             <Text style={styles.lockedText}>Need {cost - pointsBalance} more pts</Text>
@@ -92,7 +106,11 @@ export function WalletCard({
               {companyName}
             </Text>
           </View>
-          {selected && affordable ? (
+          {used ? (
+            <View style={[styles.readyPill, styles.usedPill]}>
+              <Text style={styles.readyText}>Used</Text>
+            </View>
+          ) : selected && affordable ? (
             <View style={styles.readyPill}>
               <Nfc size={14} color={colors.onPrimary} />
               <Text style={styles.readyText}>{redeemed ? "Use" : "Ready"}</Text>
@@ -100,7 +118,7 @@ export function WalletCard({
           ) : redeemed ? (
             <View style={styles.readyPill}>
               <Nfc size={14} color={colors.onPrimary} />
-              <Text style={styles.readyText}>Redeemed</Text>
+              <Text style={styles.readyText}>Ready to use</Text>
             </View>
           ) : (
             <View style={styles.pointsPill}>
@@ -131,6 +149,9 @@ const styles = StyleSheet.create({
   wrapDisabled: {
     opacity: 0.72
   },
+  wrapUsed: {
+    opacity: 0.55
+  },
   card: {
     height: 178,
     borderRadius: radius.cardLg,
@@ -146,6 +167,23 @@ const styles = StyleSheet.create({
   },
   cardDisabled: {
     borderColor: "rgba(255,255,255,0.2)"
+  },
+  cardUsed: {
+    borderColor: "rgba(255,255,255,0.15)"
+  },
+  usedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    zIndex: 1
+  },
+  usedOverlayText: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase"
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -263,5 +301,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.4
+  },
+  usedPill: {
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderColor: "rgba(255,255,255,0.2)"
   }
 });

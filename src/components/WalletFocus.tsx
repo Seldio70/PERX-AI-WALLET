@@ -19,6 +19,7 @@ type Props = {
   accepted: boolean;
   celebrateKey: number;
   redeemed?: boolean;
+  used?: boolean;
   onTap: () => void;
   onClose: () => void;
 };
@@ -33,6 +34,7 @@ export function WalletFocus({
   accepted,
   celebrateKey,
   redeemed = false,
+  used = false,
   onTap,
   onClose
 }: Props) {
@@ -75,46 +77,31 @@ export function WalletFocus({
               variant={variant}
               selected
               redeemed={redeemed}
+              used={used}
             />
-            <View style={styles.caption}>
-              <Text style={styles.captionTitle}>{benefit.title}</Text>
-              <Text style={styles.captionText} numberOfLines={2}>
-                {benefit.description}
-              </Text>
-              <Text style={styles.captionCost}>
-                {redeemed ? "Already redeemed · tap to use at provider" : `${cost} pts to use this perk`}
-              </Text>
-            </View>
+            {redeemed ? (
+              <Text style={styles.captionCost}>Tap to use at provider</Text>
+            ) : null}
           </Animated.View>
         </View>
 
         <View style={styles.bottom} pointerEvents="box-none">
-          <View style={styles.statusRow}>
-            <View style={[styles.dot, accepted && styles.dotActive]} />
-            <Text style={styles.statusText}>
-              {accepted
-                ? redeemed
-                  ? "Ready at provider"
-                  : "Perk paid · points deducted"
-                : affordable
-                  ? redeemed
-                    ? "Hold near the NFC reader"
-                    : "Ready for the NFC reader"
-                  : `Need ${cost - pointsBalance} more points`}
-            </Text>
-          </View>
           <CapsuleButton
             label={
-              accepted
-                ? "Tap again"
-                : affordable
-                  ? redeemed
-                    ? "Simulate NFC tap"
-                    : "Simulate NFC tap & pay"
-                  : "Not enough points"
+              used
+                ? "Already used"
+                : accepted
+                  ? "Tap again"
+                  : affordable
+                    ? redeemed
+                      ? "Simulate NFC tap"
+                      : "Simulate NFC tap & pay"
+                    : "Not enough points"
             }
-            onPress={onTap}
-            variant={affordable ? "primary" : "soft"}
+            onPress={() => {
+              if (!used) onTap();
+            }}
+            variant={affordable && !used ? "primary" : "soft"}
             icon={<Nfc size={16} color={colors.onPrimary} />}
           />
         </View>
@@ -153,28 +140,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 22 },
     elevation: 16
   },
-  caption: {
-    marginTop: 18,
-    alignItems: "center",
-    gap: 6
-  },
-  captionTitle: {
-    color: colors.text,
-    fontSize: 19,
-    fontWeight: "900",
-    textAlign: "center"
-  },
-  captionText: {
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: "center"
-  },
   captionCost: {
     color: colors.primary,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
-    textAlign: "center"
+    textAlign: "center",
+    marginTop: 16
   },
   bottom: {
     position: "absolute",

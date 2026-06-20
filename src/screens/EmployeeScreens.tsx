@@ -1,22 +1,22 @@
 import {
   ChevronRight,
-  Gift,
   Heart,
   MapPin,
   RefreshCw,
+  Search,
   Send,
   Sparkles,
   Star,
   Store,
   Tag,
+  Trash2,
   Trophy,
   WalletCards,
   X,
   Zap
 } from "lucide-react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { useMemo, useState } from "react";
-import { Alert, Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { Alert, Image, Modal, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { BottomNav, NavTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { EmployeePointChallenges } from "../components/EmployeePointChallenges";
@@ -124,6 +124,100 @@ export function EmployeeExperience({
     () => challengesForEmployee(appData.challenges, user.id),
     [appData.challenges, user.id]
   );
+  const now = useMemo(() => new Date(), []);
+  const benefits = appData.benefits;
+  const basePlan = useMemo(
+    () =>
+      buildAutopilotPlan({
+        user,
+        benefits,
+        health: {
+          monthlyBudget: pointsBalance,
+          available: pointsBalance,
+          used: pointsHealth.spentThisMonth,
+          reserved: 0,
+          daysLeft: pointsHealth.daysLeft,
+          cycleDays: pointsHealth.cycleDays,
+          usedPct: 0,
+          reservedPct: 0,
+          availablePct: 1
+        },
+        now
+      }),
+    [user, benefits, pointsBalance, pointsHealth, now]
+  );
+  const [planItems, setPlanItems] = useState<Benefit[]>([]);
+  const [autopilotEnabled, setAutopilotEnabled] = useState<Record<string, boolean>>({});
+  const [packageOpen, setPackageOpen] = useState(false);
+  const [sent, setSent] = useState(false);
+  const packageSeeded = useRef(false);
+
+  useEffect(() => {
+    if (packageSeeded.current || !basePlan.items.length) return;
+    packageSeeded.current = true;
+    setPlanItems(basePlan.items);
+    setAutopilotEnabled(Object.fromEntries(basePlan.items.map((benefit) => [benefit.id, true])));
+  }, [basePlan.items]);
+
+  const planTotal = planItems.reduce((sum, benefit) => sum + perkPointsCost(benefit), 0);
+
+  const removeFromPackage = useCallback((benefitId: string) => {
+    setSent(false);
+    setPlanItems((current) => current.filter((item) => item.id !== benefitId));
+    setAutopilotEnabled((current) => ({ ...current, [benefitId]: false }));
+  }, []);
+
+  const addToPackage = useCallback(
+    (benefit: Benefit, options?: { openModal?: boolean; notify?: boolean }) => {
+      if (planItems.some((item) => item.id === benefit.id)) {
+        if (options?.notify) {
+          Alert.alert("Already in package", `${benefit.title} is already in your home package.`);
+        }
+        if (options?.openModal) setPackageOpen(true);
+        return;
+      }
+      if (planItems.length >= 4) {
+        Alert.alert("Package full", "Remove a perk from your package to add another.");
+        return;
+      }
+
+      setSent(false);
+      if (options?.openModal) setPackageOpen(true);
+      setPlanItems((current) => [...current, benefit]);
+      setAutopilotEnabled((current) => ({ ...current, [benefit.id]: true }));
+      if (options?.notify) {
+        Alert.alert("Added to package", `${benefit.title} was added to your home package.`);
+      }
+    },
+    [planItems]
+  );
+
+  const toggleAutopilotItem = useCallback((benefit: Benefit, enabled: boolean) => {
+    setSent(false);
+    setAutopilotEnabled((current) => ({ ...current, [benefit.id]: enabled }));
+    setPlanItems((current) => {
+      if (enabled) {
+        return current.some((item) => item.id === benefit.id)
+          ? current
+          : [...current, benefit].slice(0, 4);
+      }
+      return current.filter((item) => item.id !== benefit.id);
+    });
+  }, []);
+
+  const sendToEmployer = useCallback(() => {
+    if (!planItems.length) return;
+    if (planTotal > pointsBalance) {
+      Alert.alert("Not enough points", `This package needs ${planTotal} pts. You have ${pointsBalance}.`);
+      return;
+    }
+    if (!onPayForPerks?.(planItems)) {
+      Alert.alert("Payment failed", "Could not complete this package. Try again.");
+      return;
+    }
+    setSent(true);
+    Alert.alert("Perks paid", `${planTotal} points spent across ${planItems.length} perk(s).`);
+  }, [planItems, planTotal, pointsBalance, onPayForPerks]);
 
   return (
     <View style={styles.roleShell}>
@@ -144,6 +238,19 @@ export function EmployeeExperience({
             openChallenges={openChallenges}
             onPayForPerk={onPayForPerk}
             onPayForPerks={onPayForPerks}
+            basePlan={basePlan}
+            planItems={planItems}
+            planTotal={planTotal}
+            autopilotEnabled={autopilotEnabled}
+            packageOpen={packageOpen}
+            sent={sent}
+            onPackageOpenChange={setPackageOpen}
+            onAddToPackage={addToPackage}
+            onRemoveFromPackage={removeFromPackage}
+            onToggleAutopilotItem={toggleAutopilotItem}
+            onSendToEmployer={sendToEmployer}
+            setPlanItems={setPlanItems}
+            setSent={setSent}
           />
         ) : null}
         {tab === "wallet" ? (
@@ -168,6 +275,8 @@ export function EmployeeExperience({
             appData={appData}
             pointsBalance={pointsBalance}
             onPayForPerk={onPayForPerk}
+            planItemIds={planItems.map((item) => item.id)}
+            onAddToPackage={(benefit) => addToPackage(benefit, { notify: true })}
           />
         ) : null}
         {tab === "profile" ? <UserProfileScreen user={user} onLogout={onLogout} /> : null}
@@ -298,73 +407,6 @@ function resolveEmployerId(appData: AppData, user: User): string | undefined {
   );
 }
 
-function EmployeePointsPanel({
-  pointsBalance,
-  rewardEvents,
-  openChallenges,
-  compact = false
-}: {
-  pointsBalance: number;
-  rewardEvents: RewardEvent[];
-  openChallenges: Challenge[];
-  compact?: boolean;
-}) {
-  return (
-    <Section title="PerX Points" meta={`${pointsBalance} pts`}>
-      <GlassPanel style={compact ? styles.compactPointsCard : styles.pointsHero} intensity={32}>
-        <View style={styles.redeemRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.pointsHeroValue}>{pointsBalance.toLocaleString()}</Text>
-            <Text style={styles.pointsHeroSub}>
-              Spend points on perks in My Cards · employer pays providers in cash
-            </Text>
-          </View>
-          <Gift size={compact ? 20 : 28} color={colors.primary} />
-        </View>
-      </GlassPanel>
-
-      {openChallenges.length ? (
-        <>
-          <Text style={styles.modalFieldLabel}>Open challenges</Text>
-          {openChallenges.slice(0, compact ? 2 : 4).map((challenge) => (
-            <GlassPanel key={challenge.id} style={styles.challengeCard} intensity={20}>
-              <View style={styles.challengeMeta}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.listTitle}>{challenge.title}</Text>
-                  <Text style={styles.listSub} numberOfLines={2}>
-                    {challenge.description}
-                  </Text>
-                </View>
-                <Text style={styles.challengePoints}>+{challenge.rewardPoints}</Text>
-              </View>
-            </GlassPanel>
-          ))}
-        </>
-      ) : null}
-
-      {rewardEvents.length ? (
-        <>
-          <Text style={styles.modalFieldLabel}>Recent rewards</Text>
-          {rewardEvents.slice(0, compact ? 3 : 5).map((event) => (
-            <View key={event.id} style={styles.pointsFeedRow}>
-              <View style={styles.pointsFeedIcon}>
-                <Star size={16} color={colors.primary} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>{rewardKindLabel(event.kind)}</Text>
-                <Text style={styles.listSub} numberOfLines={1}>
-                  {event.note}
-                </Text>
-              </View>
-              <Text style={styles.challengePoints}>+{event.points}</Text>
-            </View>
-          ))}
-        </>
-      ) : null}
-    </Section>
-  );
-}
-
 function EmployeeHome({
   user,
   companyName,
@@ -376,7 +418,20 @@ function EmployeeHome({
   rewardEvents = [],
   openChallenges = [],
   onPayForPerk,
-  onPayForPerks
+  onPayForPerks,
+  basePlan,
+  planItems,
+  planTotal,
+  autopilotEnabled,
+  packageOpen,
+  sent,
+  onPackageOpenChange,
+  onAddToPackage,
+  onRemoveFromPackage,
+  onToggleAutopilotItem,
+  onSendToEmployer,
+  setPlanItems,
+  setSent
 }: {
   user: User;
   companyName: string;
@@ -389,49 +444,30 @@ function EmployeeHome({
   openChallenges?: Challenge[];
   onPayForPerk?: (benefit: Benefit) => boolean;
   onPayForPerks?: (benefits: Benefit[]) => boolean;
+  basePlan: AutopilotPlan;
+  planItems: Benefit[];
+  planTotal: number;
+  autopilotEnabled: Record<string, boolean>;
+  packageOpen: boolean;
+  sent: boolean;
+  onPackageOpenChange: (open: boolean) => void;
+  onAddToPackage: (benefit: Benefit, options?: { openModal?: boolean; notify?: boolean }) => void;
+  onRemoveFromPackage: (benefitId: string) => void;
+  onToggleAutopilotItem: (benefit: Benefit, enabled: boolean) => void;
+  onSendToEmployer: () => void;
+  setPlanItems: Dispatch<SetStateAction<Benefit[]>>;
+  setSent: Dispatch<SetStateAction<boolean>>;
 }) {
   const now = useMemo(() => new Date(), []);
   const benefits = appData.benefits;
   const ranked = useMemo(() => rankBenefits(user, benefits, now), [user, benefits, now]);
-  const basePlan: AutopilotPlan = useMemo(
-    () =>
-      buildAutopilotPlan({
-        user,
-        benefits,
-        health: {
-          monthlyBudget: pointsBalance,
-          available: pointsBalance,
-          used: pointsHealth.spentThisMonth,
-          reserved: 0,
-          daysLeft: pointsHealth.daysLeft,
-          cycleDays: pointsHealth.cycleDays,
-          usedPct: 0,
-          reservedPct: 0,
-          availablePct: 1
-        },
-        now
-      }),
-    [user, benefits, pointsBalance, pointsHealth, now]
-  );
   const nearby = useMemo(() => pickNearby(benefits, now, 3), [benefits, now]);
   const timeCtx = useMemo(() => getTimeContext(now), [now]);
   const monthLabel = now.toLocaleString(market.locale, { month: "long" });
 
   const primary = ranked[0];
-  const [planItems, setPlanItems] = useState<Benefit[]>(basePlan.items);
-  const [autopilotOpen, setAutopilotOpen] = useState(false);
-  const [sent, setSent] = useState(false);
   const [aiOfferDetail, setAiOfferDetail] = useState<Benefit | null>(null);
-
-  const planTotal = planItems.reduce((sum, benefit) => sum + perkPointsCost(benefit), 0);
-
-  const addToPackage = (benefit: Benefit) => {
-    setSent(false);
-    setAutopilotOpen(true);
-    setPlanItems((current) =>
-      current.some((item) => item.id === benefit.id) ? current : [...current, benefit].slice(0, 4)
-    );
-  };
+  const budgetPct = pointsBalance > 0 ? Math.min(1, planTotal / pointsBalance) : 0;
 
   const swapItem = (index: number) => {
     setSent(false);
@@ -443,20 +479,6 @@ function EmployeeHome({
       next[index] = alternative;
       return next;
     });
-  };
-
-  const sendToEmployer = () => {
-    if (!planItems.length) return;
-    if (planTotal > pointsBalance) {
-      Alert.alert("Not enough points", `This package needs ${planTotal} pts. You have ${pointsBalance}.`);
-      return;
-    }
-    if (!onPayForPerks?.(planItems)) {
-      Alert.alert("Payment failed", "Could not complete this package. Try again.");
-      return;
-    }
-    setSent(true);
-    Alert.alert("Perks paid", `${planTotal} points spent across ${planItems.length} perk(s).`);
   };
 
   const useNow = (benefit: Benefit) => {
@@ -480,24 +502,32 @@ function EmployeeHome({
       </View>
 
       {planItems.length ? (
-        <Pressable style={styles.packageCapsule} onPress={() => setAutopilotOpen(true)}>
-          <View style={styles.packageCapsuleThumbs}>
-            {planItems.slice(0, 3).map((benefit, index) => (
-              <Image
-                key={benefit.id}
-                source={{ uri: benefit.imageUrl }}
-                style={[styles.packageCapsuleThumb, index > 0 && { marginLeft: -10 }]}
-              />
-            ))}
-          </View>
-          <View style={styles.packageCapsuleCopy}>
-            <Text style={styles.packageCapsuleTitle}>My package</Text>
-            <Text style={styles.packageCapsuleMeta}>
-              {planItems.length} perk{planItems.length === 1 ? "" : "s"} · {planTotal} pts
-            </Text>
-          </View>
-          <ChevronRight size={16} color={colors.muted} />
-        </Pressable>
+        <View style={styles.packageCapsule}>
+          <Pressable style={styles.packageCapsuleMain} onPress={() => onPackageOpenChange(true)}>
+            <View style={styles.packageCapsuleThumbs}>
+              {planItems.slice(0, 3).map((benefit, index) => (
+                <Image
+                  key={benefit.id}
+                  source={{ uri: benefit.imageUrl }}
+                  style={[styles.packageCapsuleThumb, index > 0 && { marginLeft: -10 }]}
+                />
+              ))}
+            </View>
+            <View style={styles.packageCapsuleCopy}>
+              <Text style={styles.packageCapsuleTitle}>My package</Text>
+              <Text style={styles.packageCapsuleMeta}>
+                {planItems.length} perk{planItems.length === 1 ? "" : "s"} · {planTotal} pts
+              </Text>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => onPackageOpenChange(true)}
+            hitSlop={12}
+            style={styles.packageCapsuleArrow}
+          >
+            <ChevronRight size={18} color={colors.primary} />
+          </Pressable>
+        </View>
       ) : null}
 
       <GlassPanel style={styles.aiCard} intensity={40}>
@@ -531,7 +561,7 @@ function EmployeeHome({
             <View style={styles.aiCtas}>
               <CapsuleButton
                 label="Add to package"
-                onPress={() => addToPackage(primary)}
+                onPress={() => onAddToPackage(primary, { openModal: true })}
                 variant="soft"
                 style={{ flex: 1 }}
               />
@@ -551,18 +581,11 @@ function EmployeeHome({
         <PointsHealthRing health={pointsHealth} />
       </Section>
 
-      <EmployeePointsPanel
-        pointsBalance={pointsBalance}
-        rewardEvents={rewardEvents}
-        openChallenges={openChallenges}
-        compact
-      />
-
       <Section title="Today nearby" meta={timeCtx.label}>
         {nearby.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {nearby.map(({ benefit, reason }) => (
-              <Pressable key={benefit.id} onPress={() => addToPackage(benefit)}>
+              <Pressable key={benefit.id} onPress={() => onAddToPackage(benefit, { openModal: true })}>
                 <GlassPanel style={styles.nearbyCard} intensity={20}>
                   <Image source={{ uri: benefit.imageUrl }} style={styles.nearbyThumb} />
                   <Text style={styles.nearbyName} numberOfLines={1}>
@@ -594,71 +617,84 @@ function EmployeeHome({
         )}
       </Section>
 
-      <Section title="PerX AI Autopilot" meta={`${monthLabel} plan`}>
-        <GlassPanel style={styles.apCard} intensity={40}>
-          <Pressable style={styles.apHead} onPress={() => setAutopilotOpen((value) => !value)}>
-            <View style={styles.apIcon}>
-              <Zap size={20} color={colors.onPrimary} />
+      <Section title="PerX AI Autopilot" meta={`${monthLabel} · planner`}>
+        <GlassPanel style={styles.apPlanner} intensity={36}>
+          <View style={styles.apPlannerHead}>
+            <View style={styles.apPlannerBadge}>
+              <Zap size={14} color={colors.onPrimary} />
+              <Text style={styles.apPlannerBadgeText}>Monthly planner</Text>
             </View>
-            <View style={styles.apHeadBody}>
-              <Text style={styles.cardTitle}>Recommended package for {monthLabel}</Text>
-              <Text style={styles.listSub}>
-                {planItems.length} perk{planItems.length === 1 ? "" : "s"} · {planTotal} pts · tap to{" "}
-                {autopilotOpen ? "hide" : "review"}
-              </Text>
-            </View>
-            <View style={styles.apConfidence}>
-              <Text style={styles.apConfidenceValue}>{basePlan.confidence}%</Text>
-              <Text style={styles.apConfidenceLabel}>confidence</Text>
-            </View>
-          </Pressable>
+            <Text style={styles.apPlannerTitle}>Build your {monthLabel} package</Text>
+            <Text style={styles.apPlannerSub}>
+              Toggle perks on or off · {basePlan.confidence}% match to your habits
+            </Text>
+          </View>
 
-          {autopilotOpen ? (
-            <View style={styles.apDetail}>
-              {planItems.length ? (
-                planItems.map((benefit, index) => (
-                  <View key={benefit.id} style={styles.apItem}>
-                    <View style={styles.apItemIndex}>
-                      <Text style={styles.apItemIndexText}>{index + 1}</Text>
-                    </View>
-                    <View style={styles.apItemBody}>
-                      <Text style={styles.apItemName} numberOfLines={1}>
-                        {benefit.title}
-                      </Text>
-                      <Text style={styles.apItemMeta} numberOfLines={1}>
-                        {benefit.providerName} · {perkPointsCost(benefit)} pts
-                      </Text>
-                    </View>
-                    <Pressable style={styles.apSwap} onPress={() => swapItem(index)}>
-                      <RefreshCw size={14} color={colors.primary} />
-                      <Text style={styles.apSwapText}>Swap</Text>
-                    </Pressable>
+          <View style={styles.apBudgetBar}>
+            <View style={styles.apBudgetTrack}>
+              <View style={[styles.apBudgetFill, { width: `${budgetPct * 100}%` }]} />
+            </View>
+            <View style={styles.apBudgetLabels}>
+              <Text style={styles.apBudgetUsed}>{planTotal} pts planned</Text>
+              <Text style={styles.apBudgetAvail}>{pointsBalance} pts available</Text>
+            </View>
+          </View>
+
+          {basePlan.items.length ? (
+            basePlan.items.map((benefit, index) => {
+              const enabled = autopilotEnabled[benefit.id] ?? false;
+              return (
+                <View key={benefit.id} style={[styles.apToggleRow, enabled && styles.apToggleRowOn]}>
+                  <View style={styles.apToggleIndex}>
+                    <Text style={styles.apToggleIndexText}>{index + 1}</Text>
                   </View>
-                ))
-              ) : (
-                <Text style={styles.bodyText}>No offers available to plan yet.</Text>
-              )}
+                  <Image source={{ uri: benefit.imageUrl }} style={styles.apToggleThumb} />
+                  <View style={styles.apToggleBody}>
+                    <Text style={styles.apToggleName} numberOfLines={1}>
+                      {benefit.title}
+                    </Text>
+                    <Text style={styles.apToggleMeta} numberOfLines={1}>
+                      {benefit.providerName} · {perkPointsCost(benefit)} pts
+                    </Text>
+                  </View>
+                  <Switch
+                    value={enabled}
+                    onValueChange={(value) => onToggleAutopilotItem(benefit, value)}
+                    trackColor={{ false: colors.stroke, true: colors.secondary }}
+                    thumbColor={colors.surface}
+                  />
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.bodyText}>No offers available to plan yet.</Text>
+          )}
 
-              <View style={styles.apReasonBox}>
-                <Text style={styles.apReasonLabel}>Why this plan</Text>
-                <Text style={styles.apReasonText}>{basePlan.reasoning}</Text>
-              </View>
-
-              <View style={styles.apTotalRow}>
-                <Text style={styles.bodyText}>Package total</Text>
-                <Text style={styles.confidence}>{planTotal} pts</Text>
-              </View>
-
-              <CapsuleButton
-                label={sent ? "Package paid" : "Pay with points"}
-                onPress={sendToEmployer}
-                variant={sent ? "soft" : "primary"}
-                icon={sent ? undefined : <Send size={16} color={colors.onPrimary} />}
-              />
-            </View>
-          ) : null}
+          <View style={styles.apPlannerActions}>
+            <Pressable style={styles.apShuffleBtn} onPress={() => swapItem(0)}>
+              <RefreshCw size={14} color={colors.secondary} />
+              <Text style={styles.apShuffleText}>Shuffle pick</Text>
+            </Pressable>
+            <CapsuleButton
+              label={planItems.length ? `Review package (${planItems.length})` : "Add perks first"}
+              onPress={() => onPackageOpenChange(true)}
+              variant={planItems.length ? "primary" : "soft"}
+              style={{ flex: 1 }}
+            />
+          </View>
         </GlassPanel>
       </Section>
+
+      <PackageModal
+        visible={packageOpen}
+        planItems={planItems}
+        planTotal={planTotal}
+        pointsBalance={pointsBalance}
+        sent={sent}
+        onClose={() => onPackageOpenChange(false)}
+        onRemove={onRemoveFromPackage}
+        onPay={onSendToEmployer}
+      />
 
       <OfferDetailModal
         visible={!!aiOfferDetail}
@@ -677,7 +713,7 @@ function EmployeeHome({
         }
         secondaryLabel="Add to package"
         onSecondary={(benefit) => {
-          addToPackage(benefit);
+          onAddToPackage(benefit, { openModal: true });
           setAiOfferDetail(null);
         }}
       />
@@ -701,9 +737,11 @@ function EmployeeWallet({
   const [focusId, setFocusId] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [celebrateKey, setCelebrateKey] = useState(0);
+  const [usedIds, setUsedIds] = useState<Set<string>>(new Set());
 
   const focusIndex = redeemedBenefits.findIndex((benefit) => benefit.id === focusId);
   const focused = focusIndex >= 0 ? redeemedBenefits[focusIndex] : null;
+  const focusedUsed = focused ? usedIds.has(focused.id) : false;
 
   return (
     <>
@@ -711,13 +749,13 @@ function EmployeeWallet({
         <Text style={styles.greetingText}>My Cards</Text>
         <Text style={styles.greetingSub}>
           {redeemedBenefits.length
-            ? `${redeemedBenefits.length} perk${redeemedBenefits.length === 1 ? "" : "s"} redeemed · tap to use at the provider.`
+            ? `${redeemedBenefits.length} perk${redeemedBenefits.length === 1 ? "" : "s"} ready · tap a card to use at the provider.`
             : "Perks you redeem from Offers will appear here."}
         </Text>
       </View>
 
       {redeemedBenefits.length ? (
-        <View style={styles.walletCardList}>
+        <View style={styles.cardStack}>
           {redeemedBenefits.map((benefit, index) => (
             <Pressable
               key={benefit.id}
@@ -725,7 +763,7 @@ function EmployeeWallet({
                 setFocusId(benefit.id);
                 setAccepted(false);
               }}
-              style={styles.walletCardListItem}
+              style={[styles.stackItem, index > 0 && styles.stackItemCollapsed]}
             >
               <WalletCard
                 user={user}
@@ -733,6 +771,7 @@ function EmployeeWallet({
                 benefit={benefit}
                 pointsBalance={perkPointsCost(benefit)}
                 redeemed
+                used={usedIds.has(benefit.id)}
                 variant={index}
                 compact
               />
@@ -761,7 +800,11 @@ function EmployeeWallet({
         accepted={accepted}
         celebrateKey={celebrateKey}
         redeemed
+        used={focusedUsed}
         onTap={() => {
+          if (focused) {
+            setUsedIds((current) => new Set([...current, focused.id]));
+          }
           setAccepted(true);
           setCelebrateKey((value) => value + 1);
         }}
@@ -781,13 +824,17 @@ function EmployeeOffers({
   companyName,
   appData,
   pointsBalance = 0,
-  onPayForPerk
+  onPayForPerk,
+  planItemIds = [],
+  onAddToPackage
 }: {
   user: User;
   companyName: string;
   appData: AppData;
   pointsBalance?: number;
   onPayForPerk?: (benefit: Benefit) => boolean;
+  planItemIds?: string[];
+  onAddToPackage?: (benefit: Benefit) => void;
 }) {
   const marketplaceBenefits = appData.benefits;
   const marketplaceProviders = appData.providerProfiles;
@@ -795,6 +842,7 @@ function EmployeeOffers({
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("All");
   const [savedOnly, setSavedOnly] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<Benefit | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const categories = useMemo<CategoryFilter[]>(() => {
     const present = Array.from(new Set(marketplaceBenefits.map((benefit) => benefit.category)));
@@ -804,6 +852,11 @@ function EmployeeOffers({
   const visibleBenefits = marketplaceBenefits.filter((benefit) => {
     if (activeCategory !== "All" && benefit.category !== activeCategory) return false;
     if (savedOnly && !savedIds.includes(benefit.id)) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const haystack = `${benefit.title} ${benefit.providerName} ${benefit.category} ${benefit.city}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
     return true;
   });
 
@@ -833,8 +886,24 @@ function EmployeeOffers({
   return (
     <>
       <View style={styles.greeting}>
-        <Text style={styles.greetingText}>Discover</Text>
-        <Text style={styles.greetingSub}>Fresh perks from local partners.</Text>
+        <Text style={styles.greetingText}>Marketplace</Text>
+        <Text style={styles.greetingSub}>Browse perks from local partners.</Text>
+      </View>
+
+      <View style={styles.inputWrap}>
+        <Search size={18} color={colors.muted} />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search perks, providers, cities…"
+          placeholderTextColor={colors.muted}
+          style={styles.inputField}
+        />
+        {searchQuery ? (
+          <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+            <X size={16} color={colors.muted} />
+          </Pressable>
+        ) : null}
       </View>
 
       <ScrollView
@@ -870,79 +939,63 @@ function EmployeeOffers({
       </ScrollView>
 
       {visibleBenefits.length ? (
-        visibleBenefits.map((benefit) => {
+        <View style={styles.marketGrid}>
+        {visibleBenefits.map((benefit) => {
           const saved = savedIds.includes(benefit.id);
           const tint = categoryTint[benefit.category] ?? colors.primary;
           const logo = logoFor(benefit.providerName);
+          const cost = perkPointsCost(benefit);
           return (
-            <Pressable key={benefit.id} onPress={() => setSelectedOffer(benefit)}>
-            <View style={styles.offerV2}>
-              <View style={styles.offerV2Hero}>
-                <Image source={{ uri: benefit.imageUrl }} style={styles.offerV2Img} />
-                <LinearGradient
-                  colors={["transparent", "rgba(12,14,22,0.62)"]}
-                  style={styles.offerV2Grad}
-                />
-                <View style={[styles.offerV2Cat, { backgroundColor: tint }]}>
-                  <Text style={styles.offerV2CatText}>{benefit.category}</Text>
+            <Pressable
+              key={benefit.id}
+              onPress={() => setSelectedOffer(benefit)}
+              style={styles.marketCard}
+            >
+              <Image source={{ uri: benefit.imageUrl }} style={styles.marketCardImg} />
+              <View style={styles.marketCardBody}>
+                <View style={styles.marketCardTop}>
+                  <View style={[styles.marketCatDot, { backgroundColor: tint }]} />
+                  <Text style={styles.marketCardCat}>{benefit.category}</Text>
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation?.();
+                      toggleSaved(benefit.id);
+                    }}
+                    hitSlop={8}
+                    style={styles.marketSaveBtn}
+                  >
+                    <Heart
+                      size={14}
+                      color={saved ? colors.onPrimary : colors.muted}
+                      fill={saved ? colors.onPrimary : "transparent"}
+                    />
+                  </Pressable>
                 </View>
-                <View style={styles.offerV2Discount}>
-                  <Tag size={12} color={colors.onPrimary} />
-                  <Text style={styles.offerV2DiscountText}>{benefit.discount}</Text>
-                </View>
-                <Pressable
-                  onPress={(event) => {
-                    event.stopPropagation?.();
-                    toggleSaved(benefit.id);
-                  }}
-                  hitSlop={8}
-                  style={[styles.offerV2Save, saved && styles.offerV2SaveActive]}
-                >
-                  <Heart
-                    size={18}
-                    color={saved ? colors.onPrimary : colors.text}
-                    fill={saved ? colors.onPrimary : "transparent"}
-                  />
-                </Pressable>
-                <Text style={styles.offerV2HeroTitle} numberOfLines={1}>
+                <Text style={styles.marketCardTitle} numberOfLines={2}>
                   {benefit.title}
                 </Text>
-              </View>
-
-              <View style={styles.offerV2Body}>
-                <View style={styles.offerV2ProviderRow}>
+                <View style={styles.marketCardProvider}>
                   {logo ? (
-                    <Image source={{ uri: logo }} style={styles.offerV2Logo} />
+                    <Image source={{ uri: logo }} style={styles.marketCardLogo} />
                   ) : (
-                    <View style={[styles.offerV2Logo, styles.offerV2LogoFallback]}>
-                      <Store size={14} color={colors.primary} />
-                    </View>
+                    <Store size={12} color={colors.primary} />
                   )}
-                  <Text style={styles.offerV2Provider} numberOfLines={1}>
+                  <Text style={styles.marketCardProviderName} numberOfLines={1}>
                     {benefit.providerName}
                   </Text>
-                  <View style={styles.offerV2LocPill}>
-                    <MapPin size={11} color={colors.muted} />
-                    <Text style={styles.offerV2Loc}>{benefit.city}</Text>
-                  </View>
                 </View>
-
-                <Text style={styles.offerV2Desc} numberOfLines={2}>
-                  {benefit.description}
-                </Text>
-
-                <View style={styles.offerV2Footer}>
-                  <View style={styles.offerV2PriceChip}>
-                    <Text style={styles.offerV2Price}>{perkPointsCost(benefit)} pts</Text>
-                    <Text style={styles.offerV2PriceLabel}>to redeem</Text>
+                <View style={styles.marketCardFooter}>
+                  <Text style={styles.marketCardPrice}>{cost} pts</Text>
+                  <View style={styles.marketDiscountPill}>
+                    <Tag size={10} color={colors.primary} />
+                    <Text style={styles.marketDiscountText}>{benefit.discount}</Text>
                   </View>
-                  <Text style={styles.offerV2Ends}>ends {benefit.validUntil}</Text>
                 </View>
               </View>
-            </View>
             </Pressable>
           );
-        })
+        })}
+        </View>
       ) : (
         <View style={styles.listRow}>
           <View style={styles.smallIcon}>
@@ -964,8 +1017,118 @@ function EmployeeOffers({
         logoUrl={selectedOffer ? logoFor(selectedOffer.providerName) : undefined}
         onClose={() => setSelectedOffer(null)}
         onRedeem={handleRedeem}
+        secondaryLabel={
+          selectedOffer && planItemIds.includes(selectedOffer.id)
+            ? "In package"
+            : "Add to package"
+        }
+        onSecondary={(benefit) => {
+          if (planItemIds.includes(benefit.id)) {
+            Alert.alert("Already in package", `${benefit.title} is already in your home package.`);
+            return;
+          }
+          onAddToPackage?.(benefit);
+          setSelectedOffer(null);
+        }}
       />
     </>
+  );
+}
+
+function PackageModal({
+  visible,
+  planItems,
+  planTotal,
+  pointsBalance,
+  sent,
+  onClose,
+  onRemove,
+  onPay
+}: {
+  visible: boolean;
+  planItems: Benefit[];
+  planTotal: number;
+  pointsBalance: number;
+  sent: boolean;
+  onClose: () => void;
+  onRemove: (benefitId: string) => void;
+  onPay: () => void;
+}) {
+  const affordable = planTotal <= pointsBalance && planItems.length > 0;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>My package</Text>
+              <Text style={styles.modalSub}>
+                {planItems.length} perk{planItems.length === 1 ? "" : "s"} · {planTotal} pts total
+              </Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.modalClose}>
+              <X size={18} color={colors.text} />
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {planItems.length ? (
+              planItems.map((benefit) => (
+                <View key={benefit.id} style={styles.packageModalItem}>
+                  <Image source={{ uri: benefit.imageUrl }} style={styles.packageModalThumb} />
+                  <View style={styles.packageModalBody}>
+                    <Text style={styles.packageModalName} numberOfLines={1}>
+                      {benefit.title}
+                    </Text>
+                    <Text style={styles.packageModalMeta} numberOfLines={1}>
+                      {benefit.providerName} · {perkPointsCost(benefit)} pts
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => onRemove(benefit.id)}
+                    hitSlop={8}
+                    style={styles.packageModalRemove}
+                  >
+                    <Trash2 size={16} color={colors.muted} />
+                  </Pressable>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.bodyText}>
+                No perks in your package yet. Use PerX AI or Autopilot to add some.
+              </Text>
+            )}
+
+            <View style={styles.apTotalRow}>
+              <Text style={styles.bodyText}>Package total</Text>
+              <Text style={styles.confidence}>{planTotal} pts</Text>
+            </View>
+            <Text style={styles.listSub}>
+              Your balance: {pointsBalance.toLocaleString()} pts
+            </Text>
+
+            <CapsuleButton
+              label={
+                sent
+                  ? "Package paid"
+                  : affordable
+                    ? `Purchase package · ${planTotal} pts`
+                    : planItems.length
+                      ? `Need ${planTotal - pointsBalance} more pts`
+                      : "Add perks to package"
+              }
+              onPress={() => {
+                if (affordable && !sent) onPay();
+              }}
+              variant={sent || !affordable ? "soft" : "primary"}
+              icon={sent || !affordable ? undefined : <Send size={16} color={colors.onPrimary} />}
+            />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
