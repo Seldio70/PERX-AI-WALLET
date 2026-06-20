@@ -18,7 +18,6 @@ import {
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { AllocationSlider } from "../components/AllocationSlider";
 import { AppIcon } from "../components/AppIcon";
 import { BottomNav, NavTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
@@ -382,9 +381,6 @@ export function EmployerExperience({
         stats={detailEmployee ? statsFor(detailEmployee.id) : null}
         benefits={appData.benefits}
         pointsBalance={detailEmployee ? employeePoints[detailEmployee.id] ?? 0 : 0}
-        onChangeBudget={(value) =>
-          detailEmployee && setBudgets((current) => ({ ...current, [detailEmployee.id]: value }))
-        }
         onClose={() => setDetailEmployeeId(null)}
       />
     </View>
@@ -613,7 +609,6 @@ function EmployeeDetailModal({
   stats,
   benefits,
   pointsBalance,
-  onChangeBudget,
   onClose
 }: {
   visible: boolean;
@@ -621,7 +616,6 @@ function EmployeeDetailModal({
   stats: EmployeeStats | null;
   benefits: Benefit[];
   pointsBalance: number;
-  onChangeBudget: (value: number) => void;
   onClose: () => void;
 }) {
   if (!employee || !stats) return null;
@@ -671,22 +665,6 @@ function EmployeeDetailModal({
                 <Text style={styles.detailStatValue}>{currency(stats.pending)}</Text>
               </GlassPanel>
             </View>
-
-            <GlassPanel style={styles.employeeBudgetCard} intensity={14}>
-              <View style={styles.employeeBudgetHeader}>
-                <View>
-                  <Text style={styles.listTitle}>Monthly budget</Text>
-                  <Text style={styles.listSub}>{stats.redemptions} redemptions so far</Text>
-                </View>
-                <Text style={styles.confidence}>{currency(stats.budget)}</Text>
-              </View>
-              <AllocationSlider
-                category="Health"
-                value={stats.budget}
-                max={15000}
-                onChange={onChangeBudget}
-              />
-            </GlassPanel>
 
             <Text style={styles.modalFieldLabel}>Recent activity</Text>
             {recent.length ? (
