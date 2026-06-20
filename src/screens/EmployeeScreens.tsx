@@ -357,7 +357,6 @@ function EmployeeOffers({
       benefitIds: selectedIds,
       total: selectedTotal,
       totalPoints: selectedPoints,
-      status: "pending",
       createdAt: new Date().toISOString()
     } satisfies SelectionRequest;
     void createSelectionRequest({

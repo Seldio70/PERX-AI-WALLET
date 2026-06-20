@@ -41,7 +41,7 @@ export function EmployerExperience({
   const employees = appData.users.filter((item) => item.role === "employee" && item.companyId === company.id);
   const employerPoints = appData.employerWalletCards.reduce((sum, card) => sum + card.points, 0);
   const spendablePoints = appData.employerWalletCards[0]?.points ?? 999999;
-  const recentRedemptions = selectionRequests.filter((r) => r.status === "approved");
+  const recentRedemptions = selectionRequests;
 
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>

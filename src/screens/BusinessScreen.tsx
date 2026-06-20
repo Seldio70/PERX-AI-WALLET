@@ -1,10 +1,24 @@
-import { Check, CircleDollarSign, Plus, Store } from "lucide-react-native";
-import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { AnalyticsRow } from "../components/AnalyticsRow";
+import {
+  Check,
+  Dumbbell,
+  GraduationCap,
+  HeartHandshake,
+  HeartPulse,
+  Plane,
+  Plus,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  TrendingUp,
+  UsersRound,
+  Wallet
+} from "lucide-react-native";
+import { LucideIcon } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Image, Pressable, ScrollView, StyleProp, Text, TextInput, View, ViewStyle } from "react-native";
+import { BentoMetricCard } from "../components/BentoMetricCard";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
-import { MetricPill } from "../components/MetricPill";
 import { Section } from "../components/Section";
 import { createProviderOffer, upsertProviderProfile } from "../lib/perxRepository";
 import { styles } from "../styles/appStyles";
@@ -17,6 +31,63 @@ type AppData = {
   benefits: Benefit[];
   selectionRequests: SelectionRequest[];
   [key: string]: unknown;
+};
+
+const categoryIcons: Record<BenefitCategory, LucideIcon> = {
+  Food: ShoppingBag,
+  Fitness: Dumbbell,
+  Health: HeartPulse,
+  Learning: GraduationCap,
+  Mobility: Plane,
+  Wellness: Sparkles,
+  Family: HeartHandshake
+};
+
+const categoryAvatarStyle: Record<BenefitCategory, StyleProp<ViewStyle>> = {
+  Food: styles.transactionAvatarTertiary,
+  Fitness: styles.transactionAvatarSecondary,
+  Health: styles.transactionAvatarPrimary,
+  Learning: styles.transactionAvatarPrimary,
+  Mobility: styles.transactionAvatarTertiary,
+  Wellness: styles.transactionAvatarSecondary,
+  Family: styles.transactionAvatarPrimary
+};
+
+const categoryAvatarColor: Record<BenefitCategory, string> = {
+  Food: colors.tertiary,
+  Fitness: colors.secondary,
+  Health: colors.primary,
+  Learning: colors.primary,
+  Mobility: colors.tertiary,
+  Wellness: colors.secondary,
+  Family: colors.primary
+};
+
+function PulseDot({ delay = 0 }: { delay?: number }) {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, delay, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.25, duration: 700, useNativeDriver: true })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [delay, opacity]);
+
+  return <Animated.View style={[styles.activityPulseDot, { opacity }]} />;
+}
+
+type TransactionRow = {
+  id: string;
+  title: string;
+  meta: string;
+  amount: number;
+  status: string;
+  category: BenefitCategory;
+  inflow: boolean;
 };
 
 export function BusinessExperience({
@@ -59,23 +130,38 @@ export function BusinessExperience({
     pointsPrice: "", imageUrl: "", redemptionType: "QR", validUntil: "2026-12-31"
   });
 
-  const allBenefits = [
+  const allBenefits = useMemo(() => ([
     ...appData.benefits.filter((item) => !offers.some((o) => o.id === item.id)),
     ...offers
-  ];
+  ]), [appData.benefits, offers]);
 
-  const routedPayments = selectionRequests.flatMap((request) =>
+  const routedPayments = useMemo(() => selectionRequests.flatMap((request) =>
     request.benefitIds
       .map((id) => allBenefits.find((b) => b.id === id))
       .filter((b): b is Benefit => Boolean(b))
       .filter((b) => b.businessId === user.businessId)
       .map((b) => ({ request, benefit: b }))
-  );
-  const approvedPayoutTotal = routedPayments
-    .filter(({ request }) => request.status === "approved")
-    .reduce((sum, { benefit }) => sum + benefit.price, 0);
-  const approvedRoutedPayments = routedPayments.filter(({ request }) => request.status === "approved");
-  const reachedEmployees = new Set(approvedRoutedPayments.map(({ request }) => request.employeeId)).size;
+  ), [selectionRequests, allBenefits, user.businessId]);
+
+  const payoutTotal = routedPayments.reduce((sum, { benefit }) => sum + benefit.price, 0);
+  const reachedEmployees = new Set(routedPayments.map(({ request }) => request.employeeId)).size;
+  const growthSignal = routedPayments.length > 0
+    ? `+${Math.min(48, routedPayments.length * 8)}%`
+    : "+0%";
+
+  const transactions: TransactionRow[] = useMemo(() => (
+    routedPayments
+      .slice(0, 6)
+      .map(({ request, benefit }) => ({
+        id: `${request.id}-${benefit.id}`,
+        title: benefit.title,
+        meta: `${request.employeeName.split(" ")[0]} • Paid out`,
+        amount: benefit.price,
+        status: "Settled",
+        category: benefit.category,
+        inflow: true
+      }))
+  ), [routedPayments]);
 
   const saveProviderProfile = async () => {
     const localProfile: ProviderProfile = {
@@ -137,21 +223,113 @@ export function BusinessExperience({
     setDraft({ title: "", description: "", discount: "", price: "", pointsPrice: "", imageUrl: "", redemptionType: "QR", validUntil: "2026-12-31" });
   };
 
+  const tagline = routedPayments.length > 0
+    ? `Your business ecosystem at a glance. ${reachedEmployees} ${reachedEmployees === 1 ? "person" : "people"} reached this period.`
+    : "Your business ecosystem at a glance. Publish your first offer to start tracking redemptions.";
+
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
-      <GlassPanel style={styles.businessProfile}>
-        <Image source={{ uri: profileDraft.logoUrl }} style={styles.businessLogoImage} />
-        <Text style={styles.greetingText}>{profileDraft.businessName}</Text>
-        <Text style={styles.greetingSub}>{profileDraft.description}</Text>
-      </GlassPanel>
-
-      <View style={styles.metricRow}>
-        <MetricPill label="Redeemed" value={`${approvedRoutedPayments.length}`} />
-        <MetricPill label="Reached" value={`${reachedEmployees}`} />
-        <MetricPill label="Payouts" value={currency(approvedPayoutTotal)} />
+      <View style={styles.insightsHero}>
+        <Text style={styles.insightsTitle}>Insights</Text>
+        <Text style={styles.insightsTagline}>{tagline}</Text>
       </View>
 
+      <View style={styles.bentoGrid}>
+        <BentoMetricCard
+          title="Revenue"
+          value={currency(payoutTotal)}
+          trend={growthSignal}
+          accent={colors.primary}
+          Icon={Wallet}
+        />
+        <BentoMetricCard
+          title="Customers"
+          value={`${reachedEmployees}`}
+          trend={reachedEmployees > 0 ? `+${reachedEmployees}` : "—"}
+          accent={colors.tertiary}
+          Icon={UsersRound}
+        />
+        <BentoMetricCard
+          title="Growth"
+          value={`${Math.min(99, routedPayments.length * 4)}%`}
+          trend={growthSignal}
+          accent={colors.secondary}
+          Icon={TrendingUp}
+        />
+      </View>
+
+      <GlassPanel style={styles.activityCard} intensity={36}>
+        <View style={styles.activityHeader}>
+          <View style={styles.activityHeaderText}>
+            <Text style={styles.sectionTitle}>Activity Heatmap</Text>
+            <Text style={styles.bodyText}>Live redemption signal across your offers.</Text>
+          </View>
+          <Pressable style={styles.exportButton} onPress={() => { /* export hook */ }}>
+            <Text style={styles.exportButtonText}>Export</Text>
+          </Pressable>
+        </View>
+        <View style={styles.activityStage}>
+          <Text style={styles.activityStageLabel}>Live Optimization</Text>
+          <View style={styles.activityPulseRow}>
+            <PulseDot />
+            <PulseDot delay={350} />
+            <PulseDot delay={700} />
+          </View>
+        </View>
+      </GlassPanel>
+
+      <Section title="Recent Transactions" meta={transactions.length ? `${transactions.length}` : undefined}>
+        <GlassPanel style={styles.transactionList} intensity={32}>
+          {transactions.length ? transactions.map((row, index) => {
+            const Icon = categoryIcons[row.category] ?? Store;
+            const lastRow = index === transactions.length - 1;
+            return (
+              <View
+                key={row.id}
+                style={[styles.transactionRow, lastRow && styles.transactionRowLast]}
+              >
+                <View style={[styles.transactionAvatar, categoryAvatarStyle[row.category]]}>
+                  <Icon size={20} color={categoryAvatarColor[row.category]} />
+                </View>
+                <View style={styles.transactionBody}>
+                  <Text style={styles.transactionTitle}>{row.title}</Text>
+                  <Text style={styles.transactionMeta}>{row.meta}</Text>
+                </View>
+                <View style={styles.transactionAmounts}>
+                  <Text
+                    style={[
+                      styles.transactionAmount,
+                      row.inflow ? styles.transactionAmountInflow : styles.transactionAmountOutflow
+                    ]}
+                  >
+                    {row.inflow ? "+" : ""}{currency(row.amount)}
+                  </Text>
+                  <Text style={styles.transactionStatus}>{row.status}</Text>
+                </View>
+              </View>
+            );
+          }) : (
+            <View style={styles.transactionEmpty}>
+              <View style={styles.smallIcon}>
+                <Store size={18} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>No routed payments yet</Text>
+                <Text style={styles.listSub}>Approved employee packages will appear here.</Text>
+              </View>
+            </View>
+          )}
+        </GlassPanel>
+      </Section>
+
+      <View style={styles.manageDivider} />
+
       <Section title="Provider profile" meta="Merchant">
+        <GlassPanel style={styles.businessProfile} intensity={34}>
+          <Image source={{ uri: profileDraft.logoUrl }} style={styles.businessLogoImage} />
+          <Text style={styles.greetingText}>{profileDraft.businessName}</Text>
+          <Text style={styles.greetingSub}>{profileDraft.description}</Text>
+        </GlassPanel>
         <GlassPanel style={styles.formPanel}>
           <TextInput
             value={profileDraft.businessName}
@@ -222,44 +400,13 @@ export function BusinessExperience({
               </View>
               <View style={styles.listText}>
                 <Text style={styles.listTitle}>{offer.title}</Text>
-                <Text style={styles.listSub}>{offer.discount} - {currency(offer.price)} - {offer.pointsPrice} pts - {offer.redemptionType}</Text>
+                <Text style={styles.listSub}>{offer.discount} · {currency(offer.price)} · {offer.pointsPrice} pts · {offer.redemptionType}</Text>
               </View>
               <Text style={styles.listSub}>{offer.validUntil}</Text>
             </View>
             <Text style={styles.bodyText}>{offer.description}</Text>
           </GlassPanel>
         ))}
-      </Section>
-
-      <Section title="Payment routing" meta="Simulated">
-        {routedPayments.length ? routedPayments.map(({ request, benefit }) => (
-          <View key={`${request.id}-${benefit.id}`} style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <CircleDollarSign size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>{benefit.title}</Text>
-              <Text style={styles.listSub}>{request.employeeName} - {request.status === "approved" ? "paid to provider" : "awaiting"}</Text>
-            </View>
-            <Text style={styles.listAmount}>{currency(benefit.price)}</Text>
-          </View>
-        )) : (
-          <View style={styles.listRow}>
-            <View style={styles.smallIcon}><Store size={18} color={colors.text} /></View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>No routed payments yet</Text>
-              <Text style={styles.listSub}>Approved employee packages will appear here.</Text>
-            </View>
-          </View>
-        )}
-      </Section>
-
-      <Section title="Redemption stats" meta="Today">
-        <GlassPanel style={styles.analyticsGrid} intensity={14}>
-          <AnalyticsRow label="Employees used offers" value={`${reachedEmployees}`} />
-          <AnalyticsRow label="Approved payouts" value={`${approvedRoutedPayments.length}`} />
-          <AnalyticsRow label="Offer count" value={`${offers.length}`} />
-        </GlassPanel>
       </Section>
     </ScrollView>
   );

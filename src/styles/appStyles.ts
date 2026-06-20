@@ -139,5 +139,58 @@ export const styles = StyleSheet.create({
   segment: { flex: 1, borderRadius: radius.capsule, alignItems: "center", justifyContent: "center" },
   segmentActive: { backgroundColor: colors.text },
   segmentText: { color: colors.muted, fontWeight: "800" },
-  segmentTextActive: { color: colors.background }
+  segmentTextActive: { color: colors.background },
+
+  insightsHero: { marginTop: 4, marginBottom: 4, gap: 8 },
+  insightsTitle: {
+    color: colors.text, fontSize: 34, lineHeight: 40, fontWeight: "900", letterSpacing: -0.5
+  },
+  insightsTagline: { color: colors.muted, fontSize: 16, lineHeight: 22, maxWidth: 420 },
+
+  bentoGrid: { flexDirection: "row", gap: 12 },
+
+  activityCard: { padding: 22, gap: 16, minHeight: 220 },
+  activityHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  activityHeaderText: { flex: 1, gap: 4 },
+  activityStage: {
+    marginTop: 4, minHeight: 132, borderRadius: 18, borderWidth: 1, borderColor: colors.stroke,
+    backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center", gap: 12
+  },
+  activityStageLabel: { color: colors.primary, fontSize: 22, fontWeight: "900", letterSpacing: -0.3 },
+  activityPulseRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  activityPulseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  exportButton: {
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.capsule,
+    backgroundColor: colors.primary, alignItems: "center", justifyContent: "center"
+  },
+  exportButtonText: { color: colors.onPrimary, fontSize: 13, fontWeight: "800" },
+
+  transactionList: { padding: 0, overflow: "hidden" },
+  transactionRow: {
+    flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.35)"
+  },
+  transactionRowLast: { borderBottomWidth: 0 },
+  transactionAvatar: {
+    width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center"
+  },
+  transactionAvatarPrimary: { backgroundColor: "rgba(0,88,188,0.14)" },
+  transactionAvatarSecondary: { backgroundColor: "rgba(0,110,40,0.14)" },
+  transactionAvatarTertiary: { backgroundColor: "rgba(76,74,202,0.14)" },
+  transactionBody: { flex: 1, gap: 2 },
+  transactionTitle: { color: colors.text, fontSize: 15, fontWeight: "800" },
+  transactionMeta: { color: colors.muted, fontSize: 12 },
+  transactionAmounts: { alignItems: "flex-end", gap: 2 },
+  transactionAmount: { fontSize: 15, fontWeight: "900" },
+  transactionAmountInflow: { color: colors.secondary },
+  transactionAmountOutflow: { color: colors.error },
+  transactionStatus: { color: colors.muted, fontSize: 11, fontWeight: "600" },
+  transactionEmpty: {
+    paddingHorizontal: 16, paddingVertical: 22, flexDirection: "row", alignItems: "center", gap: 12
+  },
+  sectionLinkText: { color: colors.primary, fontSize: 13, fontWeight: "800" },
+
+  manageDivider: {
+    marginTop: 6, marginBottom: 2, height: 1, backgroundColor: "rgba(0,0,0,0.06)"
+  }
 });

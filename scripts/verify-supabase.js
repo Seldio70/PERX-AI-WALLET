@@ -203,7 +203,8 @@ async function main() {
           company_id: company.id,
           total: 99,
           total_points: 9,
-          status: "pending"
+          status: "approved",
+          approved_at: new Date().toISOString()
         })
         .select("id")
         .single()
@@ -258,21 +259,15 @@ async function main() {
     );
     created.challenges.push(challenge.id);
 
-    const approve = await client
-      .from("selection_requests")
-      .update({ status: "approved", approved_at: new Date().toISOString() })
-      .eq("id", request.id);
-    await assertNoError("approve request", approve);
-
     const ledger = await assertNoError(
       "insert ledger",
       await client
         .from("points_ledger")
         .insert({
           user_id: employer.id,
-          source: "selection_approved",
+          source: "employee_redemption",
           points_delta: -9,
-          description: "Smoke approval spend"
+          description: "Smoke redemption spend"
         })
         .select("id")
         .single()
