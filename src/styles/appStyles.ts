@@ -3230,32 +3230,54 @@ export const styles = StyleSheet.create({
 
   // ── Perk Duel ─────────────────────────────────────────────────────────────
   duelBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    backgroundColor: colors.tertiary,
-    borderRadius: radius.card,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    padding: 20,
+    gap: 16,
     marginBottom: 8
   },
-  duelBannerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.18)",
+  duelBannerHead: {
+    gap: 10
+  },
+  duelBannerBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center"
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.tertiary
+  },
+  duelBannerBadgeText: {
+    color: colors.onPrimary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.4
   },
   duelBannerTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3
+  },
+  duelBannerSub: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18
+  },
+  duelBannerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.tertiary,
+    borderRadius: radius.capsule,
+    paddingVertical: 13,
+    paddingHorizontal: 20
+  },
+  duelBannerBtnText: {
     color: colors.onPrimary,
     fontSize: 15,
     fontWeight: "700"
-  },
-  duelBannerSub: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 12,
-    marginTop: 1
   },
   duelShell: {
     flex: 1,

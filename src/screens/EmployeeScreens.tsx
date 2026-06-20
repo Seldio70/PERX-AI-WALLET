@@ -1014,16 +1014,23 @@ function EmployeeHome({
         )}
       </GlassPanel>
 
-      <Pressable onPress={() => setDuelOpen(true)} style={styles.duelBanner}>
-        <View style={styles.duelBannerIcon}>
-          <Sword size={22} color={colors.onPrimary} />
+      <GlassPanel style={styles.duelBanner} intensity={40}>
+        <View style={styles.duelBannerHead}>
+          <View style={styles.duelBannerBadge}>
+            <Sword size={13} color={colors.onPrimary} />
+            <Text style={styles.duelBannerBadgeText}>Perk Duel</Text>
+          </View>
+          <Text style={styles.duelBannerTitle}>Which perk fits you best?</Text>
+          <Text style={styles.duelBannerSub}>5 quick rounds — we'll rank your top picks by taste</Text>
         </View>
-        <View style={styles.listText}>
-          <Text style={styles.duelBannerTitle}>Perk Duel</Text>
-          <Text style={styles.duelBannerSub}>5 rounds · find your perk style</Text>
-        </View>
-        <ChevronRight size={18} color={colors.onPrimary} />
-      </Pressable>
+        <Pressable
+          onPress={() => setDuelOpen(true)}
+          style={({ pressed }) => [styles.duelBannerBtn, pressed && { opacity: 0.82 }]}
+        >
+          <Sword size={15} color={colors.onPrimary} />
+          <Text style={styles.duelBannerBtnText}>Start Duel</Text>
+        </Pressable>
+      </GlassPanel>
 
       <PerkDuelModal
         visible={duelOpen}
