@@ -555,10 +555,12 @@ export const styles = StyleSheet.create({
     paddingVertical: 12
   },
   rolePills: {
+    flexDirection: "row",
     gap: 10,
     marginTop: 4
   },
   rolePill: {
+    flex: 1,
     minHeight: 48,
     borderRadius: radius.capsule,
     borderWidth: 0.5,
@@ -578,6 +580,27 @@ export const styles = StyleSheet.create({
   },
   rolePillTextActive: {
     color: colors.primary
+  },
+  noticeText: {
+    color: colors.secondary,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  forgotLink: {
+    alignSelf: "center",
+    paddingVertical: 4
+  },
+  forgotText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  authHint: {
+    color: colors.muted,
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 17,
+    marginTop: 2
   },
   adminHeader: {
     flexDirection: "row",
@@ -1337,6 +1360,570 @@ export const styles = StyleSheet.create({
     marginBottom: 12
   },
   stackItemCollapsed: {
-    marginTop: -148
+    marginTop: -126
+  },
+  aiCard: {
+    padding: 18,
+    gap: 14
+  },
+  aiHead: {
+    gap: 10
+  },
+  aiBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.primary
+  },
+  aiBadgeText: {
+    color: colors.onPrimary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.4
+  },
+  aiHeadTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3
+  },
+  aiPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14
+  },
+  aiThumb: {
+    width: 68,
+    height: 68,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  aiPrimaryInfo: {
+    flex: 1,
+    gap: 3
+  },
+  aiName: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  aiProvider: {
+    color: colors.muted,
+    fontSize: 13
+  },
+  aiPrice: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 2
+  },
+  aiReason: {
+    color: colors.soft,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  aiCtas: {
+    flexDirection: "row",
+    gap: 10
+  },
+  nearbyCard: {
+    width: 178,
+    minHeight: 178,
+    padding: 14,
+    marginRight: 12,
+    gap: 8
+  },
+  nearbyThumb: {
+    width: "100%",
+    height: 84,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  nearbyName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  nearbyMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5
+  },
+  nearbyMeta: {
+    flex: 1,
+    color: colors.muted,
+    fontSize: 12
+  },
+  nearbyReason: {
+    color: colors.soft,
+    fontSize: 12,
+    lineHeight: 16
+  },
+  apCard: {
+    padding: 16,
+    gap: 14
+  },
+  apHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  apIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.capsule,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary
+  },
+  apHeadBody: {
+    flex: 1
+  },
+  apConfidence: {
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.compact,
+    backgroundColor: "rgba(0,88,188,0.1)"
+  },
+  apConfidenceValue: {
+    color: colors.primary,
+    fontSize: 17,
+    fontWeight: "900"
+  },
+  apConfidenceLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  apDetail: {
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.06)",
+    paddingTop: 14
+  },
+  apItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  apItemIndex: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  apItemIndexText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  apItemBody: {
+    flex: 1
+  },
+  apItemName: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  apItemMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 2
+  },
+  apSwap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(0,88,188,0.08)"
+  },
+  apSwapText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  apReasonBox: {
+    padding: 14,
+    borderRadius: radius.compact,
+    backgroundColor: "rgba(0,88,188,0.06)",
+    gap: 6
+  },
+  apReasonLabel: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.5
+  },
+  apReasonText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  apTotalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  tapPanel: {
+    padding: 18,
+    gap: 12
+  },
+  tapHeadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  tapDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.muted
+  },
+  tapDotActive: {
+    backgroundColor: colors.secondary
+  },
+  filterRow: {
+    gap: 8,
+    paddingVertical: 2,
+    paddingRight: 8
+  },
+  filterChip: {
+    minHeight: 38,
+    paddingHorizontal: 16,
+    borderRadius: radius.capsule,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle,
+    backgroundColor: colors.panelStrong
+  },
+  filterChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  filterChipText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  filterChipTextActive: {
+    color: colors.onPrimary
+  },
+  filterSavedChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  offerV2: {
+    borderRadius: radius.cardLg,
+    backgroundColor: colors.surface,
+    borderWidth: 0.5,
+    borderColor: colors.stroke,
+    overflow: "hidden",
+    ...shadow
+  },
+  offerV2Hero: {
+    height: 168,
+    justifyContent: "flex-end",
+    padding: 14
+  },
+  offerV2Img: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  offerV2Grad: {
+    ...StyleSheet.absoluteFillObject
+  },
+  offerV2Cat: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.capsule
+  },
+  offerV2CatText: {
+    color: colors.onPrimary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.3
+  },
+  offerV2Discount: {
+    position: "absolute",
+    top: 12,
+    left: 92,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(12,14,22,0.5)"
+  },
+  offerV2DiscountText: {
+    color: colors.onPrimary,
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  offerV2Save: {
+    position: "absolute",
+    top: 10,
+    right: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.82)",
+    borderWidth: 0.5,
+    borderColor: colors.stroke
+  },
+  offerV2SaveActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  offerV2HeroTitle: {
+    color: colors.onPrimaryContainer,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3
+  },
+  offerV2Body: {
+    padding: 16,
+    gap: 10
+  },
+  offerV2ProviderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  offerV2Logo: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  offerV2LogoFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,88,188,0.1)"
+  },
+  offerV2Provider: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  offerV2LocPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4
+  },
+  offerV2Loc: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  offerV2Desc: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  offerV2Footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  offerV2PriceChip: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(0,88,188,0.08)"
+  },
+  offerV2Price: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  offerV2PriceLabel: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  offerV2Ends: {
+    color: colors.soft,
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  inviteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.primary
+  },
+  inviteButtonText: {
+    color: colors.onPrimary,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  employeeRow: {
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  inviteSuccess: {
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8
+  },
+  inviteSuccessIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary
+  },
+  pointsHero: {
+    padding: 18,
+    gap: 8
+  },
+  pointsHeroValue: {
+    color: colors.text,
+    fontSize: 32,
+    fontWeight: "900"
+  },
+  pointsHeroSub: {
+    color: colors.muted,
+    fontSize: 13
+  },
+  pointsFeedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8
+  },
+  pointsFeedIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.panelStrong
+  },
+  challengeCard: {
+    padding: 14,
+    gap: 8
+  },
+  challengeMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  challengePoints: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  automationRow: {
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  automationToggle: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    padding: 2,
+    backgroundColor: colors.stroke
+  },
+  automationToggleOn: {
+    backgroundColor: colors.primary
+  },
+  automationKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.onPrimary
+  },
+  automationKnobOn: {
+    alignSelf: "flex-end"
+  },
+  automationPointsInput: {
+    width: 64,
+    textAlign: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: radius.compact,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    backgroundColor: colors.panel,
+    color: colors.text,
+    fontWeight: "800"
+  },
+  employeeMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4
+  },
+  employeeMetaPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.panelStrong,
+    borderWidth: 1,
+    borderColor: colors.stroke
+  },
+  employeeMetaPillText: {
+    color: colors.soft,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  inviteCodeBox: {
+    padding: 12,
+    borderRadius: radius.compact,
+    backgroundColor: colors.panelStrong,
+    borderWidth: 1,
+    borderColor: colors.stroke,
+    alignItems: "center",
+    gap: 4
+  },
+  inviteCodeText: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: 1
+  },
+  compactPointsCard: {
+    padding: 14,
+    gap: 6
+  },
+  redeemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
   }
 });
