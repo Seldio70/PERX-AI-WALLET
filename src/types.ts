@@ -75,7 +75,9 @@ export type SelectionRequest = {
   benefitIds: string[];
   total: number;
   totalPoints: number;
+  status: "draft" | "pending" | "approved" | "rejected";
   createdAt: string;
+  approvedAt?: string;
 };
 
 export type EmployerInvite = {

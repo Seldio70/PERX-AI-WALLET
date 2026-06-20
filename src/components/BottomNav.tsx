@@ -1,29 +1,22 @@
 import { BlurView } from "expo-blur";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { AppIcon } from "./AppIcon";
+import { AppIcon, AppIconName } from "./AppIcon";
 import { colors, radius, shadow } from "../theme";
 
-export type EmployeeTab = "home" | "wallet" | "allocate" | "alerts";
-
-const tabs: Array<{
-  id: EmployeeTab;
+export type NavTab<T extends string = string> = {
+  id: T;
   label: string;
-  icon: "home-outline" | "wallet-outline" | "tune-variant" | "tag-outline";
-  iconActive: "home" | "wallet" | "tune" | "tag";
-}> = [
-  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
-  { id: "wallet", label: "Wallet", icon: "wallet-outline", iconActive: "wallet" },
-  { id: "allocate", label: "Split", icon: "tune-variant", iconActive: "tune" },
-  { id: "alerts", label: "Offers", icon: "tag-outline", iconActive: "tag" }
-];
-
-type Props = {
-  active: EmployeeTab;
-  onChange: (tab: EmployeeTab) => void;
-  onProfilePress?: () => void;
+  icon: AppIconName;
+  iconActive: AppIconName;
 };
 
-export function BottomNav({ active, onChange, onProfilePress }: Props) {
+type Props<T extends string> = {
+  tabs: ReadonlyArray<NavTab<T>>;
+  active: T;
+  onChange: (tab: T) => void;
+};
+
+export function BottomNav<T extends string>({ tabs, active, onChange }: Props<T>) {
   return (
     <View style={styles.shell}>
       <BlurView intensity={72} tint="light" style={styles.nav}>
@@ -46,11 +39,6 @@ export function BottomNav({ active, onChange, onProfilePress }: Props) {
               </Pressable>
             );
           })}
-          {onProfilePress ? (
-            <Pressable onPress={onProfilePress} style={styles.item}>
-              <AppIcon name="account-circle-outline" size={22} color={colors.muted} />
-            </Pressable>
-          ) : null}
         </View>
       </BlurView>
     </View>
