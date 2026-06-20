@@ -441,7 +441,7 @@ export async function signInOrSignUpPlatformAuth(input: {
 }
 
 export async function signInPlatformUser(input: {
-  role: User["role"];
+  role?: User["role"];
   email: string;
   password: string;
 }) {
@@ -473,7 +473,14 @@ export async function signInPlatformUser(input: {
 
   if (!row) return null;
   const user = mapUser(row as DbUser);
-  return user.role === input.role ? user : null;
+  return !input.role || user.role === input.role ? user : null;
+}
+
+export async function requestPasswordReset(email: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+  const result = await client.auth.resetPasswordForEmail(email);
+  return !result.error;
 }
 
 export async function acceptEmployerInvite(input: {

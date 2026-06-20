@@ -10,6 +10,9 @@ export type User = {
   yearsEmployed?: number;
   businessId?: string;
   invitedByUserId?: string;
+  birthDate?: string;
+  startDate?: string;
+  pointsBalance?: number;
 };
 
 export type Company = {
@@ -106,4 +109,40 @@ export type Challenge = {
   description: string;
   rewardPoints: number;
   status: "open" | "completed";
+  target?: "everyone" | string;
+  dueDate?: string;
+};
+
+export type RewardEventKind = "birthday" | "anniversary" | "seasonal" | "welcome" | "spot" | "challenge";
+
+export type RewardEvent = {
+  id: string;
+  employeeId: string;
+  employeeName?: string;
+  kind: RewardEventKind;
+  points: number;
+  note: string;
+  createdAt: string;
+};
+
+export type EmployeeInvite = {
+  id: string;
+  email: string;
+  code: string;
+  companyId: string;
+  companyName: string;
+  employerId: string;
+  startDate: string;
+  status: "sent" | "accepted";
+  createdAt: string;
+};
+
+export type RewardAutomationKind = "birthday" | "anniversary" | "seasonal" | "welcome";
+
+export type RewardAutomation = {
+  kind: RewardAutomationKind;
+  enabled: boolean;
+  points: number;
+  label: string;
+  description: string;
 };

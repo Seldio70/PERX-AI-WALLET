@@ -1,0 +1,185 @@
+import { BlurView } from "expo-blur";
+import { Nfc, X } from "lucide-react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Benefit, User } from "../types";
+import { colors } from "../theme";
+import { CapsuleButton } from "./CapsuleButton";
+import { ConfettiBurst } from "./ConfettiBurst";
+import { WalletCard } from "./WalletCard";
+
+type Props = {
+  visible: boolean;
+  benefit: Benefit | null;
+  user: User;
+  companyName: string;
+  balance: number;
+  variant: number;
+  accepted: boolean;
+  celebrateKey: number;
+  onTap: () => void;
+  onClose: () => void;
+};
+
+export function WalletFocus({
+  visible,
+  benefit,
+  user,
+  companyName,
+  balance,
+  variant,
+  accepted,
+  celebrateKey,
+  onTap,
+  onClose
+}: Props) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      anim.setValue(0);
+      Animated.spring(anim, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 7,
+        tension: 70
+      }).start();
+    }
+  }, [visible, benefit?.id, anim]);
+
+  if (!visible || !benefit) return null;
+
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [60, 0] });
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] });
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]}>
+        <BlurView intensity={48} tint="light" style={StyleSheet.absoluteFill} />
+        <View style={styles.scrim} />
+      </Animated.View>
+
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+      <View style={styles.content} pointerEvents="box-none">
+        <Animated.View style={[styles.cardWrap, { opacity: anim, transform: [{ translateY }, { scale }] }]}>
+          <WalletCard
+            user={user}
+            companyName={companyName}
+            balance={balance}
+            benefit={benefit}
+            variant={variant}
+            selected
+          />
+          <View style={styles.caption}>
+            <Text style={styles.captionTitle}>{benefit.title}</Text>
+            <Text style={styles.captionText} numberOfLines={2}>
+              {benefit.description}
+            </Text>
+          </View>
+        </Animated.View>
+      </View>
+
+      <View style={styles.bottom} pointerEvents="box-none">
+        <View style={styles.statusRow}>
+          <View style={[styles.dot, accepted && styles.dotActive]} />
+          <Text style={styles.statusText}>
+            {accepted ? "Payment accepted" : "Ready for the NFC reader"}
+          </Text>
+        </View>
+        <CapsuleButton
+          label={accepted ? "Tap again" : "Simulate NFC tap"}
+          onPress={onTap}
+          icon={<Nfc size={16} color={colors.onPrimary} />}
+        />
+      </View>
+
+      <Pressable style={styles.closeBtn} onPress={onClose}>
+        <X size={18} color={colors.text} />
+      </Pressable>
+
+      {accepted ? <ConfettiBurst key={celebrateKey} /> : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(20,22,30,0.28)"
+  },
+  content: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24
+  },
+  cardWrap: {
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "stretch",
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 38,
+    shadowOffset: { width: 0, height: 22 },
+    elevation: 16
+  },
+  caption: {
+    marginTop: 18,
+    alignItems: "center",
+    gap: 6
+  },
+  captionTitle: {
+    color: colors.text,
+    fontSize: 19,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  captionText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center"
+  },
+  bottom: {
+    position: "absolute",
+    left: 24,
+    right: 24,
+    bottom: 40,
+    gap: 14,
+    alignItems: "stretch"
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  dot: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: colors.muted
+  },
+  dotActive: {
+    backgroundColor: colors.secondary
+  },
+  statusText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  closeBtn: {
+    position: "absolute",
+    top: 14,
+    right: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderWidth: 0.5,
+    borderColor: colors.stroke
+  }
+});
