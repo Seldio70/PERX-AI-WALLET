@@ -9,9 +9,9 @@ type Props = {
   intensity?: number;
 };
 
-export function GlassPanel({ children, style, intensity = 24 }: Props) {
+export function GlassPanel({ children, style, intensity = 36 }: Props) {
   return (
-    <BlurView intensity={intensity} tint="dark" style={[styles.panel, style]}>
+    <BlurView intensity={intensity} tint="light" style={[styles.panel, style]}>
       {children}
     </BlurView>
   );
@@ -20,8 +20,8 @@ export function GlassPanel({ children, style, intensity = 24 }: Props) {
 const styles = StyleSheet.create({
   panel: {
     overflow: "hidden",
-    borderRadius: radius.card,
-    borderWidth: 1,
+    borderRadius: radius.cardLg,
+    borderWidth: 0.5,
     borderColor: colors.stroke,
     backgroundColor: colors.panel,
     ...shadow

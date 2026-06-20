@@ -23,9 +23,9 @@ export function AllocationSlider({ category, value, max, onChange }: Props) {
         maximumValue={max}
         step={1}
         value={value}
-        minimumTrackTintColor={colors.text}
-        maximumTrackTintColor="rgba(255,255,255,0.16)"
-        thumbTintColor={colors.text}
+        minimumTrackTintColor={colors.primary}
+        maximumTrackTintColor="rgba(0,0,0,0.08)"
+        thumbTintColor={colors.primary}
         onValueChange={onChange}
       />
     </View>
@@ -35,9 +35,9 @@ export function AllocationSlider({ category, value, max, onChange }: Props) {
 const styles = StyleSheet.create({
   row: {
     borderRadius: radius.compact,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: colors.stroke,
+    backgroundColor: colors.panel,
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle,
     padding: 14,
     marginBottom: 10
   },

@@ -1,0 +1,52 @@
+﻿[
+    {
+        "title":  "Business Dashboard",
+        "screenId":  "dc397a31c37349e0a314051f57be10bc",
+        "slug":  "business-dashboard",
+        "width":  "780",
+        "height":  "3268",
+        "deviceType":  "MOBILE",
+        "screenshot":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\business-dashboard\\screenshot.png",
+        "html":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\business-dashboard\\index.html"
+    },
+    {
+        "title":  "Login - User Selection",
+        "screenId":  "6f5a95ed12344f23ba4c9de3fa19aff7",
+        "slug":  "login-user-selection",
+        "width":  "780",
+        "height":  "1768",
+        "deviceType":  "MOBILE",
+        "screenshot":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\login-user-selection\\screenshot.png",
+        "html":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\login-user-selection\\index.html"
+    },
+    {
+        "title":  "Admin Management",
+        "screenId":  "ce87dd5341e9453aa9deb47b479c8ef0",
+        "slug":  "admin-management",
+        "width":  "780",
+        "height":  "2582",
+        "deviceType":  "MOBILE",
+        "screenshot":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\admin-management\\screenshot.png",
+        "html":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\admin-management\\index.html"
+    },
+    {
+        "title":  "Wallet",
+        "screenId":  "b36ef68ecfb840738afaa0901d824e15",
+        "slug":  "wallet",
+        "width":  "780",
+        "height":  "1768",
+        "deviceType":  "MOBILE",
+        "screenshot":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\wallet\\screenshot.png",
+        "html":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\wallet\\index.html"
+    },
+    {
+        "title":  "User Profile",
+        "screenId":  "d143a7c97cb3411a9b949e6d45dc6e2a",
+        "slug":  "user-profile",
+        "width":  "780",
+        "height":  "2264",
+        "deviceType":  "MOBILE",
+        "screenshot":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\user-profile\\screenshot.png",
+        "html":  "c:\\Users\\Seldio\\Desktop\\PERX_AI\\.stitch\\minimalist-glassy-ios-ui\\user-profile\\index.html"
+    }
+]
