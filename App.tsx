@@ -4,29 +4,21 @@ import {
   Building2,
   Check,
   CircleDollarSign,
-  Dumbbell,
-  GraduationCap,
-  HeartPulse,
   LineChart,
-  Plane,
   Plus,
   QrCode,
   Shield,
   ShieldCheck,
-  ShoppingBag,
-  Sparkles,
   Store,
   TrendingUp,
   UserPlus,
   UserRound,
   Users,
   UsersRound,
-  Wallet,
   WalletCards
 } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Animated,
   KeyboardAvoidingView,
   Image,
   Platform,
@@ -51,7 +43,9 @@ import { UserProfileScreen } from "./src/components/UserProfileScreen";
 import { WalletCard } from "./src/components/WalletCard";
 import { currency, market } from "./src/lib/format";
 import { getSupabaseClient } from "./src/lib/supabase";
+import { notify, registerForPushNotifications } from "./src/lib/notifications";
 import {
+  createEmployerInvite,
   createProviderOffer,
   createPlatformUser,
   createSelectionRequest,
@@ -148,6 +142,7 @@ export default function App() {
   const [benefitItems, setBenefitItems] = useState<Benefit[]>([]);
   const [liveData, setLiveData] = useState<AppData | null>(null);
   const [dataSource, setDataSource] = useState<"empty" | "supabase">("empty");
+  const [pushToken, setPushToken] = useState<string | null>(null);
   const supabaseReady = Boolean(getSupabaseClient());
   const appData: AppData = {
     companies: liveData?.companies ?? emptyAppData.companies,
@@ -161,6 +156,10 @@ export default function App() {
   };
 
   useEffect(() => {
+    registerForPushNotifications().then(setPushToken);
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     fetchPerxLiveData().then((data) => {
@@ -171,7 +170,19 @@ export default function App() {
       setInviteItems(data.employerInvites);
       setWalletCardItems(data.employerWalletCards);
       setProviderProfileItems(data.providerProfiles);
-      setBenefitItems(data.benefits);
+
+      setBenefitItems((prev) => {
+        const prevIds = new Set(prev.map((b) => b.id));
+        const newByCategory: Record<string, number> = {};
+        for (const b of data.benefits) {
+          if (!prevIds.has(b.id)) newByCategory[b.category] = (newByCategory[b.category] ?? 0) + 1;
+        }
+        for (const [cat, count] of Object.entries(newByCategory)) {
+          void notify.newPerks(cat, count, pushToken);
+        }
+        return data.benefits;
+      });
+
       setDataSource("supabase");
     });
 
@@ -231,11 +242,7 @@ export default function App() {
               onOpenProfile={() => setShowProfile(true)}
               onSubmitSelection={(request) => {
                 setSelectionRequests((current) => [request, ...current]);
-                setWalletCardItems((current) =>
-                  current.map((card, index) =>
-                    index === 0 ? { ...card, points: Math.max(0, card.points - request.totalPoints) } : card
-                  )
-                );
+                void notify.requestPending(request.employeeName, pushToken);
               }}
               onUpdateProviderProfile={(profile) =>
                 setProviderProfileItems((current) => [
@@ -872,7 +879,7 @@ function EmployeeOffers({
         <View style={styles.packageFooter}>
           <Text style={styles.confidence}>{currency(selectedTotal)}</Text>
           <CapsuleButton
-            label={submitted ? "Redeemed" : "Redeem now"}
+            label={submitted ? "Sent to employer" : "Show employer"}
             onPress={submitSelection}
             variant={submitted ? "soft" : "primary"}
           />
@@ -883,9 +890,9 @@ function EmployeeOffers({
         <GlassPanel style={styles.packageSummaryPanel} intensity={12}>
           <View style={styles.packageSummaryHeader}>
             <View style={styles.listText}>
-              <Text style={styles.cardTitle}>Ready to redeem</Text>
+              <Text style={styles.cardTitle}>Ready for employer review</Text>
               <Text style={styles.bodyText}>
-                Grouped by provider so payment routes correctly the moment you redeem.
+                Grouped by provider so the employer can see where payment will be routed.
               </Text>
             </View>
             <View style={styles.selectedBadge}>
@@ -983,15 +990,15 @@ function EmployeeOffers({
         })}
       </Section>
 
-      <Section title="How redemption works" meta="Live flow">
+      <Section title="How approval works" meta="Live flow">
         <View style={styles.listRow}>
           <View style={styles.smallIcon}>
             <UsersRound size={18} color={colors.text} />
           </View>
           <View style={styles.listText}>
-            <Text style={styles.listTitle}>Instant routing to each provider</Text>
+            <Text style={styles.listTitle}>Employer approves the package</Text>
             <Text style={styles.listSub}>
-              Tap redeem and the simulated payment is split across providers from your monthly budget. No employer approval step.
+              Once approved, simulated payment is routed to each provider. Employee never receives cash.
             </Text>
           </View>
         </View>
@@ -1037,15 +1044,34 @@ function EmployerExperience({
     });
   }, [employees, company.monthlyBudgetPerEmployee]);
 
+  const pendingCount = 0;
   const employerPoints = appData.employerWalletCards.reduce((sum, card) => sum + card.points, 0);
-  const redemptionsCount = selectionRequests.length;
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
+
+  const handleGenerateInvite = async () => {
+    setInviteLoading(true);
+    try {
+      const invite = await createEmployerInvite({
+        employeeId: "",
+        employerEmail: user.email,
+        companyName: company.name
+      });
+      if (invite) setGeneratedCode(invite.inviteCode);
+    } finally {
+      setInviteLoading(false);
+    }
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1 }}>
+      <View style={styles.screenContent}>
       <View style={styles.adminHeader}>
         <View style={styles.adminHeaderCopy}>
           <Text style={styles.greetingText}>Management</Text>
-          <Text style={styles.greetingSub}>Fund points, watch redemptions, manage employee access.</Text>
+          <Text style={styles.greetingSub}>Monitor approvals, points, and employee access.</Text>
         </View>
         <Pressable onPress={onOpenProfile} style={styles.searchPill}>
           <AppIcon name="magnify" size={18} color={colors.soft} />
@@ -1054,35 +1080,38 @@ function EmployerExperience({
 
       <View style={styles.bentoRow}>
         <BentoMetricCard
-          title="Employees"
+          title="System"
           value={`${employees.length}`}
           trend="Active"
           accent={colors.secondary}
           Icon={Shield}
         />
         <BentoMetricCard
-          title="Redemptions"
-          value={`${redemptionsCount}`}
-          trend="+live"
+          title="Pending"
+          value={`${pendingCount}`}
+          trend="+queue"
           accent={colors.primary}
           Icon={Users}
         />
       </View>
 
-      <View style={styles.adminActionCard}>
+      <Pressable
+        style={styles.adminActionCard}
+        onPress={() => { setShowInvite(true); setGeneratedCode(""); setInviteEmail(""); }}
+      >
         <View style={styles.adminActionIcon}>
           <UserPlus size={20} color={colors.onPrimary} />
         </View>
         <View style={styles.listText}>
           <Text style={styles.adminActionTitle}>Invite employee</Text>
-          <Text style={styles.adminActionSub}>Provision new team access keys.</Text>
+          <Text style={styles.adminActionSub}>Tap to generate an invite code.</Text>
         </View>
-      </View>
+      </Pressable>
 
       <View style={styles.metricRow}>
         <MetricPill label="Employees" value={`${employees.length}`} />
         <MetricPill label="Points" value={`${employerPoints.toLocaleString(market.locale)}`} />
-        <MetricPill label="Redemptions" value={`${redemptionsCount}`} />
+        <MetricPill label="Pending" value={`${pendingCount}`} />
       </View>
 
       <Section title="Points wallet" meta="Cards">
@@ -1144,15 +1173,14 @@ function EmployerExperience({
         )}
       </Section>
 
-      <Section title="Recent redemptions" meta="Live">
-        {selectionRequests.length ? selectionRequests.map((request) => {
+      <Section title="Approval queue" meta="Core loop">
+        {selectionRequests.map((request) => {
           const requestBenefits = request.benefitIds
             .map((benefitId) => appData.benefits.find((benefit) => benefit.id === benefitId))
             .filter(Boolean) as Benefit[];
           const providers = Array.from(new Set(requestBenefits.map((benefit) => benefit.providerName)));
-          const pointsCharged =
+          const pointsNeeded =
             request.totalPoints || requestBenefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
-
           return (
             <GlassPanel key={request.id} style={styles.approvalCard} intensity={14}>
               <View style={styles.employeeBudgetHeader}>
@@ -1162,32 +1190,25 @@ function EmployerExperience({
                     {requestBenefits.map((benefit) => benefit.title).join(", ")}
                   </Text>
                   <Text style={styles.listSub}>
-                    Routed to {providers.join(", ")}
+                    Routes to {providers.join(", ")}
                   </Text>
                 </View>
                 <Text style={styles.confidence}>{currency(request.total)}</Text>
               </View>
               <Text style={styles.listSub}>
-                Points charged: {pointsCharged.toLocaleString(market.locale)}
+                Points needed: {pointsNeeded.toLocaleString(market.locale)}
               </Text>
               <View style={styles.packageFooter}>
                 <View style={styles.selectedBadge}>
-                  <Text style={styles.selectedBadgeText}>Settled</Text>
+                  <Text style={styles.selectedBadgeText}>
+                    {"Approved - paid"}
+                  </Text>
                 </View>
+                {null}
               </View>
             </GlassPanel>
           );
-        }) : (
-          <View style={styles.listRow}>
-            <View style={styles.smallIcon}>
-              <CircleDollarSign size={18} color={colors.text} />
-            </View>
-            <View style={styles.listText}>
-              <Text style={styles.listTitle}>No redemptions yet</Text>
-              <Text style={styles.listSub}>Employee redemptions will land here automatically.</Text>
-            </View>
-          </View>
-        )}
+        })}
       </Section>
 
       <Section title="Recent records" meta={`${employees.length} team`}>
@@ -1232,7 +1253,7 @@ function EmployerExperience({
       <Section title="Analytics" meta="Trending">
         <GlassPanel style={styles.analyticsGrid} intensity={14}>
           <AnalyticsRow label="Employees" value={`${employees.length}`} />
-          <AnalyticsRow label="Redemptions" value={`${redemptionsCount}`} />
+          <AnalyticsRow label="Pending approvals" value={`${pendingCount}`} />
         </GlassPanel>
       </Section>
 
@@ -1240,7 +1261,8 @@ function EmployerExperience({
         {[
           ["Policy templates", "Create department-specific allowance rules."],
           ["Budget forecasting", "Preview cost changes before bulk updates."],
-          ["Engagement nudges", "Auto-remind employees with unused budget."]
+          ["Engagement nudges", "Auto-remind employees with unused budget."],
+          ["Approval queue", "Review exceptions and high-value redemptions."]
         ].map(([title, text]) => (
           <View key={title} style={styles.listRow}>
             <View style={styles.smallIcon}>
@@ -1253,45 +1275,46 @@ function EmployerExperience({
           </View>
         ))}
       </Section>
-    </ScrollView>
+      </View>
+
+      {showInvite && (
+        <View style={styles.inviteOverlay}>
+          <GlassPanel style={styles.inviteCard} intensity={70}>
+            <Text style={styles.adminActionTitle}>Invite employee</Text>
+            <Text style={styles.listSub}>Enter the employee's email (optional), then generate a code to share with them.</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Employee email (optional)"
+              placeholderTextColor={colors.soft}
+              value={inviteEmail}
+              onChangeText={setInviteEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            {generatedCode ? (
+              <View style={styles.inviteCodeBox}>
+                <Text style={styles.listSub}>Share this code with the employee:</Text>
+                <Text style={styles.inviteCodeText}>{generatedCode}</Text>
+              </View>
+            ) : null}
+            <View style={styles.inviteActions}>
+              <CapsuleButton
+                label={inviteLoading ? "Generating…" : "Generate code"}
+                onPress={handleGenerateInvite}
+                variant="primary"
+                icon={<UserPlus size={16} color={colors.onPrimary} />}
+              />
+              <CapsuleButton
+                label="Close"
+                onPress={() => setShowInvite(false)}
+                variant="soft"
+              />
+            </View>
+          </GlassPanel>
+        </View>
+      )}
+    </View>
   );
-}
-
-const businessCategoryIcons: Record<BenefitCategory, typeof Store> = {
-  Food: ShoppingBag,
-  Fitness: Dumbbell,
-  Health: HeartPulse,
-  Learning: GraduationCap,
-  Mobility: Plane,
-  Wellness: Sparkles,
-  Family: UsersRound
-};
-
-const businessCategoryAvatar: Record<BenefitCategory, { background: string; color: string }> = {
-  Food: { background: "rgba(76,74,202,0.14)", color: colors.tertiary },
-  Fitness: { background: "rgba(0,110,40,0.14)", color: colors.secondary },
-  Health: { background: "rgba(0,88,188,0.14)", color: colors.primary },
-  Learning: { background: "rgba(0,88,188,0.14)", color: colors.primary },
-  Mobility: { background: "rgba(76,74,202,0.14)", color: colors.tertiary },
-  Wellness: { background: "rgba(0,110,40,0.14)", color: colors.secondary },
-  Family: { background: "rgba(0,88,188,0.14)", color: colors.primary }
-};
-
-function PulseDot({ delay = 0 }: { delay?: number }) {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, delay, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.25, duration: 700, useNativeDriver: true })
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [delay, opacity]);
-
-  return <Animated.View style={[styles.activityPulseDot, { opacity }]} />;
 }
 
 function BusinessExperience({
@@ -1346,8 +1369,11 @@ function BusinessExperience({
       .filter((benefit) => benefit.businessId === user.businessId)
       .map((benefit) => ({ request, benefit }))
   );
-  const payoutTotal = routedPayments.reduce((sum, { benefit }) => sum + benefit.price, 0);
-  const reachedEmployees = new Set(routedPayments.map(({ request }) => request.employeeId)).size;
+  const approvedPayoutTotal = routedPayments
+    .filter(() => true)
+    .reduce((sum, { benefit }) => sum + benefit.price, 0);
+  const approvedRoutedPayments = routedPayments.filter(() => true);
+  const reachedEmployees = new Set(approvedRoutedPayments.map(({ request }) => request.employeeId)).size;
 
   const saveProviderProfile = async () => {
     const localProfile: ProviderProfile = {
@@ -1425,22 +1451,14 @@ function BusinessExperience({
     });
   };
 
-  const heroTagline = routedPayments.length > 0
-    ? `Your business ecosystem at a glance. ${reachedEmployees} ${reachedEmployees === 1 ? "person" : "people"} reached this period.`
-    : `Your business ecosystem at a glance. Publish your first offer to start tracking redemptions, ${profileDraft.businessName.split(" ")[0]}.`;
-
-  const growthTrend = routedPayments.length > 0
-    ? `+${Math.min(48, routedPayments.length * 8)}%`
-    : "+0%";
-
-  const recentTransactions = routedPayments.slice(0, 6);
-
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <View style={styles.adminHeader}>
         <View style={styles.adminHeaderCopy}>
           <Text style={styles.greetingText}>Insights</Text>
-          <Text style={styles.insightsTagline}>{heroTagline}</Text>
+          <Text style={styles.greetingSub}>
+            Your provider ecosystem at a glance. {profileDraft.businessName}
+          </Text>
         </View>
         <Pressable onPress={onOpenProfile} style={styles.searchPill}>
           <AppIcon name="magnify" size={18} color={colors.soft} />
@@ -1449,24 +1467,34 @@ function BusinessExperience({
 
       <View style={styles.bentoRow}>
         <BentoMetricCard
-          title="Revenue"
-          value={currency(payoutTotal)}
-          trend={growthTrend}
+          title="Payouts"
+          value={currency(approvedPayoutTotal)}
+          trend="+live"
           accent={colors.primary}
-          Icon={Wallet}
+          Icon={CircleDollarSign}
         />
         <BentoMetricCard
-          title="Customers"
+          title="Reached"
           value={`${reachedEmployees}`}
-          trend={reachedEmployees > 0 ? `+${reachedEmployees}` : "—"}
+          trend="+team"
           accent={colors.tertiary}
-          Icon={UsersRound}
+          Icon={Users}
+        />
+      </View>
+
+      <View style={styles.bentoRow}>
+        <BentoMetricCard
+          title="Offers"
+          value={`${offers.length}`}
+          trend="+catalog"
+          accent={colors.secondary}
+          Icon={Store}
         />
         <BentoMetricCard
           title="Growth"
-          value={`${Math.min(99, routedPayments.length * 4)}%`}
-          trend={growthTrend}
-          accent={colors.secondary}
+          value={`${approvedRoutedPayments.length}`}
+          trend="+12%"
+          accent={colors.primary}
           Icon={TrendingUp}
         />
       </View>
@@ -1474,61 +1502,28 @@ function BusinessExperience({
       <GlassPanel style={styles.activityPanel} intensity={36}>
         <View style={styles.activityHeader}>
           <View>
-            <Text style={styles.cardTitle}>Activity Heatmap</Text>
-            <Text style={styles.bodyText}>Live redemption signal across your offers.</Text>
+            <Text style={styles.cardTitle}>Activity heatmap</Text>
+            <Text style={styles.bodyText}>Live optimization across routed redemptions.</Text>
           </View>
-          <Pressable style={styles.exportPill} onPress={() => undefined}>
-            <Text style={styles.exportPillText}>Export</Text>
-          </Pressable>
+          <CapsuleButton label="Export" onPress={() => undefined} />
         </View>
-        <View style={styles.activityStage}>
-          <Text style={styles.activityStageLabel}>Live Optimization</Text>
-          <View style={styles.activityPulseRow}>
-            <PulseDot />
-            <PulseDot delay={350} />
-            <PulseDot delay={700} />
-          </View>
+        <View style={styles.activityBody}>
+          <Activity size={28} color={colors.primary} />
+          <Text style={styles.activityValue}>Live Optimization</Text>
         </View>
       </GlassPanel>
 
-      <Section title="Recent Transactions" meta={recentTransactions.length ? `${recentTransactions.length}` : undefined}>
-        <GlassPanel style={styles.txList} intensity={32}>
-          {recentTransactions.length ? recentTransactions.map(({ request, benefit }, index) => {
-            const Icon = businessCategoryIcons[benefit.category] ?? Store;
-            const avatar = businessCategoryAvatar[benefit.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
-            const last = index === recentTransactions.length - 1;
-            return (
-              <View key={`${request.id}-${benefit.id}`} style={[styles.txRow, last && styles.txRowLast]}>
-                <View style={[styles.txAvatar, { backgroundColor: avatar.background }]}>
-                  <Icon size={20} color={avatar.color} />
-                </View>
-                <View style={styles.txBody}>
-                  <Text style={styles.txTitle}>{benefit.title}</Text>
-                  <Text style={styles.txMeta}>
-                    {request.employeeName.split(" ")[0]} · Paid out
-                  </Text>
-                </View>
-                <View style={styles.txAmounts}>
-                  <Text style={styles.txAmount}>+{currency(benefit.price)}</Text>
-                  <Text style={styles.txStatus}>Settled</Text>
-                </View>
-              </View>
-            );
-          }) : (
-            <View style={styles.txEmpty}>
-              <View style={styles.smallIcon}>
-                <Store size={18} color={colors.text} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>No routed payments yet</Text>
-                <Text style={styles.listSub}>Employee redemptions will land here automatically.</Text>
-              </View>
-            </View>
-          )}
-        </GlassPanel>
-      </Section>
+      <GlassPanel style={styles.businessProfile}>
+        <Image source={{ uri: profileDraft.logoUrl }} style={styles.businessLogoImage} />
+        <Text style={styles.greetingText}>{profileDraft.businessName}</Text>
+        <Text style={styles.greetingSub}>{profileDraft.description}</Text>
+      </GlassPanel>
 
-      <View style={styles.manageDivider} />
+      <View style={styles.metricRow}>
+        <MetricPill label="Redeemed" value={`${approvedRoutedPayments.length}`} />
+        <MetricPill label="Reached" value={`${reachedEmployees}`} />
+        <MetricPill label="Payouts" value={currency(approvedPayoutTotal)} />
+      </View>
 
       <Section title="Provider profile" meta="Merchant">
         <GlassPanel style={styles.formPanel}>
@@ -1666,6 +1661,42 @@ function BusinessExperience({
         ))}
       </Section>
 
+      <Section title="Payment routing" meta="Simulated">
+        {routedPayments.length ? (
+          routedPayments.map(({ request, benefit }) => (
+            <View key={`${request.id}-${benefit.id}`} style={styles.listRow}>
+              <View style={styles.smallIcon}>
+                <CircleDollarSign size={18} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>{benefit.title}</Text>
+                <Text style={styles.listSub}>
+                  {request.employeeName} - paid to provider
+                </Text>
+              </View>
+              <Text style={styles.listAmount}>{currency(benefit.price)}</Text>
+            </View>
+          ))
+        ) : (
+          <View style={styles.listRow}>
+            <View style={styles.smallIcon}>
+              <Store size={18} color={colors.text} />
+            </View>
+            <View style={styles.listText}>
+              <Text style={styles.listTitle}>No routed payments yet</Text>
+              <Text style={styles.listSub}>Approved employee packages will appear here.</Text>
+            </View>
+          </View>
+        )}
+      </Section>
+
+      <Section title="Redemption stats" meta="Today">
+        <GlassPanel style={styles.analyticsGrid} intensity={14}>
+          <AnalyticsRow label="Employees used offers" value={`${reachedEmployees}`} />
+          <AnalyticsRow label="Approved payouts" value={`${approvedRoutedPayments.length}`} />
+          <AnalyticsRow label="Offer count" value={`${offers.length}`} />
+        </GlassPanel>
+      </Section>
     </ScrollView>
   );
 }
@@ -2328,6 +2359,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2
   },
+  inviteOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 20,
+    zIndex: 100
+  },
+  inviteCard: {
+    padding: 24,
+    gap: 16
+  },
+  inviteCodeBox: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderRadius: radius.card
+  },
+  inviteCodeText: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: colors.primary,
+    letterSpacing: 4,
+    textAlign: "center"
+  },
+  inviteActions: {
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "flex-end"
+  },
   recordRow: {
     padding: 14,
     flexDirection: "row",
@@ -2384,114 +2450,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 22,
     fontWeight: "800"
-  },
-  insightsTagline: {
-    color: colors.muted,
-    fontSize: 15,
-    lineHeight: 21,
-    maxWidth: 380,
-    marginTop: 6
-  },
-  activityStage: {
-    minHeight: 132,
-    borderRadius: radius.compact,
-    borderWidth: 0.5,
-    borderColor: colors.stroke,
-    backgroundColor: "rgba(255,255,255,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10
-  },
-  activityStageLabel: {
-    color: colors.primary,
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: -0.3
-  },
-  activityPulseRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center"
-  },
-  activityPulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary
-  },
-  exportPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.capsule,
-    backgroundColor: colors.primary
-  },
-  exportPillText: {
-    color: colors.onPrimary,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  txList: {
-    padding: 0,
-    overflow: "hidden"
-  },
-  txRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.35)"
-  },
-  txRowLast: {
-    borderBottomWidth: 0
-  },
-  txAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  txBody: {
-    flex: 1
-  },
-  txTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: "800"
-  },
-  txMeta: {
-    color: colors.muted,
-    fontSize: 12,
-    marginTop: 2
-  },
-  txAmounts: {
-    alignItems: "flex-end"
-  },
-  txAmount: {
-    color: colors.secondary,
-    fontSize: 15,
-    fontWeight: "900"
-  },
-  txStatus: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: "600",
-    marginTop: 2
-  },
-  txEmpty: {
-    paddingHorizontal: 16,
-    paddingVertical: 22,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12
-  },
-  manageDivider: {
-    marginTop: 8,
-    marginBottom: 4,
-    height: 1,
-    backgroundColor: "rgba(0,0,0,0.06)"
   },
   walletHero: {
     marginTop: 2,
