@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
 import { colors, radius } from "../theme";
@@ -21,6 +22,13 @@ export function CapsuleButton({ label, onPress, icon, variant = "primary", style
         style
       ]}
     >
+      <LinearGradient
+        pointerEvents="none"
+        colors={["rgba(255,255,255,0.34)", "rgba(255,255,255,0)", "rgba(255,255,255,0.16)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.sheen}
+      />
       {icon}
       <Text
         style={[
@@ -43,7 +51,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 8
+    gap: 8,
+    overflow: "hidden"
   },
   primary: {
     backgroundColor: colors.primary
@@ -52,14 +61,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.text
   },
   soft: {
-    backgroundColor: "rgba(255,255,255,0.55)",
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle
+    backgroundColor: colors.glassStrong,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
   },
   ghost: {
-    backgroundColor: "transparent",
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 0.8,
+    borderColor: colors.stroke
   },
   label: {
     color: colors.onPrimary,
@@ -75,5 +84,8 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.76,
     transform: [{ scale: 0.98 }]
+  },
+  sheen: {
+    ...StyleSheet.absoluteFillObject
   }
 });

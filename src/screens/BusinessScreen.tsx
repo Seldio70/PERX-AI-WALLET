@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
   Image,
   Modal,
   Platform,
@@ -19,6 +20,7 @@ import { AppIcon } from "../components/AppIcon";
 import { BentoMetricCard } from "../components/BentoMetricCard";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
+import { ScreenTransition } from "../components/ScreenTransition";
 import { currency, market } from "../lib/format";
 import { ensurePublicImageUrl, isLocalImageUri, uploadImageToStorage } from "../lib/imageUpload";
 import { DEFAULT_PROVIDER_LOGO, isProviderProfileComplete, validateProviderProfileDraft } from "../lib/providerProfile";
@@ -72,7 +74,7 @@ async function pickImageFromDevice(): Promise<string | null> {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.85
+      quality: 1
     });
     if (result.canceled || !result.assets?.[0]) return null;
     return result.assets[0].uri;
@@ -105,23 +107,76 @@ function BusinessBottomNav({
         {items.map(({ key, Icon, label }) => {
           const isActive = active === key;
           return (
-            <Pressable
+            <BusinessNavItem
               key={key}
+              Icon={Icon}
+              label={label}
+              selected={isActive}
               onPress={() => onChange(key)}
-              style={[styles.businessNavItem, isActive && styles.businessNavItemActive]}
-            >
-              <Icon size={20} color={isActive ? colors.onPrimary : colors.muted} />
-              <Text style={[styles.businessNavLabel, isActive && styles.businessNavLabelActive]}>
-                {label}
-              </Text>
-            </Pressable>
+            />
           );
         })}
-        <Pressable onPress={onAddOffer} style={styles.businessNavFab}>
+        <Pressable
+          onPress={onAddOffer}
+          style={({ pressed }) => [styles.businessNavFab, pressed && styles.navItemPressed]}
+        >
           <Plus size={20} color={colors.onPrimary} />
         </Pressable>
       </View>
     </View>
+  );
+}
+
+function BusinessNavItem({
+  Icon,
+  label,
+  selected,
+  onPress
+}: {
+  Icon: typeof Home;
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const progress = useRef(new Animated.Value(selected ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: selected ? 1 : 0,
+      duration: 190,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true
+    }).start();
+  }, [progress, selected]);
+
+  const activeScale = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.86, 1]
+  });
+  const iconScale = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.08]
+  });
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.businessNavItem, pressed && styles.navItemPressed]}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.businessNavItemActiveLayer,
+          { opacity: progress, transform: [{ scale: activeScale }] }
+        ]}
+      />
+      <Animated.View style={{ transform: [{ scale: iconScale }] }}>
+        <Icon size={20} color={selected ? colors.onPrimary : colors.muted} />
+      </Animated.View>
+      <Text style={[styles.businessNavLabel, selected && styles.businessNavLabelActive]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -249,16 +304,16 @@ function OfferFormModal({
     setSubmitting(true);
     try {
       let imageUrl = draft.imageUrl;
-      if (imageUrl && isLocalImageUri(imageUrl)) {
+      if (imageUrl) {
         const uploaded = await ensurePublicImageUrl(imageUrl, "offers");
-        if (!uploaded || isLocalImageUri(uploaded)) {
+        if (isLocalImageUri(imageUrl) && (!uploaded || isLocalImageUri(uploaded))) {
           Alert.alert(
             "Upload failed",
             "The offer photo could not be uploaded. Try picking the image again."
           );
           return;
         }
-        imageUrl = uploaded;
+        imageUrl = uploaded ?? imageUrl;
       }
       await onSubmit({ ...draft, imageUrl });
       onClose();
@@ -286,7 +341,7 @@ function OfferFormModal({
           <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
             <Pressable onPress={handlePickImage} disabled={uploadingImage} style={styles.imagePicker}>
               {draft.imageUrl ? (
-                <Image source={{ uri: draft.imageUrl }} style={styles.imagePickerPreview} />
+                <Image source={{ uri: draft.imageUrl }} style={styles.imagePickerPreview} resizeMode="cover" />
               ) : (
                 <View style={styles.imagePickerPlaceholder}>
                   <Camera size={26} color={colors.muted} />
@@ -306,6 +361,21 @@ function OfferFormModal({
                 </View>
               ) : null}
             </Pressable>
+
+            <Text style={styles.modalFieldLabel}>Image URL</Text>
+            <TextInput
+              value={draft.imageUrl}
+              onChangeText={(imageUrl) => setDraft((c) => ({ ...c, imageUrl }))}
+              placeholder="Paste a direct image address"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={styles.imagePickerHint}>
+              Direct image links work best. Avoid Google thumbnail links like encrypted-tbn0.
+            </Text>
 
             <Text style={styles.modalFieldLabel}>Title</Text>
             <TextInput
@@ -443,7 +513,7 @@ function OfferDetailModal({
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <Image source={{ uri: offer.imageUrl }} style={styles.detailHeroImage} />
+            <Image source={{ uri: offer.imageUrl }} style={styles.detailHeroImage} resizeMode="cover" />
 
             <View style={styles.detailMetaRow}>
               <View style={[styles.detailCategoryBadge, { backgroundColor: tint.background }]}>
@@ -714,9 +784,11 @@ export function BusinessExperience({
     }
 
     let logoUrl = next.logoUrl.trim();
-    if (logoUrl && isLocalImageUri(logoUrl)) {
+    if (logoUrl) {
       const uploaded = await ensurePublicImageUrl(logoUrl, "logos");
-      logoUrl = (!uploaded || isLocalImageUri(uploaded)) ? DEFAULT_PROVIDER_LOGO : uploaded;
+      logoUrl = isLocalImageUri(logoUrl)
+        ? (!uploaded || isLocalImageUri(uploaded)) ? DEFAULT_PROVIDER_LOGO : uploaded
+        : uploaded ?? logoUrl;
     }
     if (!logoUrl) logoUrl = DEFAULT_PROVIDER_LOGO;
 
@@ -747,13 +819,13 @@ export function BusinessExperience({
 
   const handleOfferSubmit = async (draft: OfferFormDraft) => {
     let imageUrl = draft.imageUrl;
-    if (imageUrl && isLocalImageUri(imageUrl)) {
+    if (imageUrl) {
       const uploaded = await ensurePublicImageUrl(imageUrl, "offers");
-      if (!uploaded || isLocalImageUri(uploaded)) {
+      if (isLocalImageUri(imageUrl) && (!uploaded || isLocalImageUri(uploaded))) {
         Alert.alert("Upload failed", "The offer photo could not be uploaded. Try picking the image again.");
         return;
       }
-      imageUrl = uploaded;
+      imageUrl = uploaded ?? imageUrl;
     }
 
     if (editingOffer) {
@@ -850,46 +922,48 @@ export function BusinessExperience({
         contentContainerStyle={[styles.screenContent, styles.businessContent]}
         showsVerticalScrollIndicator={false}
       >
-        {tab === "home" ? (
-          <BusinessHomeTab
-            profileDraft={profileDraft}
-            payoutTotal={payoutTotal}
-            pointsRedeemed={pointsRedeemed}
-            reachedEmployees={reachedEmployees}
-            routedPayments={routedPayments}
-            onOpenAccount={() => setTab("account")}
-            onSelectTransaction={(item) => setDetailTransaction(item)}
-            onSeeAllTransactions={() => setTab("offers")}
-          />
-        ) : null}
+        <ScreenTransition transitionKey={tab}>
+          {tab === "home" ? (
+            <BusinessHomeTab
+              profileDraft={profileDraft}
+              payoutTotal={payoutTotal}
+              pointsRedeemed={pointsRedeemed}
+              reachedEmployees={reachedEmployees}
+              routedPayments={routedPayments}
+              onOpenAccount={() => setTab("account")}
+              onSelectTransaction={(item) => setDetailTransaction(item)}
+              onSeeAllTransactions={() => setTab("offers")}
+            />
+          ) : null}
 
-        {tab === "offers" ? (
-          <BusinessOffersTab
-            offers={offers}
-            statsForOffer={statsForOffer}
-            onAdd={handleOpenAdd}
-            onSelect={(offer) => setDetailOffer(offer)}
-          />
-        ) : null}
+          {tab === "offers" ? (
+            <BusinessOffersTab
+              offers={offers}
+              statsForOffer={statsForOffer}
+              onAdd={handleOpenAdd}
+              onSelect={(offer) => setDetailOffer(offer)}
+            />
+          ) : null}
 
-        {tab === "profile" ? (
-          <BusinessProfileTab
-            user={user}
-            profile={profileDraft}
-            offerCount={offers.length}
-            customerCount={reachedEmployees}
-            payoutTotal={payoutTotal}
-            onEdit={() => setProfileEditOpen(true)}
-          />
-        ) : null}
+          {tab === "profile" ? (
+            <BusinessProfileTab
+              user={user}
+              profile={profileDraft}
+              offerCount={offers.length}
+              customerCount={reachedEmployees}
+              payoutTotal={payoutTotal}
+              onEdit={() => setProfileEditOpen(true)}
+            />
+          ) : null}
 
-        {tab === "account" ? (
-          <BusinessAccountTab
-            user={user}
-            profile={profileDraft}
-            onLogout={onLogout}
-          />
-        ) : null}
+          {tab === "account" ? (
+            <BusinessAccountTab
+              user={user}
+              profile={profileDraft}
+              onLogout={onLogout}
+            />
+          ) : null}
+        </ScreenTransition>
       </ScrollView>
 
       <BusinessBottomNav active={tab} onChange={setTab} onAddOffer={handleOpenAdd} />
@@ -1106,7 +1180,7 @@ function BusinessOffersTab({
         return (
           <Pressable key={offer.id} onPress={() => onSelect(offer)}>
             <GlassPanel style={styles.offerListCard} intensity={20}>
-              <Image source={{ uri: offer.imageUrl }} style={styles.offerListThumb} />
+              <Image source={{ uri: offer.imageUrl }} style={styles.offerListThumb} resizeMode="cover" />
               <View style={styles.offerListBody}>
                 <Text style={styles.offerListTitle}>{offer.title}</Text>
                 <Text style={styles.offerListMeta}>
@@ -1332,9 +1406,11 @@ function ProfileEditModal({
     setSubmitting(true);
     try {
       let logoUrl = draft.logoUrl;
-      if (logoUrl && isLocalImageUri(logoUrl)) {
+      if (logoUrl) {
         const uploaded = await ensurePublicImageUrl(logoUrl, "logos");
-        logoUrl = (!uploaded || isLocalImageUri(uploaded)) ? DEFAULT_PROVIDER_LOGO : uploaded;
+        logoUrl = isLocalImageUri(logoUrl)
+          ? (!uploaded || isLocalImageUri(uploaded)) ? DEFAULT_PROVIDER_LOGO : uploaded
+          : uploaded ?? logoUrl;
       }
       if (!logoUrl) logoUrl = DEFAULT_PROVIDER_LOGO;
       await onSubmit({ ...draft, logoUrl });
@@ -1377,7 +1453,7 @@ function ProfileEditModal({
             <Text style={styles.modalFieldLabel}>Logo (optional)</Text>
             <Pressable onPress={handlePickLogo} disabled={uploadingLogo} style={styles.imagePicker}>
               {draft.logoUrl ? (
-                <Image source={{ uri: draft.logoUrl }} style={styles.imagePickerPreview} />
+                <Image source={{ uri: draft.logoUrl }} style={styles.imagePickerPreview} resizeMode="cover" />
               ) : (
                 <View style={styles.imagePickerPlaceholder}>
                   <Camera size={26} color={colors.muted} />
@@ -1396,6 +1472,18 @@ function ProfileEditModal({
                 </View>
               ) : null}
             </Pressable>
+
+            <Text style={styles.modalFieldLabel}>Logo URL</Text>
+            <TextInput
+              value={draft.logoUrl}
+              onChangeText={(logoUrl) => setDraft((c) => ({ ...c, logoUrl }))}
+              placeholder="Paste a direct logo image address"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
 
             <Text style={styles.modalFieldLabel}>Business name *</Text>
             <TextInput

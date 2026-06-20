@@ -1,5 +1,5 @@
 import { Platform, StyleSheet } from "react-native";
-import { colors, radius, shadow } from "../theme";
+import { colors, liquidShadow, radius, shadow } from "../theme";
 
 export const styles = StyleSheet.create({
   safe: {
@@ -46,12 +46,13 @@ export const styles = StyleSheet.create({
     height: 34,
     paddingHorizontal: 12,
     borderRadius: radius.capsule,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.stroke,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 6,
+    ...liquidShadow
   },
   statusDot: {
     color: colors.accent,
@@ -68,9 +69,9 @@ export const styles = StyleSheet.create({
     borderRadius: radius.capsule,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle,
-    backgroundColor: colors.panel
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
   },
   avatarButton: {
     width: 36,
@@ -78,9 +79,9 @@ export const styles = StyleSheet.create({
     borderRadius: radius.capsule,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 0.5,
-    borderColor: colors.stroke,
-    backgroundColor: colors.surfaceContainerHigh
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glassStrong
   },
   avatarButtonText: {
     color: colors.primary,
@@ -98,7 +99,8 @@ export const styles = StyleSheet.create({
     gap: 16
   },
   employeeContent: {
-    paddingBottom: 112
+    paddingBottom: 112,
+    gap: 24
   },
   roleShell: {
     flex: 1
@@ -113,10 +115,10 @@ export const styles = StyleSheet.create({
     height: 46,
     borderRadius: radius.capsule,
     borderWidth: 1,
-    borderColor: colors.stroke,
+    borderColor: colors.glassEdge,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.panelStrong
+    backgroundColor: colors.glassStrong
   },
   heroTitle: {
     color: colors.text,
@@ -168,7 +170,8 @@ export const styles = StyleSheet.create({
     marginTop: 3
   },
   greeting: {
-    marginTop: 2
+    marginTop: 4,
+    marginBottom: 2
   },
   greetingText: {
     color: colors.text,
@@ -186,12 +189,13 @@ export const styles = StyleSheet.create({
     gap: 8
   },
   section: {
-    gap: 10
+    gap: 14
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    marginBottom: 2
   },
   sectionTitle: {
     color: colors.text,
@@ -257,12 +261,12 @@ export const styles = StyleSheet.create({
     fontWeight: "900"
   },
   listRow: {
-    minHeight: 66,
+    minHeight: 72,
     borderRadius: 22,
     borderWidth: 0.5,
     borderColor: colors.strokeSubtle,
     backgroundColor: colors.panel,
-    padding: 12,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 12
@@ -627,7 +631,10 @@ export const styles = StyleSheet.create({
   },
   catalogProviderCard: {
     padding: 16,
-    gap: 12
+    gap: 12,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
   },
   catalogProviderHead: {
     flexDirection: "row",
@@ -648,9 +655,9 @@ export const styles = StyleSheet.create({
     minHeight: 36,
     paddingHorizontal: 12,
     borderRadius: radius.capsule,
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle,
-    backgroundColor: "rgba(255,255,255,0.55)",
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glassStrong,
     flexDirection: "row",
     alignItems: "center",
     gap: 6
@@ -693,11 +700,11 @@ export const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.55)"
+    backgroundColor: colors.glassStrong
   },
   catalogOfferCheckActive: {
     backgroundColor: colors.primary,
@@ -706,11 +713,14 @@ export const styles = StyleSheet.create({
   inputWrap: {
     minHeight: 56,
     borderRadius: radius.capsule,
-    backgroundColor: "rgba(0,0,0,0.03)",
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    gap: 10
+    gap: 10,
+    marginBottom: 4
   },
   inputField: {
     flex: 1,
@@ -727,9 +737,9 @@ export const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     borderRadius: radius.capsule,
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle,
-    backgroundColor: "rgba(255,255,255,0.55)",
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -866,9 +876,9 @@ export const styles = StyleSheet.create({
   activityBody: {
     minHeight: 140,
     borderRadius: radius.compact,
-    borderWidth: 0.5,
-    borderColor: colors.stroke,
-    backgroundColor: "rgba(255,255,255,0.45)",
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass,
     alignItems: "center",
     justifyContent: "center",
     gap: 8
@@ -888,9 +898,9 @@ export const styles = StyleSheet.create({
   activityStage: {
     minHeight: 132,
     borderRadius: radius.compact,
-    borderWidth: 0.5,
-    borderColor: colors.stroke,
-    backgroundColor: "rgba(255,255,255,0.55)",
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glassStrong,
     alignItems: "center",
     justifyContent: "center",
     gap: 10
@@ -1014,9 +1024,12 @@ export const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: radius.capsule
+    borderRadius: radius.capsule,
+    overflow: "hidden"
   },
-  businessNavItemActive: {
+  businessNavItemActiveLayer: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radius.capsule,
     backgroundColor: colors.primary
   },
   businessNavLabel: {
@@ -1035,6 +1048,10 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.primary,
     marginLeft: 4
+  },
+  navItemPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.96 }]
   },
   categoryGrid: {
     flexDirection: "row",
@@ -1071,17 +1088,20 @@ export const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(15,23,42,0.45)",
+    backgroundColor: "rgba(15,23,42,0.36)",
     justifyContent: "flex-end"
   },
   modalSheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glassStrong,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
     maxHeight: "92%",
     paddingTop: 8,
     paddingHorizontal: 20,
-    paddingBottom: 24
+    paddingBottom: 24,
+    ...liquidShadow
   },
   modalHandle: {
     alignSelf: "center",
@@ -1117,17 +1137,19 @@ export const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.04)"
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
   },
   modalContent: {
-    gap: 10,
-    paddingTop: 16,
-    paddingBottom: 16
+    gap: 14,
+    paddingTop: 18,
+    paddingBottom: 20
   },
   offerModalActions: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 4
+    gap: 12,
+    marginTop: 8
   },
   modalFieldLabel: {
     color: colors.muted,
@@ -1142,13 +1164,13 @@ export const styles = StyleSheet.create({
     gap: 10
   },
   imagePicker: {
-    height: 168,
+    height: 220,
     borderRadius: radius.cardLg,
-    borderWidth: 1,
-    borderColor: colors.strokeSubtle,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
     borderStyle: "dashed",
     overflow: "hidden",
-    backgroundColor: "rgba(0,0,0,0.03)"
+    backgroundColor: colors.glassMist
   },
   imagePickerPreview: {
     width: "100%",
@@ -1203,7 +1225,7 @@ export const styles = StyleSheet.create({
   },
   detailHeroImage: {
     width: "100%",
-    height: 180,
+    height: 220,
     borderRadius: radius.cardLg,
     backgroundColor: colors.surfaceContainerHigh
   },
@@ -1330,7 +1352,10 @@ export const styles = StyleSheet.create({
   profileHeroCard: {
     padding: 22,
     gap: 14,
-    alignItems: "center"
+    alignItems: "center",
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
   },
   profileHeroLogo: {
     width: 96,
@@ -1389,7 +1414,10 @@ export const styles = StyleSheet.create({
   },
   profileSection: {
     padding: 18,
-    gap: 12
+    gap: 12,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
   },
   profileSectionTitle: {
     color: colors.muted,
@@ -1436,11 +1464,14 @@ export const styles = StyleSheet.create({
     padding: 14,
     gap: 12,
     flexDirection: "row",
-    alignItems: "center"
+    alignItems: "center",
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
   },
   offerListThumb: {
-    width: 64,
-    height: 64,
+    width: 76,
+    height: 76,
     borderRadius: 16,
     backgroundColor: colors.surfaceContainerHigh
   },
@@ -1526,8 +1557,8 @@ export const styles = StyleSheet.create({
     marginTop: 2
   },
   walletHero: {
-    marginTop: 2,
-    marginBottom: 4
+    marginTop: 4,
+    marginBottom: 8
   },
   walletCardList: {
     gap: 12
@@ -1539,17 +1570,17 @@ export const styles = StyleSheet.create({
     gap: 0
   },
   stackItem: {
-    marginBottom: 12
+    marginBottom: 16
   },
   stackItemCollapsed: {
     marginTop: -126
   },
   aiCard: {
-    padding: 18,
-    gap: 14
+    padding: 20,
+    gap: 18
   },
   aiHead: {
-    gap: 10
+    gap: 12
   },
   aiBadge: {
     alignSelf: "flex-start",
@@ -1579,14 +1610,14 @@ export const styles = StyleSheet.create({
     gap: 14
   },
   aiThumb: {
-    width: 68,
-    height: 68,
+    width: 74,
+    height: 74,
     borderRadius: 18,
     backgroundColor: colors.surfaceContainerHigh
   },
   aiPrimaryInfo: {
     flex: 1,
-    gap: 3
+    gap: 5
   },
   aiName: {
     color: colors.text,
@@ -1616,18 +1647,23 @@ export const styles = StyleSheet.create({
   },
   aiCtas: {
     flexDirection: "row",
-    gap: 10
+    gap: 12,
+    marginTop: 2
+  },
+  nearbyScrollRow: {
+    gap: 14,
+    paddingVertical: 4,
+    paddingRight: 4
   },
   nearbyCard: {
-    width: 178,
-    minHeight: 178,
-    padding: 14,
-    marginRight: 12,
-    gap: 8
+    width: 184,
+    minHeight: 188,
+    padding: 16,
+    gap: 10
   },
   nearbyThumb: {
     width: "100%",
-    height: 84,
+    height: 98,
     borderRadius: 16,
     backgroundColor: colors.surfaceContainerHigh
   },
@@ -1896,14 +1932,14 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 12,
+    padding: 14,
     borderRadius: radius.compact,
     backgroundColor: colors.surfaceContainerHigh,
-    marginBottom: 8
+    marginBottom: 12
   },
   packageModalThumb: {
-    width: 48,
-    height: 48,
+    width: 54,
+    height: 54,
     borderRadius: 14,
     backgroundColor: colors.surface
   },
@@ -1928,11 +1964,207 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.surface
   },
+  offersShopHero: {
+    height: 430,
+    marginHorizontal: -20,
+    marginTop: -6,
+    marginBottom: 18,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  offersShopHeroRail: {
+    ...StyleSheet.absoluteFillObject
+  },
+  offersShopHeroSlide: {
+    height: "100%",
+    overflow: "hidden",
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  offersShopHeroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%"
+  },
+  offersShopHeroShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(5,7,16,0.08)",
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0
+  },
+  offersShopTopBar: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  offersShopTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1
+  },
+  offersShopAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface
+  },
+  offersShopAvatarLogo: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  offersShopAvatarText: {
+    color: colors.text,
+    fontSize: 21,
+    fontWeight: "900"
+  },
+  offersShopActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  offersHeroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(12,14,22,0.42)"
+  },
+  offersHeroIconActive: {
+    backgroundColor: colors.primary
+  },
+  offersShopHeroContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 28,
+    paddingBottom: 34
+  },
+  offersShopKicker: {
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 8,
+    textShadowColor: "rgba(0,0,0,0.28)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8
+  },
+  offersShopHeadline: {
+    color: colors.onPrimary,
+    fontSize: 36,
+    lineHeight: 42,
+    fontWeight: "900",
+    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12
+  },
+  offersShopCta: {
+    marginTop: 22,
+    minHeight: 46,
+    paddingHorizontal: 28,
+    borderRadius: radius.capsule,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.28)"
+  },
+  offersShopCtaText: {
+    color: colors.onPrimary,
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  offersShopDots: {
+    flexDirection: "row",
+    gap: 9,
+    alignItems: "center",
+    marginTop: 20
+  },
+  offersShopDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.42)"
+  },
+  offersShopDotActive: {
+    width: 22,
+    backgroundColor: colors.onPrimary
+  },
+  featuredStoreRow: {
+    gap: 14,
+    paddingRight: 10,
+    paddingVertical: 2
+  },
+  featuredStoreCard: {
+    width: 132,
+    minHeight: 156,
+    borderRadius: 24,
+    backgroundColor: colors.glass,
+    padding: 14,
+    justifyContent: "flex-end",
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    ...liquidShadow
+  },
+  featuredStoreLogoWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.glassStrong,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    marginBottom: 16
+  },
+  featuredStoreLogo: {
+    width: 52,
+    height: 52,
+    borderRadius: 26
+  },
+  featuredStoreInitial: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "900"
+  },
+  featuredStoreName: {
+    color: colors.text,
+    fontSize: 17,
+    lineHeight: 21,
+    fontWeight: "900"
+  },
+  featuredStoreMeta: {
+    color: colors.secondary,
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 5
+  },
+  offersBrowseHead: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginTop: 4
+  },
+  offersSectionTitle: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "900"
+  },
+  offersBrowseMeta: {
+    color: colors.soft,
+    fontSize: 12,
+    fontWeight: "800"
+  },
   marketGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginTop: 4
+    gap: 14,
+    marginTop: 8
   },
   marketCard: {
     width: "48%",
@@ -1940,20 +2172,20 @@ export const styles = StyleSheet.create({
     flexBasis: "46%",
     maxWidth: "48%",
     borderRadius: radius.compact,
-    backgroundColor: colors.surface,
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
     overflow: "hidden",
-    ...shadow
+    ...liquidShadow
   },
   marketCardImg: {
     width: "100%",
-    height: 88,
+    height: 118,
     backgroundColor: colors.surfaceContainerHigh
   },
   marketCardBody: {
-    padding: 10,
-    gap: 4
+    padding: 12,
+    gap: 6
   },
   marketCardTop: {
     flexDirection: "row",
@@ -1979,7 +2211,9 @@ export const styles = StyleSheet.create({
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceContainerHigh
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glassStrong
   },
   marketCardTitle: {
     color: colors.text,
@@ -2048,8 +2282,8 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.secondary
   },
   filterRow: {
-    gap: 8,
-    paddingVertical: 2,
+    gap: 10,
+    paddingVertical: 6,
     paddingRight: 8
   },
   filterChip: {
@@ -2243,7 +2477,10 @@ export const styles = StyleSheet.create({
     padding: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12
+    gap: 12,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
   },
   inviteSuccess: {
     alignItems: "center",
@@ -2259,8 +2496,8 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary
   },
   pointsHero: {
-    padding: 18,
-    gap: 8
+    padding: 20,
+    gap: 10
   },
   pointsHeroValue: {
     color: colors.text,
@@ -2274,8 +2511,8 @@ export const styles = StyleSheet.create({
   pointsFeedRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 8
+    gap: 12,
+    paddingVertical: 10
   },
   pointsFeedIcon: {
     width: 36,
@@ -2286,8 +2523,8 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.panelStrong
   },
   challengeCard: {
-    padding: 14,
-    gap: 8
+    padding: 16,
+    gap: 10
   },
   challengeMeta: {
     flexDirection: "row",
@@ -2354,14 +2591,14 @@ export const styles = StyleSheet.create({
   packageCapsule: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginBottom: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: radius.capsule,
-    backgroundColor: colors.surfaceContainerHigh,
-    borderWidth: 1,
-    borderColor: colors.stroke
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    ...liquidShadow
   },
   packageCapsuleThumbs: {
     flexDirection: "row",
@@ -2377,7 +2614,7 @@ export const styles = StyleSheet.create({
   },
   packageCapsuleCopy: {
     flex: 1,
-    gap: 1
+    gap: 3
   },
   packageCapsuleTitle: {
     color: colors.text,
@@ -2401,22 +2638,24 @@ export const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,88,188,0.08)"
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glassStrong
   },
   challengeCapsuleRow: {
-    gap: 10,
-    paddingVertical: 2
+    gap: 12,
+    paddingVertical: 6
   },
   challengeCapsule: {
-    width: 96,
+    width: 100,
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderRadius: radius.compact,
-    backgroundColor: colors.surfaceContainerHigh,
-    borderWidth: 1,
-    borderColor: colors.stroke
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
   },
   challengeCapsuleSelected: {
     borderColor: colors.primary,
@@ -2749,9 +2988,9 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 6,
     borderRadius: radius.compact,
-    backgroundColor: colors.surfaceContainerHigh,
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
   },
   employerStatValue: {
     color: colors.text,
@@ -2775,9 +3014,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: radius.capsule,
-    backgroundColor: colors.surfaceContainerHigh,
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
   },
   employerActionCapsuleText: {
     color: colors.text,

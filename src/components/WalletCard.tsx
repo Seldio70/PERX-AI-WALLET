@@ -63,6 +63,14 @@ export function WalletCard({
         ]}
       >
         <View style={styles.overlay} />
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(255,255,255,0.42)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0.18)"]}
+          locations={[0, 0.48, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.liquidHighlight}
+        />
         {used ? (
           <View style={styles.usedOverlay}>
             <Text style={styles.usedOverlayText}>Used</Text>
@@ -188,6 +196,9 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.1)"
+  },
+  liquidHighlight: {
+    ...StyleSheet.absoluteFillObject
   },
   lockedOverlay: {
     position: "absolute",

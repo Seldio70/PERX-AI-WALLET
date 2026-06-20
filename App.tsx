@@ -16,6 +16,7 @@ import { CapsuleButton } from "./src/components/CapsuleButton";
 import { GlassPanel } from "./src/components/GlassPanel";
 import { LogoutButton } from "./src/components/LogoutButton";
 import { MeshBackground } from "./src/components/MeshBackground";
+import { ScreenTransition } from "./src/components/ScreenTransition";
 import { getSupabaseClient } from "./src/lib/supabase";
 import {
   createPlatformUser,
@@ -423,81 +424,88 @@ export default function App() {
               onLogout={() => setSession(null)}
             />
           ) : null}
-          {session ? (
-            <RoleRouter
-              session={session}
-              appData={appData}
-              selectionRequests={selectionRequests}
-              employeePoints={employeePoints}
-              rewardEvents={rewardEvents}
-              employeeInvites={employeeInvites}
-              bonusBudgetByEmployee={bonusBudgetByEmployee}
-              onLogout={() => setSession(null)}
-              onSubmitSelection={(request) => {
-                setSelectionRequests((current) => [request, ...current]);
-              }}
-              onUpdateProviderProfile={(profile) =>
-                setProviderProfileItems((current) => [
-                  profile,
-                  ...current.filter((item) => item.id !== profile.id && item.userId !== profile.userId)
-                ])
-              }
-              onAddOffer={(offer) =>
-                setBenefitItems((current) => [
-                  offer,
-                  ...current.filter((item) => item.id !== offer.id)
-                ])
-              }
-              onCreateChallenge={handleCreateChallenge}
-              onCompleteChallenge={handleCompleteChallenge}
-              onGrantReward={handleGrantReward}
-              onSendEmployeeInvite={handleSendEmployeeInvite}
-              employerEnabledBenefits={employerEnabledBenefits}
-              enabledBenefitIds={employerEnabledBenefits[session.user.id] ?? []}
-              onToggleBenefit={(benefitId) => handleToggleEmployerBenefit(session.user.id, benefitId)}
-              onToggleProvider={(benefitIds, selected) =>
-                handleToggleEmployerProvider(session.user.id, benefitIds, selected)
-              }
-              onPayForPerk={(benefit) => {
-                if (session.user.role !== "employee") return false;
-                const company = appData.companies.find((item) => item.id === session.user.companyId);
-                const employerId =
-                  company?.employerId ??
-                  appData.users.find(
-                    (user) => user.role === "employer" && user.companyId === session.user.companyId
-                  )?.id;
-                return handlePayForPerk({
-                  employee: session.user,
-                  companyId: session.user.companyId ?? company?.id ?? "",
-                  employerId,
-                  benefit
-                });
-              }}
-              onPayForPerks={(benefits) => {
-                if (session.user.role !== "employee") return false;
-                const company = appData.companies.find((item) => item.id === session.user.companyId);
-                const employerId =
-                  company?.employerId ??
-                  appData.users.find(
-                    (user) => user.role === "employer" && user.companyId === session.user.companyId
-                  )?.id;
-                return handlePayForPerks({
-                  employee: session.user,
-                  companyId: session.user.companyId ?? company?.id ?? "",
-                  employerId,
-                  benefits
-                });
-              }}
-            />
-          ) : (
-            <LoginScreen
-              onLogin={loginWithCredentials}
-              onStartSession={startSessionForUser}
-              onJoinWithInvite={handleJoinWithInvite}
-              onForgotPassword={forgotPassword}
-              appData={appData}
-            />
-          )}
+          <ScreenTransition
+            transitionKey={session ? `session-${session.user.id}-${session.user.role}` : "login"}
+            style={{ flex: 1 }}
+            distance={12}
+            duration={260}
+          >
+            {session ? (
+              <RoleRouter
+                session={session}
+                appData={appData}
+                selectionRequests={selectionRequests}
+                employeePoints={employeePoints}
+                rewardEvents={rewardEvents}
+                employeeInvites={employeeInvites}
+                bonusBudgetByEmployee={bonusBudgetByEmployee}
+                onLogout={() => setSession(null)}
+                onSubmitSelection={(request) => {
+                  setSelectionRequests((current) => [request, ...current]);
+                }}
+                onUpdateProviderProfile={(profile) =>
+                  setProviderProfileItems((current) => [
+                    profile,
+                    ...current.filter((item) => item.id !== profile.id && item.userId !== profile.userId)
+                  ])
+                }
+                onAddOffer={(offer) =>
+                  setBenefitItems((current) => [
+                    offer,
+                    ...current.filter((item) => item.id !== offer.id)
+                  ])
+                }
+                onCreateChallenge={handleCreateChallenge}
+                onCompleteChallenge={handleCompleteChallenge}
+                onGrantReward={handleGrantReward}
+                onSendEmployeeInvite={handleSendEmployeeInvite}
+                employerEnabledBenefits={employerEnabledBenefits}
+                enabledBenefitIds={employerEnabledBenefits[session.user.id] ?? []}
+                onToggleBenefit={(benefitId) => handleToggleEmployerBenefit(session.user.id, benefitId)}
+                onToggleProvider={(benefitIds, selected) =>
+                  handleToggleEmployerProvider(session.user.id, benefitIds, selected)
+                }
+                onPayForPerk={(benefit) => {
+                  if (session.user.role !== "employee") return false;
+                  const company = appData.companies.find((item) => item.id === session.user.companyId);
+                  const employerId =
+                    company?.employerId ??
+                    appData.users.find(
+                      (user) => user.role === "employer" && user.companyId === session.user.companyId
+                    )?.id;
+                  return handlePayForPerk({
+                    employee: session.user,
+                    companyId: session.user.companyId ?? company?.id ?? "",
+                    employerId,
+                    benefit
+                  });
+                }}
+                onPayForPerks={(benefits) => {
+                  if (session.user.role !== "employee") return false;
+                  const company = appData.companies.find((item) => item.id === session.user.companyId);
+                  const employerId =
+                    company?.employerId ??
+                    appData.users.find(
+                      (user) => user.role === "employer" && user.companyId === session.user.companyId
+                    )?.id;
+                  return handlePayForPerks({
+                    employee: session.user,
+                    companyId: session.user.companyId ?? company?.id ?? "",
+                    employerId,
+                    benefits
+                  });
+                }}
+              />
+            ) : (
+              <LoginScreen
+                onLogin={loginWithCredentials}
+                onStartSession={startSessionForUser}
+                onJoinWithInvite={handleJoinWithInvite}
+                onForgotPassword={forgotPassword}
+                appData={appData}
+              />
+            )}
+          </ScreenTransition>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

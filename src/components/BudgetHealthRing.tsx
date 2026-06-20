@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { WalletHealth } from "../lib/benefitAutopilot";
 import { currency } from "../lib/format";
-import { colors, radius } from "../theme";
+import { colors, liquidShadow, radius } from "../theme";
 
 type Props = {
   health: WalletHealth;
@@ -102,9 +102,10 @@ const styles = StyleSheet.create({
     gap: 18,
     padding: 18,
     borderRadius: radius.cardLg,
-    borderWidth: 0.5,
-    borderColor: colors.stroke,
-    backgroundColor: colors.panelStrong
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glassStrong,
+    ...liquidShadow
   },
   ringWrap: {
     width: SIZE,

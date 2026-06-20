@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, radius } from "../theme";
+import { colors, liquidShadow, radius } from "../theme";
 
 type Props = {
   label: string;
@@ -18,12 +18,13 @@ export function MetricPill({ label, value }: Props) {
 const styles = StyleSheet.create({
   pill: {
     borderRadius: radius.capsule,
-    borderWidth: 0.5,
-    borderColor: colors.strokeSubtle,
-    backgroundColor: colors.panel,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    minWidth: 106
+    minWidth: 106,
+    ...liquidShadow
   },
   label: {
     color: colors.muted,

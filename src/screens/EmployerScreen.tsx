@@ -22,6 +22,7 @@ import { AppIcon } from "../components/AppIcon";
 import { BottomNav, NavTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
+import { ScreenTransition } from "../components/ScreenTransition";
 import { Section } from "../components/Section";
 import { UserProfileScreen } from "../components/UserProfileScreen";
 import { currency, market } from "../lib/format";
@@ -173,6 +174,7 @@ export function EmployerExperience({
         contentContainerStyle={[styles.screenContent, styles.employeeContent]}
         showsVerticalScrollIndicator={false}
       >
+        <ScreenTransition transitionKey={tab}>
         {tab === "home" ? (
           <>
       <View style={styles.adminHeader}>
@@ -348,6 +350,7 @@ export function EmployerExperience({
         ) : null}
 
         {tab === "profile" ? <UserProfileScreen user={user} onLogout={onLogout} /> : null}
+        </ScreenTransition>
       </ScrollView>
 
       <BottomNav tabs={employerTabs} active={tab} onChange={setTab} />

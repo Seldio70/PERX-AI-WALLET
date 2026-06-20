@@ -18,6 +18,24 @@ export function isLocalImageUri(uri: string) {
   return LOCAL_URI_PREFIXES.some((prefix) => uri.startsWith(prefix));
 }
 
+export function improveRemoteImageUrl(uri: string) {
+  if (!uri || isLocalImageUri(uri)) return uri;
+
+  try {
+    const url = new URL(uri);
+    if (url.hostname.includes("googleusercontent.com")) {
+      url.searchParams.delete("sz");
+      url.searchParams.delete("w");
+      url.searchParams.delete("h");
+      return url.toString().replace(/=w\d+-h\d+(-[a-z]+)?$/i, "=s1600");
+    }
+  } catch {
+    return uri;
+  }
+
+  return uri;
+}
+
 function extensionForContentType(contentType: string) {
   if (contentType.includes("png")) return "png";
   if (contentType.includes("webp")) return "webp";
@@ -120,6 +138,6 @@ export async function ensurePublicImageUrl(
   folder: "offers" | "logos"
 ): Promise<string | null> {
   if (!uri) return null;
-  if (!isLocalImageUri(uri)) return uri;
+  if (!isLocalImageUri(uri)) return improveRemoteImageUrl(uri);
   return uploadImageToStorage(uri, folder);
 }

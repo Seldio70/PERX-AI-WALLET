@@ -5,6 +5,11 @@ export const colors = {
   surfaceContainerHigh: "#E9E7ED",
   panel: "rgba(255,255,255,0.7)",
   panelStrong: "rgba(255,255,255,0.85)",
+  glass: "rgba(255,255,255,0.58)",
+  glassStrong: "rgba(255,255,255,0.78)",
+  glassMist: "rgba(255,255,255,0.34)",
+  glassEdge: "rgba(255,255,255,0.86)",
+  glassShadow: "rgba(31,38,54,0.16)",
   stroke: "rgba(255,255,255,0.4)",
   strokeSubtle: "rgba(193,198,215,0.45)",
   text: "#1A1B1F",
@@ -42,6 +47,14 @@ export const shadow = {
   shadowRadius: 24,
   shadowOffset: { width: 0, height: 12 },
   elevation: 6
+};
+
+export const liquidShadow = {
+  shadowColor: colors.glassShadow,
+  shadowOpacity: 0.18,
+  shadowRadius: 28,
+  shadowOffset: { width: 0, height: 16 },
+  elevation: 8
 };
 
 export const cardGradients = [
