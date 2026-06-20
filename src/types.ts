@@ -75,7 +75,7 @@ export type SelectionRequest = {
   benefitIds: string[];
   total: number;
   totalPoints: number;
-  status: "pending" | "approved";
+  status: "draft" | "pending" | "approved" | "rejected";
   createdAt: string;
   approvedAt?: string;
 };

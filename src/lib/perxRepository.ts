@@ -186,7 +186,7 @@ function mapSelection(row: DbSelectionRequest): SelectionRequest {
     benefitIds: row.selection_items?.map((item) => item.benefit_id) ?? [],
     total: numberFromDb(row.total),
     totalPoints: numberFromDb(row.total_points),
-    status: row.status === "approved" ? "approved" : "pending",
+    status: row.status,
     createdAt: row.created_at ?? new Date().toISOString(),
     approvedAt: row.approved_at ?? undefined
   };
@@ -542,6 +542,7 @@ export async function createSelectionRequest(input: {
 
   const total = input.benefits.reduce((sum, benefit) => sum + benefit.price, 0);
   const totalPoints = input.benefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
+  const now = new Date().toISOString();
   const request = await client
     .from("selection_requests")
     .insert({
@@ -550,7 +551,8 @@ export async function createSelectionRequest(input: {
       company_id: input.companyId,
       total,
       total_points: totalPoints,
-      status: "pending"
+      status: "approved",
+      approved_at: now
     })
     .select("id")
     .single();
@@ -568,6 +570,46 @@ export async function createSelectionRequest(input: {
   const items = await client.from("selection_items").insert(itemRows);
   if (items.error) return null;
 
+  const walletResult = await client
+    .from("employer_wallet_cards")
+    .select("id,points")
+    .eq("employer_id", input.employerId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!walletResult.error && walletResult.data) {
+    const currentPoints = Number(walletResult.data.points ?? 0);
+    await client
+      .from("employer_wallet_cards")
+      .update({ points: Math.max(0, currentPoints - totalPoints) })
+      .eq("id", walletResult.data.id);
+  }
+
+  await client.from("points_ledger").insert({
+    user_id: input.employerId,
+    source: "employee_redemption",
+    points_delta: -totalPoints,
+    description: `Employee redeemed perks (${totalPoints} points)`
+  });
+
+  if (input.benefits.length) {
+    await client.from("redemptions").insert(
+      input.benefits.map((benefit) => ({
+        benefit_id: benefit.id,
+        provider_id: benefit.providerId,
+        employee_id: input.employeeId,
+        employer_id: input.employerId,
+        selection_request_id: request.data.id,
+        amount: benefit.price,
+        points_spent: benefit.pointsPrice,
+        status: "paid",
+        qr_code: `PERX-${request.data.id}-${benefit.id}`.slice(0, 64),
+        redeemed_at: now
+      }))
+    );
+  }
+
   return request.data.id as string;
 }
 
@@ -580,43 +622,42 @@ export async function approveSelectionRequest(input: {
   const client = getSupabaseClient();
   if (!client) return false;
 
-  const result = await client
+  const now = new Date().toISOString();
+  const request = await client
     .from("selection_requests")
-    .update({ status: "approved", approved_at: new Date().toISOString() })
-    .eq("id", input.requestId);
+    .update({
+      status: "approved",
+      approved_at: now
+    })
+    .eq("id", input.requestId)
+    .select("employee_id,employer_id")
+    .single();
 
-  if (result.error) return false;
+  if (request.error || !request.data) return false;
 
-  if (input.employerId) {
+  const employerId = input.employerId ?? request.data.employer_id;
+
+  if (employerId) {
     const walletResult = await client
       .from("employer_wallet_cards")
       .select("id,points")
-      .eq("employer_id", input.employerId)
+      .eq("employer_id", employerId)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
     if (!walletResult.error && walletResult.data) {
-      const currentPoints = Number(walletResult.data.points ?? 0);
-      if (currentPoints < input.totalPoints) {
-        await client
-          .from("selection_requests")
-          .update({ status: "pending", approved_at: null })
-          .eq("id", input.requestId);
-        return false;
-      }
-
       await client
         .from("employer_wallet_cards")
-        .update({ points: currentPoints - input.totalPoints })
+        .update({ points: Math.max(0, Number(walletResult.data.points ?? 0) - input.totalPoints) })
         .eq("id", walletResult.data.id);
     }
 
     await client.from("points_ledger").insert({
-      user_id: input.employerId,
+      user_id: employerId,
       source: "selection_approved",
       points_delta: -input.totalPoints,
-      description: `Approved employee-selected perks (${input.totalPoints} points)`
+      description: `Selection approved (${input.totalPoints} points)`
     });
   }
 
@@ -625,14 +666,14 @@ export async function approveSelectionRequest(input: {
       input.benefits.map((benefit) => ({
         benefit_id: benefit.id,
         provider_id: benefit.providerId,
-        employee_id: undefined,
-        employer_id: input.employerId,
+        employee_id: request.data.employee_id,
+        employer_id: employerId,
         selection_request_id: input.requestId,
         amount: benefit.price,
         points_spent: benefit.pointsPrice,
         status: "paid",
         qr_code: `PERX-${input.requestId}-${benefit.id}`.slice(0, 64),
-        redeemed_at: new Date().toISOString()
+        redeemed_at: now
       }))
     );
   }
