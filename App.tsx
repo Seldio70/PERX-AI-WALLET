@@ -14,7 +14,6 @@ import {
   UserPlus,
   UserRound,
   Users,
-  UsersRound,
   WalletCards
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
@@ -34,8 +33,9 @@ import QRCode from "react-native-qrcode-svg";
 import { AllocationSlider } from "./src/components/AllocationSlider";
 import { AppIcon } from "./src/components/AppIcon";
 import { BentoMetricCard } from "./src/components/BentoMetricCard";
-import { BottomNav, EmployeeTab } from "./src/components/BottomNav";
+import { BottomNav, NavTab } from "./src/components/BottomNav";
 import { CapsuleButton } from "./src/components/CapsuleButton";
+import { ConfettiBurst } from "./src/components/ConfettiBurst";
 import { GlassPanel } from "./src/components/GlassPanel";
 import { MeshBackground } from "./src/components/MeshBackground";
 import { MetricPill } from "./src/components/MetricPill";
@@ -47,7 +47,6 @@ import {
   approveSelectionRequest,
   createProviderOffer,
   createPlatformUser,
-  createSelectionRequest,
   fetchPerxLiveData,
   PerxLiveData,
   signInPlatformUser,
@@ -72,6 +71,38 @@ type Session = {
   user: User;
   jwt: string;
 };
+
+type EmployeeTab = "home" | "wallet" | "alerts" | "profile";
+type EmployerTab = "home" | "approvals" | "team" | "profile";
+type BusinessTab = "home" | "offers" | "payments" | "profile";
+
+const profileTab: NavTab = {
+  id: "profile",
+  label: "You",
+  icon: "account-circle-outline",
+  iconActive: "account-circle"
+};
+
+const employeeTabs: NavTab<EmployeeTab>[] = [
+  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
+  { id: "wallet", label: "Wallet", icon: "wallet-outline", iconActive: "wallet" },
+  { id: "alerts", label: "Offers", icon: "tag-outline", iconActive: "tag" },
+  profileTab as NavTab<EmployeeTab>
+];
+
+const employerTabs: NavTab<EmployerTab>[] = [
+  { id: "home", label: "Home", icon: "view-dashboard-outline", iconActive: "view-dashboard" },
+  { id: "approvals", label: "Approvals", icon: "check-decagram-outline", iconActive: "check-decagram" },
+  { id: "team", label: "Team", icon: "account-group-outline", iconActive: "account-group" },
+  profileTab as NavTab<EmployerTab>
+];
+
+const businessTabs: NavTab<BusinessTab>[] = [
+  { id: "home", label: "Insights", icon: "chart-box-outline", iconActive: "chart-box" },
+  { id: "offers", label: "Offers", icon: "tag-multiple-outline", iconActive: "tag-multiple" },
+  { id: "payments", label: "Payments", icon: "cash-multiple", iconActive: "cash-multiple" },
+  profileTab as NavTab<BusinessTab>
+];
 
 type AppData = PerxLiveData;
 
@@ -114,25 +145,12 @@ const benefitCategoryOptions: BenefitCategory[] = [
   "Wellness"
 ];
 
-const allocationCategories: BenefitCategory[] = ["Food", "Fitness", "Family", "Learning"];
-
-const emptyAllocation: Record<BenefitCategory, number> = {
-  Food: 0,
-  Fitness: 0,
-  Family: 0,
-  Learning: 0,
-  Health: 0,
-  Mobility: 0,
-  Wellness: 0
-};
-
 function createSessionToken(role: Role) {
   return `perx.session.${role}.${Date.now()}`;
 }
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
-  const [showProfile, setShowProfile] = useState(false);
   const [selectionRequests, setSelectionRequests] = useState<SelectionRequest[]>([]);
   const [challengeItems, setChallengeItems] = useState<Challenge[]>([]);
   const [inviteItems, setInviteItems] = useState<EmployerInvite[]>([]);
@@ -210,19 +228,14 @@ export default function App() {
           <AppHeader
             session={session}
             supabaseReady={supabaseReady}
-            onLogout={() => {
-              setShowProfile(false);
-              setSession(null);
-            }}
-            onProfilePress={session ? () => setShowProfile(true) : undefined}
+            onLogout={() => setSession(null)}
           />
           {session ? (
             <RoleRouter
               session={session}
               appData={appData}
               selectionRequests={selectionRequests}
-              onOpenProfile={() => setShowProfile(true)}
-              onSubmitSelection={(request) => setSelectionRequests((current) => [request, ...current])}
+              onLogout={() => setSession(null)}
               onApproveSelection={(requestId) => {
                 const request = selectionRequests.find((item) => item.id === requestId);
                 const requestBenefits =
@@ -274,16 +287,6 @@ export default function App() {
               appData={appData}
             />
           )}
-          {session && showProfile ? (
-            <UserProfileScreen
-              user={session.user}
-              onClose={() => setShowProfile(false)}
-              onLogout={() => {
-                setShowProfile(false);
-                setSession(null);
-              }}
-            />
-          ) : null}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -293,13 +296,11 @@ export default function App() {
 function AppHeader({
   session,
   supabaseReady,
-  onLogout,
-  onProfilePress
+  onLogout
 }: {
   session: Session | null;
   supabaseReady: boolean;
   onLogout: () => void;
-  onProfilePress?: () => void;
 }) {
   return (
     <View style={styles.header}>
@@ -318,14 +319,9 @@ function AppHeader({
           <Text style={styles.statusText}>{supabaseReady ? "Supabase" : "No DB"}</Text>
         </View>
         {session ? (
-          <>
-            <Pressable onPress={onProfilePress} style={styles.avatarButton}>
-              <AppIcon name="account-circle" size={24} color={colors.primary} />
-            </Pressable>
-            <Pressable onPress={onLogout} style={styles.iconButton}>
-              <Text style={styles.logoutText}>Out</Text>
-            </Pressable>
-          </>
+          <Pressable onPress={onLogout} style={styles.iconButton}>
+            <Text style={styles.logoutText}>Out</Text>
+          </Pressable>
         ) : null}
       </View>
     </View>
@@ -509,8 +505,7 @@ function RoleRouter({
   session,
   appData,
   selectionRequests,
-  onOpenProfile,
-  onSubmitSelection,
+  onLogout,
   onApproveSelection,
   onUpdateProviderProfile,
   onAddOffer
@@ -518,8 +513,7 @@ function RoleRouter({
   session: Session;
   appData: AppData;
   selectionRequests: SelectionRequest[];
-  onOpenProfile: () => void;
-  onSubmitSelection: (request: SelectionRequest) => void;
+  onLogout: () => void;
   onApproveSelection: (requestId: string) => void;
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
   onAddOffer: (offer: Benefit) => void;
@@ -531,7 +525,7 @@ function RoleRouter({
         appData={appData}
         selectionRequests={selectionRequests}
         onApproveSelection={onApproveSelection}
-        onOpenProfile={onOpenProfile}
+        onLogout={onLogout}
       />
     );
   }
@@ -543,7 +537,7 @@ function RoleRouter({
         selectionRequests={selectionRequests}
         onUpdateProviderProfile={onUpdateProviderProfile}
         onAddOffer={onAddOffer}
-        onOpenProfile={onOpenProfile}
+        onLogout={onLogout}
       />
     );
   }
@@ -551,8 +545,7 @@ function RoleRouter({
     <EmployeeExperience
       user={session.user}
       appData={appData}
-      onSubmitSelection={onSubmitSelection}
-      onOpenProfile={onOpenProfile}
+      onLogout={onLogout}
     />
   );
 }
@@ -560,15 +553,14 @@ function RoleRouter({
 function EmployeeExperience({
   user,
   appData,
-  onSubmitSelection,
-  onOpenProfile
+  onLogout
 }: {
   user: User;
   appData: AppData;
-  onSubmitSelection: (request: SelectionRequest) => void;
-  onOpenProfile: () => void;
+  onLogout: () => void;
 }) {
   const [tab, setTab] = useState<EmployeeTab>("home");
+  const [celebrateKey, setCelebrateKey] = useState(0);
 
   const company =
     appData.companies.find((item) => item.id === user.companyId) ??
@@ -587,7 +579,7 @@ function EmployeeExperience({
   return (
     <View style={styles.roleShell}>
       <ScrollView
-        contentContainerStyle={[styles.screenContent, styles.employeeContent]}
+        contentContainerStyle={[styles.screenContent, styles.navClearance]}
         showsVerticalScrollIndicator={false}
       >
         {tab === "home" ? (
@@ -600,12 +592,19 @@ function EmployeeExperience({
           />
         ) : null}
         {tab === "wallet" ? (
-          <EmployeeWallet user={user} companyName={company.name} balance={balance} appData={appData} />
+          <EmployeeWallet
+            user={user}
+            companyName={company.name}
+            balance={balance}
+            appData={appData}
+            onCelebrate={() => setCelebrateKey((key) => key + 1)}
+          />
         ) : null}
-        {tab === "allocate" ? <BudgetAllocation monthlyBudget={monthlyBudget} /> : null}
-        {tab === "alerts" ? <EmployeeOffers user={user} appData={appData} onSubmitSelection={onSubmitSelection} /> : null}
+        {tab === "alerts" ? <EmployeeOffers appData={appData} /> : null}
+        {tab === "profile" ? <UserProfileScreen user={user} onLogout={onLogout} /> : null}
       </ScrollView>
-      <BottomNav active={tab} onChange={setTab} onProfilePress={onOpenProfile} />
+      <BottomNav tabs={employeeTabs} active={tab} onChange={setTab} />
+      {celebrateKey > 0 ? <ConfettiBurst key={celebrateKey} /> : null}
     </View>
   );
 }
@@ -667,19 +666,21 @@ function EmployeeWallet({
   user,
   companyName,
   balance,
-  appData
+  appData,
+  onCelebrate
 }: {
   user: User;
   companyName: string;
   balance: number;
   appData: AppData;
+  onCelebrate: () => void;
 }) {
-  const [activeBenefit, setActiveBenefit] = useState(appData.benefits[0]);
-  const [nfcActive, setNfcActive] = useState(false);
-  const [expandedCardId, setExpandedCardId] = useState<string | null>(appData.benefits[0]?.id ?? null);
   const walletBenefits = appData.benefits;
-  const currentBenefit = activeBenefit ?? walletBenefits[0];
-  if (!currentBenefit) {
+  const [chosenId, setChosenId] = useState<string | null>(walletBenefits[0]?.id ?? null);
+  const [accepted, setAccepted] = useState(false);
+  const chosenBenefit = walletBenefits.find((benefit) => benefit.id === chosenId) ?? walletBenefits[0];
+
+  if (!chosenBenefit) {
     return (
       <Section title="Wallet" meta="No offers">
         <View style={styles.listRow}>
@@ -694,26 +695,32 @@ function EmployeeWallet({
       </Section>
     );
   }
-  const qrValue = `PERX:${user.id}:${currentBenefit.id}:${Date.now().toString().slice(-6)}`;
+
+  const qrValue = `PERX:${user.id}:${chosenBenefit.id}:${Date.now().toString().slice(-6)}`;
+
+  const simulateTap = () => {
+    setAccepted(true);
+    onCelebrate();
+  };
 
   return (
     <>
       <View style={styles.walletHero}>
-        <Text style={styles.greetingText}>My Cards</Text>
-        <Text style={styles.greetingSub}>Manage your digital perks and passes</Text>
+        <Text style={styles.greetingText}>My Wallet</Text>
+        <Text style={styles.greetingSub}>Tap a card to get it ready for the reader</Text>
       </View>
 
       <View style={styles.cardStack}>
         {walletBenefits.map((benefit, index) => {
-          const expanded = expandedCardId === benefit.id;
+          const chosen = benefit.id === chosenBenefit.id;
           return (
             <Pressable
               key={benefit.id}
               onPress={() => {
-                setActiveBenefit(benefit);
-                setExpandedCardId(expanded ? null : benefit.id);
+                setChosenId(benefit.id);
+                setAccepted(false);
               }}
-              style={[styles.stackItem, !expanded && index > 0 && styles.stackItemCollapsed]}
+              style={[styles.stackItem, !chosen && index > 0 && styles.stackItemCollapsed]}
             >
               <WalletCard
                 user={user}
@@ -722,115 +729,56 @@ function EmployeeWallet({
                 benefit={benefit}
                 variant={index}
                 compact
+                selected={chosen}
               />
             </Pressable>
           );
         })}
       </View>
 
-      <GlassPanel style={styles.qrPanel}>
-        <View style={styles.qrBox}>
-          <QRCode value={qrValue} size={158} color={colors.text} backgroundColor={colors.surface} />
+      <GlassPanel style={styles.tapPanel}>
+        <View style={[styles.tapStatusDot, accepted && styles.tapStatusDotActive]}>
+          <AppIcon name={accepted ? "check-bold" : "contactless-payment"} size={26} color={colors.onPrimary} />
         </View>
-        <View style={styles.qrText}>
-          <Text style={styles.cardTitle}>{currentBenefit.title}</Text>
-          <Text style={styles.bodyText}>{currentBenefit.description}</Text>
-          <Text style={styles.listSub}>Session code {qrValue.slice(-6)}</Text>
-        </View>
-      </GlassPanel>
-
-      <GlassPanel style={styles.nfcPanel}>
-        <View style={styles.nfcCopy}>
-          <Text style={styles.cardTitle}>NFC simulation</Text>
+        <View style={styles.tapBody}>
+          <Text style={styles.cardTitle}>{accepted ? "Payment accepted" : "Ready for NFC reader"}</Text>
           <Text style={styles.bodyText}>
-            {nfcActive ? "Hold near terminal. Awaiting provider confirmation." : "Tap to arm a wallet payment session."}
+            {accepted
+              ? `${chosenBenefit.title} tapped successfully.`
+              : `Hold your phone near the reader to pay with ${chosenBenefit.title}.`}
           </Text>
         </View>
-        <CapsuleButton
-          label={nfcActive ? "Armed" : "Tap NFC"}
-          onPress={() => setNfcActive((value) => !value)}
-          variant={nfcActive ? "soft" : "primary"}
-        />
-      </GlassPanel>
-    </>
-  );
-}
-
-function BudgetAllocation({ monthlyBudget }: { monthlyBudget: number }) {
-  const [values, setValues] = useState<Record<BenefitCategory, number>>(emptyAllocation);
-  const total = allocationCategories.reduce((sum, category) => sum + values[category], 0);
-  const remaining = Math.max(0, monthlyBudget - total);
-
-  const updateCategory = (category: BenefitCategory, nextValue: number) => {
-    const otherTotal = allocationCategories.reduce(
-      (sum, item) => sum + (item === category ? 0 : values[item]),
-      0
-    );
-    const capped = Math.min(nextValue, Math.max(0, monthlyBudget - otherTotal));
-    setValues((current) => ({ ...current, [category]: capped }));
-  };
-
-  return (
-    <>
-      <GlassPanel style={styles.allocationSummary}>
-        <Text style={styles.cardTitle}>Monthly split</Text>
-        <Text style={styles.largeNumber}>{currency(remaining)}</Text>
-        <Text style={styles.bodyText}>left unallocated from {currency(monthlyBudget)}</Text>
       </GlassPanel>
 
-      <Section title="Allocate" meta="Drag sliders">
-        {allocationCategories.map((category) => (
-          <AllocationSlider
-            key={category}
-            category={category}
-            value={values[category]}
-            max={monthlyBudget}
-            onChange={(value) => updateCategory(category, value)}
+      <GlassPanel style={styles.qrPanel}>
+        <View style={styles.qrBox}>
+          <QRCode value={qrValue} size={150} color={colors.text} backgroundColor={colors.surface} />
+        </View>
+        <View style={styles.qrText}>
+          <Text style={styles.cardTitle}>Scan or tap</Text>
+          <Text style={styles.bodyText}>Let the venue scan this code, or test the contactless reader below.</Text>
+          <CapsuleButton
+            label="Simulate NFC tap"
+            onPress={simulateTap}
+            icon={<AppIcon name="nfc" size={16} color={colors.onPrimary} />}
           />
-        ))}
-      </Section>
+        </View>
+      </GlassPanel>
     </>
   );
 }
 
-function EmployeeOffers({
-  user,
-  appData,
-  onSubmitSelection
-}: {
-  user: User;
-  appData: AppData;
-  onSubmitSelection: (request: SelectionRequest) => void;
-}) {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [selectedProviderNames, setSelectedProviderNames] = useState<string[]>([]);
-  const [submitted, setSubmitted] = useState(false);
+function EmployeeOffers({ appData }: { appData: AppData }) {
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [activeProviderNames, setActiveProviderNames] = useState<string[]>([]);
   const marketplaceBenefits = appData.benefits;
   const marketplaceProviders = appData.providerProfiles;
-  const visibleBenefits = selectedProviderNames.length
-    ? marketplaceBenefits.filter((benefit) => selectedProviderNames.includes(benefit.providerName))
+  const visibleBenefits = activeProviderNames.length
+    ? marketplaceBenefits.filter((benefit) => activeProviderNames.includes(benefit.providerName))
     : marketplaceBenefits;
-  const selectedBenefits = marketplaceBenefits.filter((benefit) => selectedIds.includes(benefit.id));
-  const selectedTotal = selectedBenefits.reduce((sum, benefit) => sum + benefit.price, 0);
-  const selectedPoints = selectedBenefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
-  const selectedByProvider = useMemo(
-    () =>
-      selectedBenefits.reduce<Record<string, Benefit[]>>((grouped, benefit) => {
-        grouped[benefit.providerName] = [...(grouped[benefit.providerName] ?? []), benefit];
-        return grouped;
-      }, {}),
-    [selectedBenefits]
-  );
-  const selectedProviderGroups = Object.entries(selectedByProvider);
-  const company = appData.companies.find((item) => item.id === user.companyId);
-  const connectedEmployerId =
-    company?.employerId ||
-    appData.users.find((candidate) => candidate.role === "employer" && candidate.companyId === user.companyId)?.id ||
-    appData.users.find((candidate) => candidate.role === "employer")?.id;
 
-  const toggleBenefit = (benefitId: string) => {
-    setSubmitted(false);
-    setSelectedIds((current) =>
+  const toggleSaved = (benefitId: string) => {
+    setSavedIds((current) =>
       current.includes(benefitId)
         ? current.filter((id) => id !== benefitId)
         : [...current, benefitId]
@@ -838,127 +786,31 @@ function EmployeeOffers({
   };
 
   const toggleProvider = (providerName: string) => {
-    setSubmitted(false);
-    const providerBenefitIds = marketplaceBenefits
-      .filter((benefit) => benefit.providerName === providerName)
-      .map((benefit) => benefit.id);
-
-    setSelectedProviderNames((current) => {
-      const selected = current.includes(providerName);
-      return selected ? current.filter((name) => name !== providerName) : [...current, providerName];
-    });
-
-    setSelectedIds((current) => {
-      const selected = selectedProviderNames.includes(providerName);
-      if (selected) {
-        return current.filter((id) => !providerBenefitIds.includes(id));
-      }
-
-      return Array.from(new Set([...current, ...providerBenefitIds]));
-    });
-  };
-
-  const submitSelection = () => {
-    if (!selectedIds.length) return;
-
-    const localRequest = {
-      id: `request_${Date.now()}`,
-      employeeId: user.id,
-      employeeName: user.name,
-      employerId: connectedEmployerId,
-      benefitIds: selectedIds,
-      total: selectedTotal,
-      totalPoints: selectedPoints,
-      status: "pending",
-      createdAt: new Date().toISOString()
-    } satisfies SelectionRequest;
-
-    void createSelectionRequest({
-      employeeId: user.id,
-      employerId: connectedEmployerId,
-      companyId: user.companyId,
-      benefitIds: selectedIds,
-      benefits: selectedBenefits
-    });
-
-    onSubmitSelection(localRequest);
-    setSubmitted(true);
+    setActiveProviderNames((current) =>
+      current.includes(providerName)
+        ? current.filter((name) => name !== providerName)
+        : [...current, providerName]
+    );
   };
 
   return (
     <>
-      <GlassPanel style={styles.packagePanel}>
-        <View style={styles.packageFooter}>
-          <Text style={styles.confidence}>{currency(selectedTotal)}</Text>
-          <CapsuleButton
-            label={submitted ? "Sent to employer" : "Show employer"}
-            onPress={submitSelection}
-            variant={submitted ? "soft" : "primary"}
-          />
-        </View>
-      </GlassPanel>
+      <View style={styles.walletHero}>
+        <Text style={styles.greetingText}>Marketplace</Text>
+        <Text style={styles.greetingSub}>Browse partner perks in {market.city}</Text>
+      </View>
 
-      <Section title="Selected package" meta={`${selectedBenefits.length} perks`}>
-        <GlassPanel style={styles.packageSummaryPanel} intensity={12}>
-          <View style={styles.packageSummaryHeader}>
-            <View style={styles.listText}>
-              <Text style={styles.cardTitle}>Ready for employer review</Text>
-              <Text style={styles.bodyText}>
-                Grouped by provider so the employer can see where payment will be routed.
-              </Text>
-            </View>
-            <View style={styles.selectedBadge}>
-              <Text style={styles.selectedBadgeText}>{selectedPoints} pts</Text>
-            </View>
-          </View>
-
-          {selectedProviderGroups.length ? (
-            selectedProviderGroups.map(([providerName, providerBenefits]) => (
-              <View key={providerName} style={styles.listRow}>
-                <View style={styles.smallIcon}>
-                  <Store size={18} color={colors.text} />
-                </View>
-                <View style={styles.listText}>
-                  <Text style={styles.listTitle}>{providerName}</Text>
-                  <Text style={styles.listSub}>
-                    {providerBenefits.map((benefit) => benefit.title).join(", ")}
-                  </Text>
-                </View>
-                <Text style={styles.listAmount}>
-                  {providerBenefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0)} pts
-                </Text>
-              </View>
-            ))
-          ) : (
-            <View style={styles.listRow}>
-              <View style={styles.smallIcon}>
-                <Plus size={18} color={colors.text} />
-              </View>
-              <View style={styles.listText}>
-                <Text style={styles.listTitle}>No perks selected</Text>
-                <Text style={styles.listSub}>Choose offers or tap a provider to include their full package.</Text>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.packageSummaryTotals}>
-            <Text style={styles.bodyText}>Cash equivalent</Text>
-            <Text style={styles.confidence}>{currency(selectedTotal)}</Text>
-          </View>
-        </GlassPanel>
-      </Section>
-
-      <Section title="Marketplace" meta={market.city}>
+      <Section title="Providers" meta={market.city}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {marketplaceProviders.map((provider) => {
-            const selected = selectedProviderNames.includes(provider.businessName);
+            const selected = activeProviderNames.includes(provider.businessName);
             return (
               <Pressable key={provider.id} onPress={() => toggleProvider(provider.businessName)}>
                 <GlassPanel style={[styles.providerCard, selected && styles.selectedOfferCard]} intensity={12}>
                   <Image source={{ uri: provider.logoUrl }} style={styles.providerLogo} />
                   <Text style={styles.listTitle}>{provider.businessName}</Text>
                   <Text style={styles.listSub}>{provider.category} - {provider.city}</Text>
-                  <Text style={styles.selectedBadgeText}>{selected ? "Included" : "Tap to include"}</Text>
+                  <Text style={styles.selectedBadgeText}>{selected ? "Filtering" : "Tap to filter"}</Text>
                 </GlassPanel>
               </Pressable>
             );
@@ -966,11 +818,11 @@ function EmployeeOffers({
         </ScrollView>
 
         {visibleBenefits.map((benefit) => {
-          const selected = selectedIds.includes(benefit.id);
+          const saved = savedIds.includes(benefit.id);
           return (
-            <Pressable key={benefit.id} onPress={() => toggleBenefit(benefit.id)}>
+            <Pressable key={benefit.id} onPress={() => toggleSaved(benefit.id)}>
               <GlassPanel
-                style={[styles.offerCard, selected && styles.selectedOfferCard]}
+                style={[styles.offerCard, saved && styles.selectedOfferCard]}
                 intensity={14}
               >
                 <Image source={{ uri: benefit.imageUrl }} style={styles.offerImage} />
@@ -990,7 +842,7 @@ function EmployeeOffers({
                   </View>
                   <View style={styles.selectedBadge}>
                     <Text style={styles.selectedBadgeText}>
-                      {selected ? "Added" : `${benefit.pointsPrice} pts`}
+                      {saved ? "Saved" : `${benefit.pointsPrice} pts`}
                     </Text>
                   </View>
                 </View>
@@ -1001,20 +853,6 @@ function EmployeeOffers({
           );
         })}
       </Section>
-
-      <Section title="How approval works" meta="Live flow">
-        <View style={styles.listRow}>
-          <View style={styles.smallIcon}>
-            <UsersRound size={18} color={colors.text} />
-          </View>
-          <View style={styles.listText}>
-            <Text style={styles.listTitle}>Employer approves the package</Text>
-            <Text style={styles.listSub}>
-              Once approved, simulated payment is routed to each provider. Employee never receives cash.
-            </Text>
-          </View>
-        </View>
-      </Section>
     </>
   );
 }
@@ -1024,14 +862,15 @@ function EmployerExperience({
   appData,
   selectionRequests,
   onApproveSelection,
-  onOpenProfile
+  onLogout
 }: {
   user: User;
   appData: AppData;
   selectionRequests: SelectionRequest[];
   onApproveSelection: (requestId: string) => void;
-  onOpenProfile: () => void;
+  onLogout: () => void;
 }) {
+  const [tab, setTab] = useState<EmployerTab>("home");
   const company =
     appData.companies.find((item) => item.employerId === user.id) ??
     appData.companies.find((item) => item.id === user.companyId) ?? {
@@ -1064,15 +903,21 @@ function EmployerExperience({
   const [approvalNotice, setApprovalNotice] = useState("");
 
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <View style={styles.roleShell}>
+      <ScrollView
+        contentContainerStyle={[styles.screenContent, styles.navClearance]}
+        showsVerticalScrollIndicator={false}
+      >
+      {tab === "home" ? (
+      <>
       <View style={styles.adminHeader}>
         <View style={styles.adminHeaderCopy}>
           <Text style={styles.greetingText}>Management</Text>
           <Text style={styles.greetingSub}>Monitor approvals, points, and employee access.</Text>
         </View>
-        <Pressable onPress={onOpenProfile} style={styles.searchPill}>
+        <View style={styles.searchPill}>
           <AppIcon name="magnify" size={18} color={colors.soft} />
-        </Pressable>
+        </View>
       </View>
 
       <View style={styles.bentoRow}>
@@ -1108,8 +953,6 @@ function EmployerExperience({
         <MetricPill label="Pending" value={`${pendingCount}`} />
       </View>
 
-      {approvalNotice ? <Text style={styles.errorText}>{approvalNotice}</Text> : null}
-
       <Section title="Points wallet" meta="Cards">
         {appData.employerWalletCards.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1134,6 +977,12 @@ function EmployerExperience({
           </View>
         )}
       </Section>
+      </>
+      ) : null}
+
+      {tab === "approvals" ? (
+      <>
+      {approvalNotice ? <Text style={styles.errorText}>{approvalNotice}</Text> : null}
 
       <Section title="Perks for points" meta="Catalog">
         {appData.benefits.length ? appData.benefits.map((benefit) => {
@@ -1222,7 +1071,11 @@ function EmployerExperience({
           );
         })}
       </Section>
+      </>
+      ) : null}
 
+      {tab === "team" ? (
+      <>
       <Section title="Recent records" meta={`${employees.length} team`}>
         {employees.map((employee) => (
           <GlassPanel key={employee.id} style={styles.recordRow} intensity={32}>
@@ -1287,7 +1140,13 @@ function EmployerExperience({
           </View>
         ))}
       </Section>
-    </ScrollView>
+      </>
+      ) : null}
+
+      {tab === "profile" ? <UserProfileScreen user={user} onLogout={onLogout} /> : null}
+      </ScrollView>
+      <BottomNav tabs={employerTabs} active={tab} onChange={setTab} />
+    </View>
   );
 }
 
@@ -1297,15 +1156,16 @@ function BusinessExperience({
   selectionRequests,
   onUpdateProviderProfile,
   onAddOffer,
-  onOpenProfile
+  onLogout
 }: {
   user: User;
   appData: AppData;
   selectionRequests: SelectionRequest[];
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
   onAddOffer: (offer: Benefit) => void;
-  onOpenProfile: () => void;
+  onLogout: () => void;
 }) {
+  const [tab, setTab] = useState<BusinessTab>("home");
   const existingProfile =
     appData.providerProfiles.find((profile) => profile.userId === user.id) ??
     appData.providerProfiles.find((profile) => profile.businessName === user.name);
@@ -1426,7 +1286,13 @@ function BusinessExperience({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <View style={styles.roleShell}>
+      <ScrollView
+        contentContainerStyle={[styles.screenContent, styles.navClearance]}
+        showsVerticalScrollIndicator={false}
+      >
+      {tab === "home" ? (
+      <>
       <View style={styles.adminHeader}>
         <View style={styles.adminHeaderCopy}>
           <Text style={styles.greetingText}>Insights</Text>
@@ -1434,9 +1300,9 @@ function BusinessExperience({
             Your provider ecosystem at a glance. {profileDraft.businessName}
           </Text>
         </View>
-        <Pressable onPress={onOpenProfile} style={styles.searchPill}>
+        <View style={styles.searchPill}>
           <AppIcon name="magnify" size={18} color={colors.soft} />
-        </Pressable>
+        </View>
       </View>
 
       <View style={styles.bentoRow}>
@@ -1498,7 +1364,11 @@ function BusinessExperience({
         <MetricPill label="Reached" value={`${reachedEmployees}`} />
         <MetricPill label="Payouts" value={currency(approvedPayoutTotal)} />
       </View>
+      </>
+      ) : null}
 
+      {tab === "offers" ? (
+      <>
       <Section title="Provider profile" meta="Merchant">
         <GlassPanel style={styles.formPanel}>
           <TextInput
@@ -1634,7 +1504,11 @@ function BusinessExperience({
           </GlassPanel>
         ))}
       </Section>
+      </>
+      ) : null}
 
+      {tab === "payments" ? (
+      <>
       <Section title="Payment routing" meta="Simulated">
         {routedPayments.length ? (
           routedPayments.map(({ request, benefit }) => (
@@ -1671,7 +1545,13 @@ function BusinessExperience({
           <AnalyticsRow label="Offer count" value={`${offers.length}`} />
         </GlassPanel>
       </Section>
-    </ScrollView>
+      </>
+      ) : null}
+
+      {tab === "profile" ? <UserProfileScreen user={user} onLogout={onLogout} /> : null}
+      </ScrollView>
+      <BottomNav tabs={businessTabs} active={tab} onChange={setTab} />
+    </View>
   );
 }
 
@@ -1805,6 +1685,9 @@ const styles = StyleSheet.create({
   },
   employeeContent: {
     paddingBottom: 112
+  },
+  navClearance: {
+    paddingBottom: 120
   },
   roleShell: {
     flex: 1
@@ -2398,9 +2281,30 @@ const styles = StyleSheet.create({
     gap: 0
   },
   stackItem: {
-    marginBottom: 12
+    marginBottom: 14
   },
   stackItemCollapsed: {
-    marginTop: -148
+    marginTop: -126
+  },
+  tapPanel: {
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14
+  },
+  tapStatusDot: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.capsule,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary
+  },
+  tapStatusDotActive: {
+    backgroundColor: colors.secondary
+  },
+  tapBody: {
+    flex: 1,
+    gap: 4
   }
 });

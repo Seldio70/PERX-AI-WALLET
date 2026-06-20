@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { AllocationSlider } from "../components/AllocationSlider";
-import { BottomNav, EmployeeTab } from "../components/BottomNav";
+import { BottomNav, NavTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
 import { MetricPill } from "../components/MetricPill";
@@ -14,6 +14,15 @@ import { styles } from "../styles/appStyles";
 import { colors } from "../theme";
 import { Benefit, BenefitCategory, SelectionRequest, User } from "../types";
 import { allocationCategories, benefitCategoryOptions, currency, market } from "../utils/format";
+
+type EmployeeTab = "home" | "wallet" | "allocate" | "alerts";
+
+const employeeTabs: NavTab<EmployeeTab>[] = [
+  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
+  { id: "wallet", label: "Wallet", icon: "wallet-outline", iconActive: "wallet" },
+  { id: "allocate", label: "Split", icon: "tune-variant", iconActive: "tune" },
+  { id: "alerts", label: "Offers", icon: "tag-outline", iconActive: "tag" }
+];
 
 type AppData = {
   companies: { id: string; name: string; employerId: string; monthlyBudgetPerEmployee: number }[];
@@ -83,7 +92,7 @@ export function EmployeeExperience({
           <EmployeeOffers user={user} appData={appData} onSubmitSelection={handleRedeem} />
         ) : null}
       </ScrollView>
-      <BottomNav active={tab} onChange={setTab} />
+      <BottomNav tabs={employeeTabs} active={tab} onChange={setTab} />
     </View>
   );
 }

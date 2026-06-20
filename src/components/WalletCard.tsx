@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Nfc, QrCode } from "lucide-react-native";
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, StyleSheet, Text, View } from "react-native";
 import { Benefit, User } from "../types";
 import { currency } from "../lib/format";
 import { cardGradients, colors, radius, shadow } from "../theme";
@@ -13,6 +13,7 @@ type Props = {
   benefit: Benefit;
   variant?: number;
   compact?: boolean;
+  selected?: boolean;
 };
 
 export function WalletCard({
@@ -21,7 +22,8 @@ export function WalletCard({
   balance,
   benefit,
   variant = 0,
-  compact = false
+  compact = false,
+  selected = false
 }: Props) {
   const scale = useRef(new Animated.Value(compact ? 1 : 0.96)).current;
   const gradient = cardGradients[variant % cardGradients.length];
@@ -32,34 +34,58 @@ export function WalletCard({
   }, [compact, scale]);
 
   return (
-    <Animated.View style={[styles.wrap, compact && styles.wrapCompact, { transform: [{ scale }] }]}>
-      <LinearGradient colors={[...gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
+    <Animated.View
+      style={[
+        styles.wrap,
+        compact && styles.wrapCompact,
+        selected && styles.wrapSelected,
+        { transform: [{ scale }] }
+      ]}
+    >
+      <LinearGradient
+        colors={[...gradient]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.card, selected && styles.cardSelected]}
+      >
         <View style={styles.overlay} />
         <View style={styles.topRow}>
-          <View>
-            <Text style={styles.eyebrow}>{benefit.title}</Text>
-            <Text style={styles.name}>{user.name.split(" ")[0]}</Text>
+          <View style={styles.topCopy}>
+            <Text style={styles.eyebrow}>{benefit.category}</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {benefit.title}
+            </Text>
           </View>
-          <View style={styles.iconBubble}>
-            {benefit.redemptionType === "NFC" ? (
-              <Nfc size={20} color={colors.onPrimaryContainer} />
-            ) : (
-              <QrCode size={20} color={colors.onPrimaryContainer} />
-            )}
-          </View>
+          {benefit.imageUrl ? (
+            <Image source={{ uri: benefit.imageUrl }} style={styles.logo} />
+          ) : (
+            <View style={styles.iconBubble}>
+              {benefit.redemptionType === "NFC" ? (
+                <Nfc size={20} color={colors.onPrimaryContainer} />
+              ) : (
+                <QrCode size={20} color={colors.onPrimaryContainer} />
+              )}
+            </View>
+          )}
         </View>
-        <View style={styles.middle}>
-          <Text style={styles.balance}>{currency(balance)}</Text>
-          <Text style={styles.balanceLabel}>available this month</Text>
-        </View>
+
         <View style={styles.bottomRow}>
-          <View>
-            <Text style={styles.company}>{companyName}</Text>
-            <Text style={styles.number}>5284  73XX  XXXX  2046</Text>
+          <View style={styles.bottomCopy}>
+            <Text style={styles.holder} numberOfLines={1}>
+              {user.name}
+            </Text>
+            <Text style={styles.company} numberOfLines={1}>
+              {companyName}
+            </Text>
           </View>
-          <View style={styles.benefitCapsule}>
-            <Text style={styles.benefitText}>{benefit.category}</Text>
-          </View>
+          {selected ? (
+            <View style={styles.readyPill}>
+              <Nfc size={14} color={colors.onPrimary} />
+              <Text style={styles.readyText}>Ready</Text>
+            </View>
+          ) : (
+            <Text style={styles.balance}>{currency(balance)}</Text>
+          )}
         </View>
       </LinearGradient>
     </Animated.View>
@@ -76,85 +102,105 @@ const styles = StyleSheet.create({
     width: "100%",
     marginRight: 0
   },
+  wrapSelected: {
+    shadowOpacity: 0.22,
+    shadowRadius: 30
+  },
   card: {
-    height: 224,
+    height: 178,
     borderRadius: radius.cardLg,
-    padding: 20,
+    padding: 18,
     overflow: "hidden",
     borderWidth: 0.5,
-    borderColor: "rgba(255,255,255,0.35)"
+    borderColor: "rgba(255,255,255,0.35)",
+    justifyContent: "space-between"
+  },
+  cardSelected: {
+    borderWidth: 2,
+    borderColor: "#FFFFFF"
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.12)"
+    backgroundColor: "rgba(255,255,255,0.1)"
   },
   topRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between"
   },
+  topCopy: {
+    flex: 1,
+    paddingRight: 12
+  },
   eyebrow: {
     color: "rgba(254,252,255,0.82)",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6
   },
   name: {
     color: colors.onPrimaryContainer,
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: "800",
     marginTop: 4
   },
+  logo: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.18)"
+  },
   iconBubble: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.capsule,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     borderWidth: 0.5,
     borderColor: "rgba(255,255,255,0.35)",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.16)"
   },
-  middle: {
-    marginTop: 24
-  },
   balance: {
     color: colors.onPrimaryContainer,
-    fontSize: 34,
+    fontSize: 22,
     fontWeight: "900"
-  },
-  balanceLabel: {
-    color: "rgba(254,252,255,0.78)",
-    fontSize: 13,
-    fontWeight: "600"
   },
   bottomRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: "auto"
+    alignItems: "flex-end"
+  },
+  bottomCopy: {
+    flex: 1,
+    paddingRight: 12
+  },
+  holder: {
+    color: colors.onPrimaryContainer,
+    fontSize: 15,
+    fontWeight: "800"
   },
   company: {
-    color: colors.onPrimaryContainer,
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  number: {
-    color: "rgba(254,252,255,0.72)",
+    color: "rgba(254,252,255,0.75)",
     fontSize: 12,
     marginTop: 3,
-    letterSpacing: 1.2
+    fontWeight: "600"
   },
-  benefitCapsule: {
+  readyPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     borderRadius: radius.capsule,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: "rgba(255,255,255,0.18)"
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(255,255,255,0.22)"
   },
-  benefitText: {
-    color: colors.onPrimaryContainer,
+  readyText: {
+    color: colors.onPrimary,
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "800",
+    letterSpacing: 0.4
   }
 });
