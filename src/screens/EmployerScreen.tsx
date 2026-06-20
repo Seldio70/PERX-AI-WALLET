@@ -722,6 +722,8 @@ function ProviderCatalogPage({
     [providerProfiles, benefits]
   );
   const selectedCount = enabledBenefitIds.length;
+  const allBenefitIds = useMemo(() => benefits.map((b) => b.id), [benefits]);
+  const allSelected = allBenefitIds.length > 0 && allBenefitIds.every((id) => enabledBenefitIds.includes(id));
 
   const toggleExpanded = (key: string) => {
     setExpandedKeys((current) => ({ ...current, [key]: !current[key] }));
@@ -748,6 +750,15 @@ function ProviderCatalogPage({
             {selectedCount ? "Visible in the employee marketplace." : "Nothing visible until you select perks."}
           </Text>
         </View>
+        <Pressable
+          onPress={() => onToggleProvider?.(allBenefitIds, !allSelected)}
+          style={[styles.catalogSelectBtn, allSelected && styles.catalogSelectBtnActive]}
+        >
+          {allSelected ? <Check size={16} color={colors.onPrimary} /> : null}
+          <Text style={[styles.catalogSelectText, allSelected && styles.catalogSelectTextActive]}>
+            {allSelected ? "All selected" : "Select all"}
+          </Text>
+        </Pressable>
       </GlassPanel>
 
       {groups.length ? (
