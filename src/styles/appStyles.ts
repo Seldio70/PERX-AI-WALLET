@@ -3253,7 +3253,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: radius.capsule,
-    backgroundColor: colors.tertiary
+    backgroundColor: colors.primary
   },
   duelBannerBadgeText: {
     color: colors.onPrimary,
@@ -3277,7 +3277,7 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: colors.tertiary,
+    backgroundColor: colors.primary,
     borderRadius: radius.capsule,
     paddingVertical: 13,
     paddingHorizontal: 20
