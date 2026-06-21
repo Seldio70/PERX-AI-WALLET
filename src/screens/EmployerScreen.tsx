@@ -431,7 +431,7 @@ export function EmployerExperience({
             Alert.alert("Unavailable", "Challenge creation is not available right now.");
             return false;
           }
-          return Boolean(await onCreateChallenge(input));
+          return (await onCreateChallenge(input)) ?? false;
         }}
       />
 
