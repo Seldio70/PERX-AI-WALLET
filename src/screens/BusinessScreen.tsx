@@ -20,7 +20,6 @@ import { AppIcon } from "../components/AppIcon";
 import { BentoMetricCard } from "../components/BentoMetricCard";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
-import { ScreenTransition } from "../components/ScreenTransition";
 import { currency, market } from "../lib/format";
 import { ensurePublicImageUrl, isLocalImageUri, uploadImageToStorage } from "../lib/imageUpload";
 import { DEFAULT_PROVIDER_LOGO, isProviderProfileComplete, validateProviderProfileDraft } from "../lib/providerProfile";
@@ -921,8 +920,7 @@ export function BusinessExperience({
         contentContainerStyle={[styles.screenContent, styles.businessContent]}
         showsVerticalScrollIndicator={false}
       >
-        <ScreenTransition transitionKey={tab}>
-          {tab === "home" ? (
+        {tab === "home" ? (
             <BusinessHomeTab
               profileDraft={profileDraft}
               payoutTotal={payoutTotal}
@@ -962,7 +960,6 @@ export function BusinessExperience({
               onLogout={onLogout}
             />
           ) : null}
-        </ScreenTransition>
       </ScrollView>
 
       <BusinessBottomNav active={tab} onChange={setTab} onAddOffer={handleOpenAdd} />

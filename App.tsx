@@ -1259,7 +1259,6 @@ function RoleRouter({
   onSubmitSelection: (request: SelectionRequest) => void;
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
   onAddOffer: (offer: Benefit) => void;
-  onSubmitChallenge?: (definitionId: string) => void | Promise<void>;
   onCreateChallenge: (input: {
     employerId: string;
     title: string;

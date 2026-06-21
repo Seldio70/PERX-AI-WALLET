@@ -43,7 +43,6 @@ import {
 import { EmployeeHealthSnapshot } from "../lib/healthDataService";
 import { GlassPanel } from "../components/GlassPanel";
 import { PointsHealthRing } from "../components/PointsHealthRing";
-import { ScreenTransition } from "../components/ScreenTransition";
 import { Section } from "../components/Section";
 import { UserProfileScreen } from "../components/UserProfileScreen";
 import { WalletCard } from "../components/WalletCard";
@@ -182,7 +181,7 @@ export function EmployeeExperience({
 }) {
   const [tab, setTab] = useState<EmployeeTab>("home");
   const [celebrateKey, setCelebrateKey] = useState(0);
-  const completedCountRef = useRef(0);
+  const seenCompletedChallengeIds = useRef<Set<string>>(new Set());
 
   const company =
     appData.companies.find((item) => item.id === user.companyId) ??
@@ -216,11 +215,17 @@ export function EmployeeExperience({
   const completedChallenges = useMemo(() => completedChallengeViews(challengeViews), [challengeViews]);
 
   useEffect(() => {
-    if (completedChallenges.length > completedCountRef.current) {
+    const completedIds = completedChallenges.map((challenge) => challenge.id);
+    const newlyCompleted = completedIds.filter((id) => !seenCompletedChallengeIds.current.has(id));
+
+    if (seenCompletedChallengeIds.current.size > 0 && newlyCompleted.length > 0) {
       setCelebrateKey((value) => value + 1);
     }
-    completedCountRef.current = completedChallenges.length;
-  }, [completedChallenges.length]);
+
+    for (const id of completedIds) {
+      seenCompletedChallengeIds.current.add(id);
+    }
+  }, [completedChallenges]);
 
   const milestoneMessage = useMemo(() => {
     const candidate = activeChallenges.find(
@@ -330,8 +335,7 @@ export function EmployeeExperience({
         contentContainerStyle={[styles.screenContent, styles.employeeContent]}
         showsVerticalScrollIndicator={false}
       >
-        <ScreenTransition transitionKey={tab}>
-          {tab === "home" ? (
+        {tab === "home" ? (
             <EmployeeHome
               user={user}
               companyName={company.name}
@@ -389,7 +393,6 @@ export function EmployeeExperience({
             />
           ) : null}
           {tab === "profile" ? <UserProfileScreen user={user} onLogout={onLogout} /> : null}
-        </ScreenTransition>
       </ScrollView>
 
       <BottomNav tabs={employeeTabs} active={tab} onChange={setTab} />
