@@ -13,6 +13,7 @@ import {
   Alert
 } from "react-native";
 import { AppIcon } from "./src/components/AppIcon";
+import { BrandLogo } from "./src/components/BrandLogo";
 import { CapsuleButton } from "./src/components/CapsuleButton";
 import { LogoutButton } from "./src/components/LogoutButton";
 import { MeshBackground } from "./src/components/MeshBackground";
@@ -36,7 +37,8 @@ import {
   setEmployerChallengeTemplateEnabled,
   signInPlatformUser,
   signInOrSignUpPlatformAuth,
-  updateUserPointsBalance
+  updateUserPointsBalance,
+  updateEmployeeMonthlyBudget
 } from "./src/lib/perxRepository";
 import {
   employeesForEmployer,
@@ -56,6 +58,7 @@ import {
   EmployeeHealthSnapshot
 } from "./src/lib/healthDataService";
 import { notify, registerForPushNotifications } from "./src/lib/notifications";
+import { allToPoints, pointsToAll } from "./src/lib/pointsConversion";
 import { BusinessExperience } from "./src/screens/BusinessScreen";
 import { EmployeeExperience } from "./src/screens/EmployeeScreens";
 import { EmployerExperience } from "./src/screens/EmployerScreen";
@@ -145,7 +148,7 @@ export default function App() {
   const [employeePoints, setEmployeePoints] = useState<Record<string, number>>({});
   const [rewardEvents, setRewardEvents] = useState<RewardEvent[]>([]);
   const [employeeInvites, setEmployeeInvites] = useState<EmployeeInvite[]>([]);
-  const [bonusBudgetByEmployee, setBonusBudgetByEmployee] = useState<Record<string, number>>({});
+  const [employeeBudgetsByEmployee, setEmployeeBudgetsByEmployee] = useState<Record<string, number>>({});
   const [employerEnabledBenefits, setEmployerEnabledBenefits] = useState<Record<string, string[]>>({});
   const [demoSeeded, setDemoSeeded] = useState(false);
   const supabaseReady = Boolean(getSupabaseClient());
@@ -197,10 +200,17 @@ export default function App() {
 
       // Seed employee points from DB so balances survive reload
       const dbPoints: Record<string, number> = {};
+      const dbBudgets: Record<string, number> = {};
       for (const u of data.users) {
-        if (u.role === "employee") dbPoints[u.id] = u.pointsBalance ?? 0;
+        if (u.role === "employee") {
+          dbPoints[u.id] = u.pointsBalance ?? 0;
+          dbBudgets[u.id] = u.monthlyBudgetAll ?? 0;
+        }
       }
-      if (active) setEmployeePoints(dbPoints);
+      if (active) {
+        setEmployeePoints(dbPoints);
+        setEmployeeBudgetsByEmployee(dbBudgets);
+      }
     });
 
     return () => {
@@ -597,6 +607,47 @@ export default function App() {
     void setEmployerChallengeTemplateEnabled(employerId, templateKey, enabled);
   };
 
+  const handleUpdateEmployeeBudget = async (input: { employeeIds: string[]; amountAll: number }) => {
+    const nextBudgets = { ...employeeBudgetsByEmployee };
+    const nextPoints = { ...employeePoints };
+
+    for (const employeeId of input.employeeIds) {
+      nextBudgets[employeeId] = input.amountAll;
+
+      const reqs = selectionRequests.filter((request) => request.employeeId === employeeId);
+      const usedPoints = reqs
+        .filter((request) => request.status === "approved")
+        .reduce((sum, request) => sum + request.totalPoints, 0);
+      const pendingPoints = reqs
+        .filter((request) => request.status === "pending" || request.status === "draft")
+        .reduce((sum, request) => sum + request.totalPoints, 0);
+      const budgetPoints = allToPoints(input.amountAll);
+      const newBalance = Math.max(0, budgetPoints - usedPoints - pendingPoints);
+
+      nextPoints[employeeId] = newBalance;
+      await updateEmployeeMonthlyBudget(employeeId, input.amountAll);
+      await updateUserPointsBalance(employeeId, newBalance);
+    }
+
+    setEmployeeBudgetsByEmployee(nextBudgets);
+    setEmployeePoints(nextPoints);
+    setLiveData((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        users: current.users.map((user) =>
+          input.employeeIds.includes(user.id)
+            ? {
+                ...user,
+                monthlyBudgetAll: input.amountAll,
+                pointsBalance: nextPoints[user.id] ?? user.pointsBalance
+              }
+            : user
+        )
+      };
+    });
+  };
+
   const handleGrantReward = async (input: {
     employeeId: string;
     employeeName: string;
@@ -720,7 +771,7 @@ export default function App() {
       employeeName: input.employee.name,
       employerId: input.employerId,
       benefitIds: input.benefits.map((benefit) => benefit.id),
-      total: input.benefits.reduce((sum, benefit) => sum + benefit.price, 0),
+      total: input.benefits.reduce((sum, benefit) => sum + pointsToAll(benefit.pointsPrice), 0),
       totalPoints,
       status: "approved",
       createdAt: now,
@@ -752,11 +803,7 @@ export default function App() {
       >
         <View style={styles.appChrome}>
           {session ? (
-            <AppHeader
-              session={session}
-              appData={appData}
-              onLogout={() => setSession(null)}
-            />
+            <AppHeader onLogout={() => setSession(null)} />
           ) : null}
           <ScreenTransition
             transitionKey={session ? `session-${session.user.id}-${session.user.role}` : "login"}
@@ -770,9 +817,10 @@ export default function App() {
                 appData={appData}
                 selectionRequests={selectionRequests}
                 employeePoints={employeePoints}
+                employeeBudgets={employeeBudgetsByEmployee}
                 rewardEvents={rewardEvents}
                 employeeInvites={employeeInvites}
-                bonusBudgetByEmployee={bonusBudgetByEmployee}
+                onUpdateEmployeeBudget={handleUpdateEmployeeBudget}
                 onLogout={() => setSession(null)}
                 onSubmitSelection={(request) => {
                   setSelectionRequests((current) => [request, ...current]);
@@ -852,33 +900,12 @@ export default function App() {
   );
 }
 
-function headerDisplayName(session: Session, appData: AppData): string {
-  const { user } = session;
-  if (user.role === "business") {
-    const profile = appData.providerProfiles.find((item) => item.userId === user.id);
-    return profile?.businessName ?? user.name;
-  }
-  return user.name;
-}
-
-function AppHeader({
-  session,
-  appData,
-  onLogout
-}: {
-  session: Session;
-  appData: AppData;
-  onLogout: () => void;
-}) {
-  const displayName = headerDisplayName(session, appData);
-
+function AppHeader({ onLogout }: { onLogout: () => void }) {
   return (
     <View style={styles.header}>
       <View style={styles.headerBrand}>
+        <BrandLogo size={30} />
         <Text style={styles.brand}>PerX</Text>
-        <Text style={styles.headerUserName} numberOfLines={1}>
-          {displayName}
-        </Text>
       </View>
       <View style={styles.headerActions}>
         <LogoutButton onPress={onLogout} />
@@ -1037,7 +1064,7 @@ function LoginScreen({
     >
       <View style={styles.loginBrand}>
         <View style={styles.loginLogo}>
-          <AppIcon name="bullseye" size={30} color={colors.onPrimary} />
+          <BrandLogo size={64} />
         </View>
         <Text style={styles.loginTitle}>{isLogin ? "Log in" : "Sign up"}</Text>
       </View>
@@ -1224,9 +1251,10 @@ function RoleRouter({
   appData,
   selectionRequests,
   employeePoints,
+  employeeBudgets,
   rewardEvents,
   employeeInvites,
-  bonusBudgetByEmployee,
+  onUpdateEmployeeBudget,
   onLogout,
   onSubmitSelection,
   onUpdateProviderProfile,
@@ -1252,9 +1280,10 @@ function RoleRouter({
   appData: AppData;
   selectionRequests: SelectionRequest[];
   employeePoints: Record<string, number>;
+  employeeBudgets: Record<string, number>;
   rewardEvents: RewardEvent[];
   employeeInvites: EmployeeInvite[];
-  bonusBudgetByEmployee: Record<string, number>;
+  onUpdateEmployeeBudget: (input: { employeeIds: string[]; amountAll: number }) => void | Promise<void>;
   onLogout: () => void;
   onSubmitSelection: (request: SelectionRequest) => void;
   onUpdateProviderProfile: (profile: ProviderProfile) => void;
@@ -1305,8 +1334,10 @@ function RoleRouter({
         selectionRequests={selectionRequests}
         onLogout={onLogout}
         employeePoints={employeePoints}
+        employeeBudgets={employeeBudgets}
         rewardEvents={rewardEvents}
         employeeInvites={employeeInvites}
+        onUpdateEmployeeBudget={onUpdateEmployeeBudget}
         onCreateChallenge={onCreateChallenge}
         onArchiveChallenge={onArchiveChallenge}
         onCompleteChallenge={onCompleteChallenge}

@@ -33,6 +33,7 @@ create table public.users (
   invited_by_user_id uuid references public.users(id) on delete set null,
   years_employed int default 0 check (years_employed >= 0),
   points_balance int not null default 0 check (points_balance >= 0),
+  monthly_budget_all numeric check (monthly_budget_all is null or monthly_budget_all >= 0),
   created_at timestamptz not null default now()
 );
 

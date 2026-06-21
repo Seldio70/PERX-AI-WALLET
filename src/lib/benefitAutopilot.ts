@@ -84,10 +84,10 @@ export function computeWalletHealth(input: {
   const mine = input.selectionRequests.filter((request) => request.employeeId === input.user.id);
   const used = mine
     .filter((request) => request.status === "approved")
-    .reduce((sum, request) => sum + request.total, 0);
+    .reduce((sum, request) => sum + request.totalPoints, 0);
   const reserved = mine
     .filter((request) => request.status === "pending" || request.status === "draft")
-    .reduce((sum, request) => sum + request.total, 0);
+    .reduce((sum, request) => sum + request.totalPoints, 0);
   const monthlyBudget = Math.max(0, input.monthlyBudget);
   const available = Math.max(0, monthlyBudget - used - reserved);
   const { daysLeft, cycleDays } = getDaysLeftInCycle(now);
@@ -131,7 +131,7 @@ function scoreBenefit(benefit: Benefit, user: User, now: Date): number {
   else if (expiry <= 30) score += 4;
 
   // Reasonable value: prefer mid-range so the plan isn't a single huge item.
-  if (benefit.price > 0 && benefit.price <= 3000) score += 6;
+  if (benefit.pointsPrice > 0 && benefit.pointsPrice <= 300) score += 6;
 
   return score;
 }
@@ -189,10 +189,10 @@ export function buildAutopilotPlan(input: {
   for (const benefit of ranked) {
     if (picked.length >= 3) break;
     if (usedCategories.has(benefit.category)) continue;
-    if (benefit.price > budget) continue;
+    if (benefit.pointsPrice > budget) continue;
     picked.push(benefit);
     usedCategories.add(benefit.category);
-    budget -= benefit.price;
+    budget -= benefit.pointsPrice;
   }
 
   // Second pass: relax diversity if we still have room for fewer than two items.
@@ -200,14 +200,14 @@ export function buildAutopilotPlan(input: {
     for (const benefit of ranked) {
       if (picked.length >= 3) break;
       if (picked.some((item) => item.id === benefit.id)) continue;
-      if (benefit.price > budget) continue;
+      if (benefit.pointsPrice > budget) continue;
       picked.push(benefit);
-      budget -= benefit.price;
+      budget -= benefit.pointsPrice;
     }
   }
 
-  const totalPrice = picked.reduce((sum, benefit) => sum + benefit.price, 0);
   const totalPoints = picked.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
+  const totalPrice = totalPoints;
   const unusedPct = Math.round((1 - input.health.usedPct - input.health.reservedPct) * 100);
 
   return {

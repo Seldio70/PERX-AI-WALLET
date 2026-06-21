@@ -14,6 +14,7 @@ import {
 import { defaultPlatformDefinitions, RETIRED_PLATFORM_TEMPLATE_KEYS } from "./challengePlatformTemplates";
 import { targetFromCriterion } from "./challengeEvaluator";
 import { isLocalImageUri } from "./imageUpload";
+import { pointsToAll } from "./pointsConversion";
 import { getSupabaseClient } from "./supabase";
 
 type DbUser = {
@@ -26,6 +27,7 @@ type DbUser = {
   invited_by_user_id: string | null;
   years_employed: number | null;
   points_balance: number | null;
+  monthly_budget_all: number | string | null;
 };
 
 type DbCompany = {
@@ -191,7 +193,9 @@ function mapUser(row: DbUser): User {
     invitedByUserId: row.invited_by_user_id ?? undefined,
     yearsEmployed: row.years_employed ?? undefined,
     businessId: row.role === "business" ? row.id : undefined,
-    pointsBalance: row.points_balance ?? 0
+    pointsBalance: row.points_balance ?? 0,
+    monthlyBudgetAll:
+      row.monthly_budget_all == null ? undefined : numberFromDb(row.monthly_budget_all)
   };
 }
 
@@ -207,6 +211,7 @@ function mapCompany(row: DbCompany): Company {
 function mapBenefit(row: DbBenefit): Benefit {
   const imageFallback =
     "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80";
+  const pointsPrice = numberFromDb(row.points_price);
   return {
     id: row.id,
     businessId: row.business_id ?? "",
@@ -215,8 +220,8 @@ function mapBenefit(row: DbBenefit): Benefit {
     title: row.title,
     description: row.description ?? "",
     discount: row.discount ?? "",
-    price: numberFromDb(row.price),
-    pointsPrice: numberFromDb(row.points_price),
+    price: pointsToAll(pointsPrice),
+    pointsPrice,
     imageUrl:
       row.image_url && !isLocalImageUri(row.image_url) ? row.image_url : imageFallback,
     redemptionType: row.type === "nfc" ? "NFC" : "QR",
@@ -313,9 +318,19 @@ export async function fetchPerxLiveData(): Promise<PerxLiveData | null> {
   const client = getSupabaseClient();
   if (!client) return null;
 
+  let usersResult = await client
+    .from("users")
+    .select(
+      "id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed,points_balance,monthly_budget_all"
+    );
+  if (usersResult.error?.message?.includes("monthly_budget_all")) {
+    usersResult = await client
+      .from("users")
+      .select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed,points_balance");
+  }
+
   const [
     companiesResult,
-    usersResult,
     providersResult,
     benefitsResult,
     invitesResult,
@@ -328,7 +343,6 @@ export async function fetchPerxLiveData(): Promise<PerxLiveData | null> {
     challengesResult
   ] = await Promise.all([
     client.from("companies").select("id,name,employer_id,monthly_budget_per_employee"),
-    client.from("users").select("id,auth_user_id,name,email,role,company_id,invited_by_user_id,years_employed,points_balance"),
     client.from("provider_profiles").select("id,user_id,business_name,logo_url,description,category,city,is_approved"),
     client
       .from("benefits")
@@ -436,6 +450,8 @@ export async function createProviderOffer(input: {
   const client = getSupabaseClient();
   if (!client) return null;
 
+  const price = pointsToAll(input.pointsPrice);
+
   const profile = await client
     .from("provider_profiles")
     .select("id")
@@ -471,7 +487,7 @@ export async function createProviderOffer(input: {
       title: input.title,
       description: input.description,
       discount: input.discount,
-      price: input.price,
+      price,
       points_price: input.pointsPrice,
       image_url: input.imageUrl,
       type: input.redemptionType.toLowerCase(),
@@ -692,8 +708,8 @@ export async function createSelectionRequest(input: {
   const client = getSupabaseClient();
   if (!client || !input.employerId) return null;
 
-  const total = input.benefits.reduce((sum, benefit) => sum + benefit.price, 0);
   const totalPoints = input.benefits.reduce((sum, benefit) => sum + benefit.pointsPrice, 0);
+  const total = pointsToAll(totalPoints);
   const now = new Date().toISOString();
   const request = await client
     .from("selection_requests")
@@ -715,7 +731,7 @@ export async function createSelectionRequest(input: {
     selection_request_id: request.data.id,
     benefit_id: benefit.id,
     provider_id: benefit.providerId,
-    price: benefit.price,
+    price: pointsToAll(benefit.pointsPrice),
     points_price: benefit.pointsPrice
   }));
 
@@ -730,7 +746,7 @@ export async function createSelectionRequest(input: {
         employee_id: input.employeeId,
         employer_id: input.employerId,
         selection_request_id: request.data.id,
-        amount: benefit.price,
+        amount: pointsToAll(benefit.pointsPrice),
         points_spent: benefit.pointsPrice,
         status: "paid",
         qr_code: `PERX-${request.data.id}-${benefit.id}`.slice(0, 64),
@@ -798,7 +814,7 @@ export async function approveSelectionRequest(input: {
         employee_id: request.data.employee_id,
         employer_id: employerId,
         selection_request_id: input.requestId,
-        amount: benefit.price,
+        amount: pointsToAll(benefit.pointsPrice),
         points_spent: benefit.pointsPrice,
         status: "paid",
         qr_code: `PERX-${input.requestId}-${benefit.id}`.slice(0, 64),
@@ -1310,4 +1326,17 @@ export async function updateUserPointsBalance(userId: string, newBalance: number
   const client = getSupabaseClient();
   if (!client) return;
   await client.from("users").update({ points_balance: Math.max(0, newBalance) }).eq("id", userId);
+}
+
+export async function updateEmployeeMonthlyBudget(
+  employeeId: string,
+  monthlyBudgetAll: number
+): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+  const result = await client
+    .from("users")
+    .update({ monthly_budget_all: Math.max(0, monthlyBudgetAll) })
+    .eq("id", employeeId);
+  return !result.error;
 }

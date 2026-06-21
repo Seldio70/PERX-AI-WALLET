@@ -4,6 +4,7 @@
     "slug": "perx-ai-wallet",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "assetBundlePatterns": [
       "**/*"
@@ -11,12 +12,22 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "PerX needs access to your photos so you can upload offer and business images.",
+        "NSPhotoLibraryAddUsageDescription": "PerX can save images you choose for your offers.",
+        "NSCameraUsageDescription": "PerX can use your camera to take photos for offers and your business profile.",
         "NSUserNotificationUsageDescription": "PERX sends you perk approvals, points expiry warnings, and new perk alerts.",
         "NSHealthShareUsageDescription": "PerX reads your steps and sleep from Apple Health to track wellness challenges.",
         "NSHealthUpdateUsageDescription": "PerX does not write health data."
       }
     },
     "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "PerX needs access to your photos so you can upload offer and business images.",
+          "cameraPermission": "PerX can use your camera to take photos for offers and your business profile."
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -28,6 +39,7 @@
     ],
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#050816"
       },
       "permissions": [

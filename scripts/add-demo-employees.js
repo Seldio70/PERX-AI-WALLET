@@ -13,7 +13,7 @@ const client = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
-const PASSWORD = "PerxStart2026!";
+const PASSWORD = "perx2026";
 
 async function main() {
   // Find the employer and their company
@@ -38,14 +38,14 @@ async function main() {
 
   const demoEmployees = [
     {
-      name: "Joan Smith",
-      email: "joan@perx.ai",
-      years_employed: 2
+      name: "employee1",
+      email: "employee1@perx.ai",
+      years_employed: 1
     },
     {
-      name: "Seldio Kola",
-      email: "seldio@perx.ai",
-      years_employed: 3
+      name: "employee2",
+      email: "employee2@perx.ai",
+      years_employed: 1
     }
   ];
 

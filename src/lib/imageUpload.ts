@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { readAsStringAsync } from "expo-file-system/legacy";
+import { Platform } from "react-native";
 import { getSupabaseClient } from "./supabase";
 
 const BUCKET = "offer-images";
@@ -12,10 +14,12 @@ function getStorageClient() {
   return getSupabaseClient();
 }
 
-const LOCAL_URI_PREFIXES = ["blob:", "file:", "content:", "ph://"];
+const LOCAL_URI_PREFIXES = ["blob:", "file:", "content:", "ph://", "assets-library:"];
 
 export function isLocalImageUri(uri: string) {
-  return LOCAL_URI_PREFIXES.some((prefix) => uri.startsWith(prefix));
+  if (!uri) return false;
+  if (LOCAL_URI_PREFIXES.some((prefix) => uri.startsWith(prefix))) return true;
+  return Platform.OS !== "web" && uri.startsWith("/");
 }
 
 export function improveRemoteImageUrl(uri: string) {
@@ -43,6 +47,27 @@ function extensionForContentType(contentType: string) {
   return "jpg";
 }
 
+function contentTypeForUri(uri: string) {
+  const lower = uri.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".heic") || lower.endsWith(".heif")) return "image/jpeg";
+  return "image/jpeg";
+}
+
+function decodeBase64(base64: string): Uint8Array {
+  if (typeof atob === "function") {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+  throw new Error("Base64 decoding is unavailable in this environment.");
+}
+
 async function blobToBase64(blob: Blob): Promise<string> {
   const arrayBuffer = await blob.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
@@ -56,13 +81,29 @@ async function blobToBase64(blob: Blob): Promise<string> {
   throw new Error("Base64 encoding is unavailable in this environment.");
 }
 
-async function uriToBlob(uri: string): Promise<{ blob: Blob; contentType: string }> {
-  const response = await fetch(uri);
-  if (!response.ok) {
-    throw new Error(`Failed to read image (${response.status})`);
+async function readLocalImageBytes(
+  uri: string
+): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const normalizedUri = uri.startsWith("/") ? `file://${uri}` : uri;
+  const contentType = contentTypeForUri(normalizedUri);
+
+  if (Platform.OS === "web") {
+    const response = await fetch(normalizedUri);
+    if (!response.ok) {
+      throw new Error(`Failed to read image (${response.status})`);
+    }
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    return { bytes: new Uint8Array(arrayBuffer), contentType: blob.type || contentType };
   }
-  const blob = await response.blob();
-  return { blob, contentType: blob.type || "image/jpeg" };
+
+  const base64 = await readAsStringAsync(normalizedUri, {
+    encoding: "base64"
+  });
+  if (!base64) {
+    throw new Error("Could not read the selected photo.");
+  }
+  return { bytes: decodeBase64(base64), contentType };
 }
 
 async function uploadViaApiServer(
@@ -73,8 +114,14 @@ async function uploadViaApiServer(
   if (!apiBase) return null;
 
   try {
-    const { blob, contentType } = await uriToBlob(localUri);
-    const base64 = await blobToBase64(blob);
+    const { bytes, contentType } = await readLocalImageBytes(localUri);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = typeof btoa === "function" ? btoa(binary) : null;
+    if (!base64) return null;
+
     const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/upload-image`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -99,11 +146,11 @@ async function uploadDirectToSupabase(
   if (!client) return null;
 
   try {
-    const { blob, contentType } = await uriToBlob(localUri);
+    const { bytes, contentType } = await readLocalImageBytes(localUri);
     const ext = extensionForContentType(contentType);
     const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
 
-    const { error } = await client.storage.from(BUCKET).upload(path, blob, {
+    const { error } = await client.storage.from(BUCKET).upload(path, bytes, {
       contentType,
       cacheControl: "3600",
       upsert: false

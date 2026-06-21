@@ -22,8 +22,8 @@ export const defaultRewardAutomations: RewardAutomation[] = [
     kind: "seasonal",
     enabled: true,
     points: 300,
-    label: "Christmas / seasonal",
-    description: "Holiday drop for the whole team."
+    label: "Seasonal bonus",
+    description: "Holiday or seasonal drop for the whole team."
   },
   {
     kind: "welcome",

@@ -1,12 +1,11 @@
 import * as ImagePicker from "expo-image-picker";
-import { Activity, BadgeCheck, Building2, Calendar, Camera, Check, ChevronRight, Dumbbell, GraduationCap, HeartPulse, Home, LayoutGrid, MapPin, Pencil, Plane, Plus, Settings, ShieldCheck, ShoppingBag, Sparkles, Store, Tag, Trash2, TrendingUp, UserRound, UsersRound, Wallet, X } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Activity, BadgeCheck, Building2, Calendar, Camera, Check, ChevronRight, CircleDollarSign, Dumbbell, GraduationCap, HeartPulse, MapPin, Pencil, Plane, Plus, ShoppingBag, Sparkles, Store, Tag, Trash2, TrendingUp, UserRound, UsersRound, Wallet, X } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
-  Easing,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -15,12 +14,16 @@ import {
   TextInput,
   View
 } from "react-native";
-import { AccountSettingsHub } from "../components/AccountSettingsHub";
-import { AppIcon } from "../components/AppIcon";
-import { BentoMetricCard } from "../components/BentoMetricCard";
+import { BottomNav, NavTab } from "../components/BottomNav";
 import { CapsuleButton } from "../components/CapsuleButton";
 import { GlassPanel } from "../components/GlassPanel";
+import { Section } from "../components/Section";
+import { UserProfileScreen } from "../components/UserProfileScreen";
+import { ProviderMetricCarousel, ProviderProgressBar, ProviderRevenueChart } from "../components/ProviderAnalyticsWidgets";
 import { currency, market } from "../lib/format";
+import { formatPointsRate, pointsToAll } from "../lib/pointsConversion";
+import { employerPayoutAmount } from "../lib/perkPayment";
+import { buildProviderPaymentRows, computeProviderAnalytics, ProviderAnalytics, ProviderPaymentRow } from "../lib/providerAnalytics";
 import { ensurePublicImageUrl, isLocalImageUri, uploadImageToStorage } from "../lib/imageUpload";
 import { DEFAULT_PROVIDER_LOGO, isProviderProfileComplete, validateProviderProfileDraft } from "../lib/providerProfile";
 import { createProviderOffer, PerxLiveData, upsertProviderProfile } from "../lib/perxRepository";
@@ -69,114 +72,41 @@ async function pickImageFromDevice(): Promise<string | null> {
         return null;
       }
     }
+
+    // iOS often fails to present the picker when launched from inside a Modal.
+    if (Platform.OS === "ios") {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1
     });
-    if (result.canceled || !result.assets?.[0]) return null;
+    if (result.canceled || !result.assets?.[0]?.uri) return null;
     return result.assets[0].uri;
   } catch (error) {
-    Alert.alert("Image picker", "Could not open the picker. Make sure expo-image-picker is installed.");
+    console.warn("Image picker failed", error);
+    Alert.alert("Image picker", "Could not open your photo library. Try again.");
     return null;
   }
 }
 
-type BusinessTab = "home" | "offers" | "profile" | "account";
+type BusinessTab = "home" | "analytics" | "customers" | "offers" | "profile";
 
-function BusinessBottomNav({
-  active,
-  onChange,
-  onAddOffer
-}: {
-  active: BusinessTab;
-  onChange: (tab: BusinessTab) => void;
-  onAddOffer: () => void;
-}) {
-  const items: Array<{ key: BusinessTab; Icon: typeof Home; label: string }> = [
-    { key: "home", Icon: Home, label: "Home" },
-    { key: "offers", Icon: LayoutGrid, label: "Offers" },
-    { key: "profile", Icon: Store, label: "Profile" },
-    { key: "account", Icon: Settings, label: "Account" }
-  ];
-  return (
-    <View style={styles.businessNav} pointerEvents="box-none">
-      <View style={styles.businessNavPill}>
-        {items.map(({ key, Icon, label }) => {
-          const isActive = active === key;
-          return (
-            <BusinessNavItem
-              key={key}
-              Icon={Icon}
-              label={label}
-              selected={isActive}
-              onPress={() => onChange(key)}
-            />
-          );
-        })}
-        <Pressable
-          onPress={onAddOffer}
-          style={({ pressed }) => [styles.businessNavFab, pressed && styles.navItemPressed]}
-        >
-          <Plus size={20} color={colors.onPrimary} />
-        </Pressable>
-      </View>
-    </View>
-  );
-}
+const businessTabs: Array<NavTab<BusinessTab>> = [
+  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
+  { id: "analytics", label: "Analytics", icon: "chart-box-outline", iconActive: "chart-box" },
+  { id: "customers", label: "Customers", icon: "account-group-outline", iconActive: "account-group" },
+  { id: "offers", label: "Offers", icon: "tag-outline", iconActive: "tag" },
+  { id: "profile", label: "Profile", icon: "account-circle-outline", iconActive: "account-circle" }
+];
 
-function BusinessNavItem({
-  Icon,
-  label,
-  selected,
-  onPress
-}: {
-  Icon: typeof Home;
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  const progress = useRef(new Animated.Value(selected ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: selected ? 1 : 0,
-      duration: 190,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true
-    }).start();
-  }, [progress, selected]);
-
-  const activeScale = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.86, 1]
-  });
-  const iconScale = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.08]
-  });
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.businessNavItem, pressed && styles.navItemPressed]}
-    >
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.businessNavItemActiveLayer,
-          { opacity: progress, transform: [{ scale: activeScale }] }
-        ]}
-      />
-      <Animated.View style={{ transform: [{ scale: iconScale }] }}>
-        <Icon size={20} color={selected ? colors.onPrimary : colors.muted} />
-      </Animated.View>
-      <Text style={[styles.businessNavLabel, selected && styles.businessNavLabelActive]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
+function formatShortDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function CategoryGrid({
@@ -250,10 +180,9 @@ function OfferFormModal({
     title: initial?.title ?? "",
     description: initial?.description ?? "",
     discount: initial?.discount ?? "",
-    price: initial ? String(initial.price) : "",
     pointsPrice: initial ? String(initial.pointsPrice) : "",
     imageUrl: initial?.imageUrl ?? "",
-    redemptionType: initial?.redemptionType ?? "QR",
+    redemptionType: "NFC",
     validUntil: initial?.validUntil ?? "2026-12-31",
     category: initial?.category ?? defaultCategory
   }));
@@ -266,10 +195,9 @@ function OfferFormModal({
       title: initial?.title ?? "",
       description: initial?.description ?? "",
       discount: initial?.discount ?? "",
-      price: initial ? String(initial.price) : "",
       pointsPrice: initial ? String(initial.pointsPrice) : "",
       imageUrl: initial?.imageUrl ?? "",
-      redemptionType: initial?.redemptionType ?? "QR",
+      redemptionType: "NFC",
       validUntil: initial?.validUntil ?? "2026-12-31",
       category: initial?.category ?? defaultCategory
     });
@@ -278,16 +206,17 @@ function OfferFormModal({
   const handlePickImage = async () => {
     const uri = await pickImageFromDevice();
     if (!uri) return;
+
     setDraft((current) => ({ ...current, imageUrl: uri }));
     setUploadingImage(true);
     try {
       const publicUrl = await uploadImageToStorage(uri, "offers");
-      if (publicUrl) {
+      if (publicUrl && !isLocalImageUri(publicUrl)) {
         setDraft((current) => ({ ...current, imageUrl: publicUrl }));
-      } else {
+      } else if (isLocalImageUri(uri)) {
         Alert.alert(
-          "Upload failed",
-          "Could not upload the photo. Check your connection and try again."
+          "Photo selected",
+          "Preview is ready. We will upload it when you publish the offer."
         );
       }
     } finally {
@@ -323,18 +252,29 @@ function OfferFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHandle} />
-          <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>{mode === "edit" ? "Edit offer" : "New offer"}</Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { flexShrink: 1 }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>{mode === "edit" ? "Edit offer" : "New offer"}</Text>
+              </View>
+              <Pressable onPress={onClose} style={styles.modalClose}>
+                <X size={18} color={colors.text} />
+              </Pressable>
             </View>
-            <Pressable onPress={onClose} style={styles.modalClose}>
-              <X size={18} color={colors.text} />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={{ flexShrink: 1 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={[styles.modalContent, { paddingBottom: 120 }]}
+              showsVerticalScrollIndicator={false}
+            >
             <Pressable onPress={handlePickImage} disabled={uploadingImage} style={styles.imagePicker}>
               {draft.imageUrl ? (
                 <Image source={{ uri: draft.imageUrl }} style={styles.imagePickerPreview} resizeMode="cover" />
@@ -391,30 +331,21 @@ function OfferFormModal({
               style={styles.input}
             />
 
-            <View style={styles.modalRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalFieldLabel}>Price ({market.currency})</Text>
-                <TextInput
-                  value={draft.price}
-                  onChangeText={(price) => setDraft((c) => ({ ...c, price }))}
-                  placeholder="1200"
-                  placeholderTextColor={colors.muted}
-                  style={styles.input}
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalFieldLabel}>Employer points</Text>
-                <TextInput
-                  value={draft.pointsPrice}
-                  onChangeText={(pointsPrice) => setDraft((c) => ({ ...c, pointsPrice }))}
-                  placeholder="140"
-                  placeholderTextColor={colors.muted}
-                  style={styles.input}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
+            <Text style={styles.modalFieldLabel}>Points cost</Text>
+            <TextInput
+              value={draft.pointsPrice}
+              onChangeText={(pointsPrice) => setDraft((c) => ({ ...c, pointsPrice }))}
+              placeholder="140"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+              keyboardType="numeric"
+            />
+            <Text style={styles.imagePickerHint}>{formatPointsRate()}</Text>
+            {draft.pointsPrice.trim() ? (
+              <Text style={styles.imagePickerHint}>
+                Settlement preview: ≈ {currency(pointsToAll(Number(draft.pointsPrice) || 0))}
+              </Text>
+            ) : null}
 
             <Text style={styles.modalFieldLabel}>Category</Text>
             <CategoryGrid
@@ -432,21 +363,6 @@ function OfferFormModal({
               style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
               multiline
             />
-
-            <Text style={styles.modalFieldLabel}>Redemption</Text>
-            <View style={styles.segmented}>
-              {(["QR", "NFC"] as const).map((type) => (
-                <Pressable
-                  key={type}
-                  onPress={() => setDraft((c) => ({ ...c, redemptionType: type }))}
-                  style={[styles.segment, draft.redemptionType === type && styles.segmentActive]}
-                >
-                  <Text style={[styles.segmentText, draft.redemptionType === type && styles.segmentTextActive]}>
-                    {type}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
 
             <Text style={styles.modalFieldLabel}>Valid until</Text>
             <TextInput
@@ -469,9 +385,10 @@ function OfferFormModal({
                 <Text style={styles.dangerButtonText}>Archive offer</Text>
               </Pressable>
             ) : null}
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -531,12 +448,12 @@ function OfferDetailModal({
 
             <View style={styles.detailStatsRow}>
               <GlassPanel style={styles.detailStatCard} intensity={28}>
-                <Text style={styles.detailStatLabel}>Price</Text>
-                <Text style={styles.detailStatValue}>{currency(offer.price)}</Text>
+                <Text style={styles.detailStatLabel}>Points cost</Text>
+                <Text style={styles.detailStatValue}>{offer.pointsPrice.toLocaleString(market.locale)}</Text>
               </GlassPanel>
               <GlassPanel style={styles.detailStatCard} intensity={28}>
-                <Text style={styles.detailStatLabel}>Employer pts</Text>
-                <Text style={styles.detailStatValue}>{offer.pointsPrice.toLocaleString(market.locale)}</Text>
+                <Text style={styles.detailStatLabel}>Settlement</Text>
+                <Text style={styles.detailStatValue}>{currency(employerPayoutAmount(offer))}</Text>
               </GlassPanel>
               <GlassPanel style={styles.detailStatCard} intensity={28}>
                 <Text style={styles.detailStatLabel}>Redemptions</Text>
@@ -547,10 +464,6 @@ function OfferDetailModal({
             <Text style={styles.modalFieldLabel}>Description</Text>
             <Text style={styles.detailBody}>{offer.description}</Text>
 
-            <View style={styles.detailKeyValueRow}>
-              <Text style={styles.detailKeyLabel}>Redemption method</Text>
-              <Text style={styles.detailKeyValue}>{offer.redemptionType}</Text>
-            </View>
             <View style={styles.detailKeyValueRow}>
               <Text style={styles.detailKeyLabel}>Total revenue</Text>
               <Text style={styles.detailKeyValue}>{currency(stats.revenue)}</Text>
@@ -613,7 +526,7 @@ function TransactionDetailModal({
               <View style={[styles.txDetailIcon, { backgroundColor: tint.background }]}>
                 <Icon size={26} color={tint.color} />
               </View>
-              <Text style={styles.txDetailAmount}>+{currency(benefit.price)}</Text>
+              <Text style={styles.txDetailAmount}>+{currency(employerPayoutAmount(benefit))}</Text>
               <View style={styles.txDetailBadge}>
                 <BadgeCheck size={14} color={colors.secondary} />
                 <Text style={styles.txDetailBadgeText}>Settled</Text>
@@ -660,29 +573,6 @@ function TransactionDetailModal({
       </View>
     </Modal>
   );
-}
-
-function PulseDot({ delay = 0 }: { delay?: number }) {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-
-  useEffect(() => {
-    opacity.setValue(0.3);
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: false }),
-        Animated.timing(opacity, { toValue: 0.3, duration: 700, useNativeDriver: false })
-      ]),
-      { resetBeforeIteration: true }
-    );
-    animation.start();
-    return () => {
-      animation.stop();
-      opacity.setValue(0.3);
-    };
-  }, [delay, opacity]);
-
-  return <Animated.View style={[styles.activityPulseDot, { opacity }]} />;
 }
 
 export function BusinessExperience({
@@ -742,37 +632,31 @@ export function BusinessExperience({
   const [offers, setOffers] = useState<Benefit[]>(
     appData.benefits.filter((item) => item.businessId === (user.businessId ?? user.id))
   );
-  const allBenefits = useMemo(
-    () => [...appData.benefits.filter((item) => !offers.some((offer) => offer.id === item.id)), ...offers],
-    [appData.benefits, offers]
-  );
 
   useEffect(() => {
     setOffers(appData.benefits.filter((item) => item.businessId === (user.businessId ?? user.id)));
   }, [appData.benefits, user.businessId, user.id]);
 
-  const routedPayments = useMemo(
-    () =>
-      selectionRequests.flatMap((request) =>
-        request.benefitIds
-          .map((benefitId) => allBenefits.find((benefit) => benefit.id === benefitId))
-          .filter((benefit): benefit is Benefit => Boolean(benefit))
-          .filter((benefit) => benefit.businessId === user.businessId)
-          .map((benefit) => ({ request, benefit }))
-      ),
-    [selectionRequests, allBenefits, user.businessId]
-  );
-  const payoutTotal = routedPayments.reduce((sum, { benefit }) => sum + benefit.price, 0);
-  const pointsRedeemed = routedPayments.reduce((sum, { benefit }) => sum + benefit.pointsPrice, 0);
-  const reachedEmployees = new Set(routedPayments.map(({ request }) => request.employeeId)).size;
+  const providerBusinessId = user.businessId ?? user.id;
 
-  const statsForOffer = (offerId: string) => {
-    const matches = routedPayments.filter(({ benefit }) => benefit.id === offerId);
-    return {
-      redemptions: matches.length,
-      revenue: matches.reduce((sum, { benefit }) => sum + benefit.price, 0)
-    };
-  };
+  const analytics = useMemo(() => {
+    const paymentRows = buildProviderPaymentRows({
+      selectionRequests,
+      offers,
+      companies: appData.companies,
+      users: appData.users,
+      providerBusinessId
+    });
+    return computeProviderAnalytics({ paymentRows, offers, selectionRequests });
+  }, [selectionRequests, offers, appData.companies, appData.users, providerBusinessId]);
+
+  const statsForOffer = useCallback(
+    (offerId: string) => {
+      const item = analytics.revenueByOffer.find((offer) => offer.offerId === offerId);
+      return { redemptions: item?.redemptions ?? 0, revenue: item?.revenue ?? 0 };
+    },
+    [analytics]
+  );
 
   const saveProviderProfile = async (next: typeof profileDraft) => {
     const validationError = validateProviderProfileDraft(next);
@@ -827,15 +711,16 @@ export function BusinessExperience({
     }
 
     if (editingOffer) {
+      const pointsPrice = Number(draft.pointsPrice) || editingOffer.pointsPrice;
       const updated: Benefit = {
         ...editingOffer,
         title: draft.title,
         description: draft.description || editingOffer.description,
         discount: draft.discount || editingOffer.discount,
-        price: Number(draft.price) || editingOffer.price,
-        pointsPrice: Number(draft.pointsPrice) || editingOffer.pointsPrice,
+        price: pointsToAll(pointsPrice),
+        pointsPrice,
         imageUrl: imageUrl || editingOffer.imageUrl,
-        redemptionType: draft.redemptionType,
+        redemptionType: "NFC",
         category: draft.category,
         validUntil: draft.validUntil
       };
@@ -845,6 +730,7 @@ export function BusinessExperience({
       return;
     }
 
+    const pointsPrice = Number(draft.pointsPrice) || 140;
     const nextOffer: Benefit = {
       id: `benefit_${Date.now()}`,
       businessId: user.businessId ?? user.id,
@@ -853,12 +739,12 @@ export function BusinessExperience({
       title: draft.title,
       description: draft.description || "Member-only partner offer.",
       discount: draft.discount || "10% off",
-      price: Number(draft.price) || 1200,
-      pointsPrice: Number(draft.pointsPrice) || 140,
+      price: pointsToAll(pointsPrice),
+      pointsPrice,
       imageUrl:
         imageUrl ||
         "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80",
-      redemptionType: draft.redemptionType,
+      redemptionType: "NFC",
       category: draft.category,
       validUntil: draft.validUntil,
       city: profileDraft.city.trim() || market.city
@@ -873,7 +759,7 @@ export function BusinessExperience({
       price: nextOffer.price,
       pointsPrice: nextOffer.pointsPrice,
       imageUrl: nextOffer.imageUrl,
-      redemptionType: nextOffer.redemptionType,
+      redemptionType: "NFC",
       category: nextOffer.category,
       city: nextOffer.city
     });
@@ -915,54 +801,53 @@ export function BusinessExperience({
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.roleShell}>
       <ScrollView
-        contentContainerStyle={[styles.screenContent, styles.businessContent]}
+        contentContainerStyle={[styles.screenContent, styles.adminContent]}
         showsVerticalScrollIndicator={false}
       >
         {tab === "home" ? (
-            <BusinessHomeTab
-              profileDraft={profileDraft}
-              payoutTotal={payoutTotal}
-              pointsRedeemed={pointsRedeemed}
-              reachedEmployees={reachedEmployees}
-              routedPayments={routedPayments}
-              onOpenAccount={() => setTab("account")}
-              onSelectTransaction={(item) => setDetailTransaction(item)}
-              onSeeAllTransactions={() => setTab("offers")}
-            />
-          ) : null}
+          <BusinessHomeTab
+            profileDraft={profileDraft}
+            analytics={analytics}
+            offerCount={offers.length}
+            onEditProfile={() => setProfileEditOpen(true)}
+            onAddOffer={handleOpenAdd}
+            onGoToOffers={() => setTab("offers")}
+            onGoToAnalytics={() => setTab("analytics")}
+            onGoToCustomers={() => setTab("customers")}
+            onSelectTransaction={(item) => setDetailTransaction({ request: item.request, benefit: item.benefit })}
+          />
+        ) : null}
 
-          {tab === "offers" ? (
-            <BusinessOffersTab
-              offers={offers}
-              statsForOffer={statsForOffer}
-              onAdd={handleOpenAdd}
-              onSelect={(offer) => setDetailOffer(offer)}
-            />
-          ) : null}
+        {tab === "analytics" ? (
+          <BusinessAnalyticsTab
+            analytics={analytics}
+            offers={offers}
+            onSelectOffer={(offer) => setDetailOffer(offer)}
+          />
+        ) : null}
 
-          {tab === "profile" ? (
-            <BusinessProfileTab
-              user={user}
-              profile={profileDraft}
-              offerCount={offers.length}
-              customerCount={reachedEmployees}
-              payoutTotal={payoutTotal}
-              onEdit={() => setProfileEditOpen(true)}
-            />
-          ) : null}
+        {tab === "customers" ? (
+          <BusinessCustomersTab
+            analytics={analytics}
+            onSelectTransaction={(item) => setDetailTransaction({ request: item.request, benefit: item.benefit })}
+          />
+        ) : null}
 
-          {tab === "account" ? (
-            <BusinessAccountTab
-              user={user}
-              profile={profileDraft}
-              onLogout={onLogout}
-            />
-          ) : null}
+        {tab === "offers" ? (
+          <BusinessOffersTab
+            offers={offers}
+            statsForOffer={statsForOffer}
+            onAdd={handleOpenAdd}
+            onSelect={(offer) => setDetailOffer(offer)}
+          />
+        ) : null}
+
+        {tab === "profile" ? <UserProfileScreen user={user} onLogout={onLogout} /> : null}
       </ScrollView>
 
-      <BusinessBottomNav active={tab} onChange={setTab} onAddOffer={handleOpenAdd} />
+      <BottomNav tabs={businessTabs} active={tab} onChange={setTab} />
 
       <OfferFormModal
         visible={offerFormOpen}
@@ -1012,135 +897,491 @@ export function BusinessExperience({
 
 function BusinessHomeTab({
   profileDraft,
-  payoutTotal,
-  pointsRedeemed,
-  reachedEmployees,
-  routedPayments,
-  onOpenAccount,
-  onSelectTransaction,
-  onSeeAllTransactions
+  analytics,
+  offerCount,
+  onEditProfile,
+  onAddOffer,
+  onGoToOffers,
+  onGoToAnalytics,
+  onGoToCustomers,
+  onSelectTransaction
 }: {
-  profileDraft: { businessName: string };
-  payoutTotal: number;
-  pointsRedeemed: number;
-  reachedEmployees: number;
-  routedPayments: Array<{ request: SelectionRequest; benefit: Benefit }>;
-  onOpenAccount: () => void;
-  onSelectTransaction: (data: { request: SelectionRequest; benefit: Benefit }) => void;
-  onSeeAllTransactions: () => void;
+  profileDraft: {
+    businessName: string;
+    category: BenefitCategory;
+    city: string;
+    logoUrl: string;
+  };
+  analytics: ProviderAnalytics;
+  offerCount: number;
+  onEditProfile: () => void;
+  onAddOffer: () => void;
+  onGoToOffers: () => void;
+  onGoToAnalytics: () => void;
+  onGoToCustomers: () => void;
+  onSelectTransaction: (row: ProviderPaymentRow) => void;
 }) {
-  const heroTagline = routedPayments.length > 0
-    ? `Your business ecosystem at a glance. ${reachedEmployees} ${reachedEmployees === 1 ? "person" : "people"} reached this period.`
-    : `Your business ecosystem at a glance. Publish your first offer to start tracking redemptions, ${profileDraft.businessName.split(" ")[0]}.`;
+  const categoryTint =
+    businessCategoryAvatar[profileDraft.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
 
-  const growthTrend = routedPayments.length > 0
-    ? `+${Math.min(48, routedPayments.length * 8)}%`
-    : "+0%";
-
-  const recentTransactions = routedPayments.slice(0, 6);
+  const todayPreview = analytics.todayActivity.slice(0, 4);
 
   return (
     <>
       <View style={styles.adminHeader}>
         <View style={styles.adminHeaderCopy}>
-          <Text style={styles.greetingText}>Insights</Text>
-          <Text style={styles.insightsTagline}>{heroTagline}</Text>
+          <Text style={styles.adminTitle}>Hi, {profileDraft.businessName}</Text>
         </View>
-        <Pressable onPress={onOpenAccount} style={styles.searchPill}>
-          <AppIcon name="account-cog-outline" size={18} color={colors.soft} />
-        </Pressable>
       </View>
 
-      <View style={styles.bentoRow}>
-        <BentoMetricCard
-          title="Revenue"
-          value={currency(payoutTotal)}
-          trend={growthTrend}
-          accent={colors.primary}
-          Icon={Wallet}
-        />
-        <BentoMetricCard
-          title="Pts redeemed"
-          value={`${pointsRedeemed}`}
-          trend="Employee spend"
-          accent={colors.tertiary}
-          Icon={UsersRound}
-        />
-        <BentoMetricCard
-          title="Customers"
-          value={`${reachedEmployees}`}
-          trend={reachedEmployees > 0 ? `+${reachedEmployees}` : "—"}
-          accent={colors.secondary}
-          Icon={UsersRound}
-        />
-      </View>
-
-      <GlassPanel style={styles.activityPanel} intensity={36}>
-        <View style={styles.activityHeader}>
-          <View>
-            <Text style={styles.cardTitle}>Activity Heatmap</Text>
-            <Text style={styles.bodyText}>Live redemption signal across your offers.</Text>
-          </View>
-          <Pressable style={styles.exportPill} onPress={() => undefined}>
-            <Text style={styles.exportPillText}>Export</Text>
-          </Pressable>
-        </View>
-        <View style={styles.activityStage}>
-          <Text style={styles.activityStageLabel}>Live Optimization</Text>
-          <View style={styles.activityPulseRow}>
-            <PulseDot />
-            <PulseDot delay={350} />
-            <PulseDot delay={700} />
-          </View>
-        </View>
-      </GlassPanel>
-
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        {recentTransactions.length ? (
-          <Pressable onPress={onSeeAllTransactions}>
-            <Text style={styles.sectionMeta}>{recentTransactions.length} · See all</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      <GlassPanel style={styles.txList} intensity={32}>
-        {recentTransactions.length ? recentTransactions.map(({ request, benefit }, index) => {
-          const Icon = businessCategoryIcons[benefit.category] ?? Store;
-          const avatar = businessCategoryAvatar[benefit.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
-          const last = index === recentTransactions.length - 1;
-          return (
-            <Pressable
-              key={`${request.id}-${benefit.id}`}
-              onPress={() => onSelectTransaction({ request, benefit })}
-              style={[styles.txRow, last && styles.txRowLast]}
-            >
-              <View style={[styles.txAvatar, { backgroundColor: avatar.background }]}>
-                <Icon size={20} color={avatar.color} />
-              </View>
-              <View style={styles.txBody}>
-                <Text style={styles.txTitle}>{benefit.title}</Text>
-                <Text style={styles.txMeta}>
-                  {request.employeeName.split(" ")[0]} · Paid out
-                </Text>
-              </View>
-              <View style={styles.txAmounts}>
-                <Text style={styles.txAmount}>+{currency(benefit.price)}</Text>
-                <Text style={styles.txStatus}>Settled</Text>
-              </View>
-            </Pressable>
-          );
-        }) : (
-          <View style={styles.txEmpty}>
-            <View style={styles.smallIcon}>
-              <Store size={18} color={colors.text} />
-            </View>
+      <Pressable onPress={onEditProfile}>
+        <GlassPanel style={styles.compactPanel} intensity={18}>
+          <View style={styles.adminListRow}>
+            <Image
+              source={{ uri: profileDraft.logoUrl || DEFAULT_PROVIDER_LOGO }}
+              style={styles.providerHomeLogo}
+            />
             <View style={styles.listText}>
-              <Text style={styles.listTitle}>No routed payments yet</Text>
-              <Text style={styles.listSub}>Employee redemptions will land here automatically.</Text>
+              <Text style={styles.listTitle} numberOfLines={1}>
+                {profileDraft.businessName}
+              </Text>
+              <Text style={styles.listSub} numberOfLines={1}>
+                {profileDraft.city} · {profileDraft.category}
+              </Text>
             </View>
+            <Pencil size={16} color={colors.muted} />
           </View>
+        </GlassPanel>
+      </Pressable>
+
+      <View style={styles.employerStatGrid}>
+        <View style={styles.employerStatCapsule}>
+          <Wallet size={14} color={colors.primary} />
+          <Text style={styles.employerStatValue}>{currency(analytics.totalRevenue)}</Text>
+          <Text style={styles.employerStatLabel}>Revenue</Text>
+        </View>
+        <View style={styles.employerStatCapsule}>
+          <TrendingUp size={14} color={colors.secondary} />
+          <Text style={styles.employerStatValue}>{currency(analytics.averageTransactionValue)}</Text>
+          <Text style={styles.employerStatLabel}>Avg sale</Text>
+        </View>
+        <View style={styles.employerStatCapsule}>
+          <UsersRound size={14} color={colors.tertiary} />
+          <Text style={styles.employerStatValue}>{analytics.customers.length}</Text>
+          <Text style={styles.employerStatLabel}>Customers</Text>
+        </View>
+        <View style={styles.employerStatCapsule}>
+          <Store size={14} color={colors.accent} />
+          <Text style={styles.employerStatValue}>{offerCount}</Text>
+          <Text style={styles.employerStatLabel}>Live offers</Text>
+        </View>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.employerActionRow}>
+        <Pressable onPress={onAddOffer} style={styles.employerActionCapsule}>
+          <Plus size={14} color={colors.primary} />
+          <Text style={styles.employerActionCapsuleText}>New offer</Text>
+        </Pressable>
+        <Pressable onPress={onGoToAnalytics} style={styles.employerActionCapsule}>
+          <TrendingUp size={14} color={colors.primary} />
+          <Text style={styles.employerActionCapsuleText}>Analytics</Text>
+        </Pressable>
+        <Pressable onPress={onGoToCustomers} style={styles.employerActionCapsule}>
+          <UsersRound size={14} color={colors.primary} />
+          <Text style={styles.employerActionCapsuleText}>Customers</Text>
+        </Pressable>
+        <Pressable onPress={onGoToOffers} style={styles.employerActionCapsule}>
+          <Tag size={14} color={colors.primary} />
+          <Text style={styles.employerActionCapsuleText}>All offers</Text>
+        </Pressable>
+      </ScrollView>
+
+      <Section dense title="Revenue" meta="Last 7 days">
+        <GlassPanel style={styles.compactPanel} intensity={16}>
+          <ProviderRevenueChart data={analytics.revenueByDay} />
+        </GlassPanel>
+      </Section>
+
+      <Section dense
+        title="Today's activity"
+        meta={analytics.todayActivity.length ? `${analytics.todayActivity.length} today` : undefined}
+      >
+        {todayPreview.length ? (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            {todayPreview.map((row, index) => {
+              const Icon = businessCategoryIcons[row.benefit.category] ?? Store;
+              const tint = businessCategoryAvatar[row.benefit.category] ?? categoryTint;
+              const last = index === todayPreview.length - 1;
+              return (
+                <Pressable
+                  key={`${row.request.id}-${row.benefit.id}`}
+                  onPress={() => onSelectTransaction(row)}
+                  style={[styles.providerHomeRow, !last && styles.providerHomeRowDivider]}
+                >
+                  <View style={[styles.smallIcon, { backgroundColor: tint.background }]}>
+                    <Icon size={16} color={tint.color} />
+                  </View>
+                  <View style={styles.listText}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {row.benefit.title}
+                    </Text>
+                    <Text style={styles.listSub}>
+                      {row.request.employeeName.split(" ")[0]} · {row.companyName}
+                    </Text>
+                  </View>
+                  <Text style={styles.providerHomeAmount}>+{currency(employerPayoutAmount(row.benefit))}</Text>
+                </Pressable>
+              );
+            })}
+            {analytics.todayActivity.length > todayPreview.length ? (
+              <Pressable onPress={onGoToCustomers} style={styles.providerHomeSeeAll}>
+                <Text style={styles.challengeLinkText}>See all activity</Text>
+              </Pressable>
+            ) : null}
+          </GlassPanel>
+        ) : (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            <View style={styles.adminListRow}>
+              <View style={styles.smallIcon}>
+                <Activity size={16} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>Quiet day so far</Text>
+                <Text style={styles.listSub}>Redemptions today will appear here in real time.</Text>
+              </View>
+            </View>
+          </GlassPanel>
         )}
-      </GlassPanel>
+      </Section>
+
+      <Section
+        title="Top companies"
+        meta={analytics.topCompanies.length ? "By revenue" : undefined}
+      >
+        {analytics.topCompanies.length ? (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            {analytics.topCompanies.map((company, index) => {
+              const last = index === analytics.topCompanies.length - 1;
+              const maxRevenue = analytics.topCompanies[0]?.revenue ?? 1;
+              return (
+                <View
+                  key={company.companyId}
+                  style={[styles.providerHomeRow, !last && styles.providerHomeRowDivider]}
+                >
+                  <View style={[styles.smallIcon, { backgroundColor: "rgba(0,88,188,0.12)" }]}>
+                    <Building2 size={16} color={colors.primary} />
+                  </View>
+                  <View style={styles.providerStatContent}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {company.companyName}
+                    </Text>
+                    <Text style={[styles.listSub, styles.providerStatSub]}>
+                      {company.redemptions} redemption{company.redemptions === 1 ? "" : "s"} · {currency(company.revenue)}
+                    </Text>
+                    <ProviderProgressBar ratio={company.revenue / maxRevenue} />
+                  </View>
+                </View>
+              );
+            })}
+          </GlassPanel>
+        ) : (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            <View style={styles.adminListRow}>
+              <View style={styles.smallIcon}>
+                <Building2 size={16} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>No company data yet</Text>
+                <Text style={styles.listSub}>Employer redemptions will rank here once they start.</Text>
+              </View>
+            </View>
+          </GlassPanel>
+        )}
+      </Section>
+    </>
+  );
+}
+
+function BusinessAnalyticsTab({
+  analytics,
+  offers,
+  onSelectOffer
+}: {
+  analytics: ProviderAnalytics;
+  offers: Benefit[];
+  onSelectOffer: (offer: Benefit) => void;
+}) {
+  const revenueSorted = [...analytics.revenueByOffer].sort((a, b) => b.revenue - a.revenue);
+  const maxOfferRevenue = revenueSorted[0]?.revenue ?? 1;
+  const metricItems = [
+    { label: "Total revenue", value: currency(analytics.totalRevenue) },
+    {
+      label: "Avg transaction",
+      value: currency(analytics.averageTransactionValue),
+      hint: "Per redemption"
+    },
+    {
+      label: "Conversion rate",
+      value: `${analytics.conversionRate}%`,
+      hint: "Redemptions vs views"
+    },
+    {
+      label: "Redemptions",
+      value: String(analytics.totalRedemptions),
+      hint: `${analytics.totalViews} views`
+    },
+    {
+      label: "Customers",
+      value: String(analytics.customers.length),
+      hint: "Redeemed employees"
+    },
+    {
+      label: "Live offers",
+      value: String(offers.length),
+      hint: "Published perks"
+    }
+  ];
+
+  return (
+    <>
+      <View style={styles.adminHeader}>
+        <View style={styles.adminHeaderCopy}>
+          <Text style={styles.adminTitle}>Analytics</Text>
+        </View>
+      </View>
+
+      <ProviderMetricCarousel items={metricItems} />
+
+      <Section dense title="Revenue by offer" meta={revenueSorted.length ? `${revenueSorted.length} live` : undefined}>
+        {revenueSorted.length ? (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            {revenueSorted.map((item, index) => {
+              const offer = offers.find((entry) => entry.id === item.offerId);
+              const last = index === revenueSorted.length - 1;
+              const Icon = offer ? businessCategoryIcons[offer.category] ?? Store : Store;
+              const tint = offer
+                ? businessCategoryAvatar[offer.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary }
+                : { background: "rgba(0,88,188,0.14)", color: colors.primary };
+              return (
+                <Pressable
+                  key={item.offerId}
+                  disabled={!offer}
+                  onPress={() => offer && onSelectOffer(offer)}
+                  style={[styles.providerHomeRow, !last && styles.providerHomeRowDivider]}
+                >
+                  <View style={[styles.smallIcon, { backgroundColor: tint.background }]}>
+                    <Icon size={16} color={tint.color} />
+                  </View>
+                  <View style={styles.providerStatContent}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.listSub, styles.providerStatSub]}>
+                      {item.redemptions} redemption{item.redemptions === 1 ? "" : "s"} · {currency(item.revenue)}
+                    </Text>
+                    <ProviderProgressBar ratio={item.revenue / maxOfferRevenue} />
+                  </View>
+                  {offer ? <ChevronRight size={16} color={colors.muted} /> : null}
+                </Pressable>
+              );
+            })}
+          </GlassPanel>
+        ) : (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            <View style={styles.adminListRow}>
+              <View style={styles.smallIcon}>
+                <Tag size={16} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>No offer revenue yet</Text>
+                <Text style={styles.listSub}>Publish offers to start tracking revenue by perk.</Text>
+              </View>
+            </View>
+          </GlassPanel>
+        )}
+      </Section>
+
+      <Section dense title="Best-performing perks" meta="By redemptions">
+        {analytics.bestPerforming.length ? (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            {analytics.bestPerforming.map((item, index) => {
+              const last = index === analytics.bestPerforming.length - 1;
+              return (
+                <View
+                  key={item.offerId}
+                  style={[styles.providerHomeRow, !last && styles.providerHomeRowDivider]}
+                >
+                  <View style={[styles.smallIcon, { backgroundColor: "rgba(0,88,188,0.12)" }]}>
+                    <Sparkles size={16} color={colors.primary} />
+                  </View>
+                  <View style={styles.listText}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.listSub}>
+                      {item.redemptions} redemption{item.redemptions === 1 ? "" : "s"} · {item.conversionRate}% conversion
+                    </Text>
+                  </View>
+                  <Text style={styles.providerHomeAmount}>{currency(item.revenue)}</Text>
+                </View>
+              );
+            })}
+          </GlassPanel>
+        ) : (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            <View style={styles.adminListRow}>
+              <View style={styles.smallIcon}>
+                <Sparkles size={16} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>No performance data yet</Text>
+                <Text style={styles.listSub}>Top perks will rank here after the first redemptions.</Text>
+              </View>
+            </View>
+          </GlassPanel>
+        )}
+      </Section>
+
+      <Section dense title="Views vs redemptions" meta="Per offer">
+        {analytics.revenueByOffer.length ? (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            {analytics.revenueByOffer.map((item, index) => {
+              const last = index === analytics.revenueByOffer.length - 1;
+              const viewRatio = item.views > 0 ? item.redemptions / item.views : 0;
+              return (
+                <View
+                  key={`views-${item.offerId}`}
+                  style={[styles.providerHomeRow, !last && styles.providerHomeRowDivider]}
+                >
+                  <View style={styles.providerStatContent}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.listSub, styles.providerStatSub]}>
+                      {item.views} views · {item.redemptions} redeemed · {item.conversionRate}%
+                    </Text>
+                    <ProviderProgressBar ratio={viewRatio} />
+                  </View>
+                </View>
+              );
+            })}
+          </GlassPanel>
+        ) : null}
+      </Section>
+    </>
+  );
+}
+
+function BusinessCustomersTab({
+  analytics,
+  onSelectTransaction
+}: {
+  analytics: ProviderAnalytics;
+  onSelectTransaction: (row: ProviderPaymentRow) => void;
+}) {
+  const categoryTint = { background: "rgba(0,88,188,0.14)", color: colors.primary };
+  const history = useMemo(
+    () =>
+      [...analytics.paymentRows].sort(
+        (a, b) => new Date(b.redeemedAt).getTime() - new Date(a.redeemedAt).getTime()
+      ),
+    [analytics.paymentRows]
+  );
+
+  return (
+    <>
+      <View style={styles.adminHeader}>
+        <View style={styles.adminHeaderCopy}>
+          <Text style={styles.adminTitle}>Customers</Text>
+        </View>
+      </View>
+
+      <Section dense title="Customer list" meta={analytics.customers.length ? "Redeemed employees" : undefined}>
+        {analytics.customers.length ? (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            {analytics.customers.map((customer, index) => {
+              const last = index === analytics.customers.length - 1;
+              return (
+                <View
+                  key={customer.employeeId}
+                  style={[styles.providerHomeRow, !last && styles.providerHomeRowDivider]}
+                >
+                  <View style={[styles.smallIcon, { backgroundColor: categoryTint.background }]}>
+                    <UserRound size={16} color={categoryTint.color} />
+                  </View>
+                  <View style={styles.listText}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {customer.employeeName}
+                    </Text>
+                    <Text style={styles.listSub}>
+                      {customer.companyName} · {customer.redemptions} visit{customer.redemptions === 1 ? "" : "s"} ·{" "}
+                      {currency(customer.totalSpent)}
+                    </Text>
+                    <Text style={styles.listSub}>Last · {formatShortDate(customer.lastRedemptionAt)}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </GlassPanel>
+        ) : (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            <View style={styles.adminListRow}>
+              <View style={styles.smallIcon}>
+                <UsersRound size={16} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>No customers yet</Text>
+                <Text style={styles.listSub}>Redeeming employees and their companies will show up here.</Text>
+              </View>
+            </View>
+          </GlassPanel>
+        )}
+      </Section>
+
+      <Section dense title="Redemption history" meta={history.length ? `${history.length} total` : undefined}>
+        {history.length ? (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            {history.map((row, index) => {
+              const Icon = businessCategoryIcons[row.benefit.category] ?? Store;
+              const tint = businessCategoryAvatar[row.benefit.category] ?? categoryTint;
+              const last = index === history.length - 1;
+              return (
+                <Pressable
+                  key={`${row.request.id}-${row.benefit.id}-${index}`}
+                  onPress={() => onSelectTransaction(row)}
+                  style={[styles.providerHomeRow, !last && styles.providerHomeRowDivider]}
+                >
+                  <View style={[styles.smallIcon, { backgroundColor: tint.background }]}>
+                    <Icon size={16} color={tint.color} />
+                  </View>
+                  <View style={styles.listText}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {row.benefit.title}
+                    </Text>
+                    <Text style={styles.listSub}>
+                      {row.request.employeeName} · {row.companyName}
+                    </Text>
+                    <Text style={styles.listSub}>{formatShortDate(row.redeemedAt)} · Settled</Text>
+                  </View>
+                  <Text style={styles.providerHomeAmount}>+{currency(employerPayoutAmount(row.benefit))}</Text>
+                </Pressable>
+              );
+            })}
+          </GlassPanel>
+        ) : (
+          <GlassPanel style={styles.compactPanel} intensity={16}>
+            <View style={styles.adminListRow}>
+              <View style={styles.smallIcon}>
+                <CircleDollarSign size={16} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>No redemptions yet</Text>
+                <Text style={styles.listSub}>Full payout history will live here once employees start redeeming.</Text>
+              </View>
+            </View>
+          </GlassPanel>
+        )}
+      </Section>
     </>
   );
 }
@@ -1160,7 +1401,7 @@ function BusinessOffersTab({
     <>
       <View style={styles.offersHeader}>
         <View>
-          <Text style={styles.greetingText}>Offers</Text>
+          <Text style={styles.adminTitle}>Offers</Text>
           <Text style={styles.insightsTagline}>
             {offers.length ? `${offers.length} live offer${offers.length === 1 ? "" : "s"}` : "Publish your first offer to start earning."}
           </Text>
@@ -1184,7 +1425,7 @@ function BusinessOffersTab({
                 </Text>
                 <View style={styles.offerListSubRow}>
                   <View style={styles.offerListPriceChip}>
-                    <Text style={styles.offerListPriceText}>{currency(offer.price)}</Text>
+                    <Text style={styles.offerListPriceText}>{offer.pointsPrice} pts</Text>
                   </View>
                   <Text style={styles.offerListMeta}>{stats.redemptions} redemptions</Text>
                 </View>
@@ -1197,7 +1438,7 @@ function BusinessOffersTab({
         <GlassPanel style={styles.txList} intensity={32}>
           <View style={styles.txEmpty}>
             <View style={styles.smallIcon}>
-              <LayoutGrid size={18} color={colors.text} />
+              <Tag size={18} color={colors.text} />
             </View>
             <View style={styles.listText}>
               <Text style={styles.listTitle}>No offers yet</Text>
@@ -1206,141 +1447,6 @@ function BusinessOffersTab({
           </View>
         </GlassPanel>
       )}
-    </>
-  );
-}
-
-function BusinessProfileTab({
-  user,
-  profile,
-  offerCount,
-  customerCount,
-  payoutTotal,
-  onEdit
-}: {
-  user: User;
-  profile: {
-    businessName: string;
-    description: string;
-    category: BenefitCategory;
-    logoUrl: string;
-    city: string;
-  };
-  offerCount: number;
-  customerCount: number;
-  payoutTotal: number;
-  onEdit: () => void;
-}) {
-  const Icon = businessCategoryIcons[profile.category] ?? Store;
-  const tint = businessCategoryAvatar[profile.category] ?? { background: "rgba(0,88,188,0.14)", color: colors.primary };
-  return (
-    <>
-      <GlassPanel style={styles.profileHeroCard} intensity={34}>
-        <Pressable style={styles.profileHeroLogoWrap} onPress={onEdit}>
-          <Image source={{ uri: profile.logoUrl || DEFAULT_PROVIDER_LOGO }} style={styles.profileHeroLogo} />
-          <View style={styles.profileHeroLogoEdit}>
-            <Camera size={14} color={colors.onPrimary} />
-          </View>
-        </Pressable>
-        <Text style={styles.profileHeroName}>{profile.businessName}</Text>
-        <View style={styles.profileHeroMetaRow}>
-          <View style={[styles.detailCategoryBadge, { backgroundColor: tint.background }]}>
-            <Icon size={14} color={tint.color} />
-            <Text style={[styles.detailCategoryText, { color: tint.color }]}>{profile.category}</Text>
-          </View>
-          <View style={styles.detailMetaPill}>
-            <MapPin size={14} color={colors.muted} />
-            <Text style={styles.detailMetaText}>{profile.city}</Text>
-          </View>
-          <View style={styles.profileVerifiedBadge}>
-            <BadgeCheck size={14} color={colors.secondary} />
-            <Text style={styles.profileVerifiedText}>Verified</Text>
-          </View>
-        </View>
-        <Text style={styles.profileHeroDescription}>{profile.description}</Text>
-        <CapsuleButton label="Edit profile" onPress={onEdit} icon={<Pencil size={16} color={colors.onPrimary} />} />
-      </GlassPanel>
-
-      <View style={styles.bentoRow}>
-        <BentoMetricCard
-          title="Offers"
-          value={`${offerCount}`}
-          accent={colors.secondary}
-          Icon={Store}
-        />
-        <BentoMetricCard
-          title="Customers"
-          value={`${customerCount}`}
-          accent={colors.tertiary}
-          Icon={UsersRound}
-        />
-        <BentoMetricCard
-          title="Revenue"
-          value={currency(payoutTotal)}
-          accent={colors.primary}
-          Icon={Wallet}
-        />
-      </View>
-
-      <GlassPanel style={styles.profileSection} intensity={32}>
-        <Text style={styles.profileSectionTitle}>Account</Text>
-        <View style={styles.profileRow}>
-          <View style={styles.profileRowIcon}>
-            <UserRound size={18} color={colors.primary} />
-          </View>
-          <View style={styles.profileRowBody}>
-            <Text style={styles.profileRowLabel}>Owner</Text>
-            <Text style={styles.profileRowValue}>{user.name}</Text>
-          </View>
-        </View>
-        <View style={[styles.profileRow, styles.profileRowDivider]}>
-          <View style={styles.profileRowIcon}>
-            <Building2 size={18} color={colors.primary} />
-          </View>
-          <View style={styles.profileRowBody}>
-            <Text style={styles.profileRowLabel}>Email</Text>
-            <Text style={styles.profileRowValue}>{user.email}</Text>
-          </View>
-        </View>
-        <View style={[styles.profileRow, styles.profileRowDivider]}>
-          <View style={styles.profileRowIcon}>
-            <MapPin size={18} color={colors.primary} />
-          </View>
-          <View style={styles.profileRowBody}>
-            <Text style={styles.profileRowLabel}>City</Text>
-            <Text style={styles.profileRowValue}>{profile.city}</Text>
-          </View>
-        </View>
-      </GlassPanel>
-    </>
-  );
-}
-
-function BusinessAccountTab({
-  user,
-  profile,
-  onLogout
-}: {
-  user: User;
-  profile: { businessName: string };
-  onLogout: () => void;
-}) {
-  return (
-    <>
-      <View style={styles.adminHeader}>
-        <View style={styles.adminHeaderCopy}>
-          <Text style={styles.greetingText}>Account</Text>
-          <Text style={styles.insightsTagline}>
-            Signed in as {profile.businessName}. Manage how PerX works for you.
-          </Text>
-        </View>
-      </View>
-      <AccountSettingsHub
-        user={user}
-        onLogout={onLogout}
-        subtitle={`Provider account for ${profile.businessName}`}
-        showHero={false}
-      />
     </>
   );
 }
@@ -1425,22 +1531,33 @@ function ProfileEditModal({
       transparent
       onRequestClose={isOnboarding ? () => undefined : onClose}
     >
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHandle} />
-          <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>
-                {isOnboarding ? "Set up your business profile" : "Edit profile"}
-              </Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { flexShrink: 1 }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>
+                  {isOnboarding ? "Set up your business profile" : "Edit profile"}
+                </Text>
+              </View>
+              {isOnboarding ? null : (
+                <Pressable onPress={onClose} style={styles.modalClose}>
+                  <X size={18} color={colors.text} />
+                </Pressable>
+              )}
             </View>
-            {isOnboarding ? null : (
-              <Pressable onPress={onClose} style={styles.modalClose}>
-                <X size={18} color={colors.text} />
-              </Pressable>
-            )}
-          </View>
-          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={{ flexShrink: 1 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
+            >
             <Text style={styles.modalFieldLabel}>Logo (optional)</Text>
             <Pressable onPress={handlePickLogo} disabled={uploadingLogo} style={styles.imagePicker}>
               {draft.logoUrl ? (
@@ -1517,9 +1634,10 @@ function ProfileEditModal({
               onPress={() => void handleSave()}
               icon={<Check size={16} color={colors.onPrimary} />}
             />
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

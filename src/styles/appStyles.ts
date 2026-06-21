@@ -16,7 +16,9 @@ export const styles = StyleSheet.create({
   headerBrand: {
     flex: 1,
     minWidth: 0,
-    gap: 1
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   header: {
     paddingHorizontal: 20,
@@ -102,11 +104,73 @@ export const styles = StyleSheet.create({
   screenContent: {
     paddingHorizontal: 20,
     paddingBottom: 36,
-    gap: 16
+    gap: 12
   },
   employeeContent: {
     paddingBottom: 112,
     gap: 24
+  },
+  employerContent: {
+    paddingBottom: 112,
+    gap: 12
+  },
+  adminContent: {
+    paddingBottom: 112,
+    gap: 12
+  },
+  adminPageTitle: {
+    gap: 2
+  },
+  adminPageSummary: {
+    gap: 8
+  },
+  adminPageActions: {
+    gap: 6
+  },
+  adminPageMain: {
+    gap: 8
+  },
+  adminTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: -0.2
+  },
+  adminSub: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2
+  },
+  adminSection: {
+    gap: 6
+  },
+  adminSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  adminSectionTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  adminListRow: {
+    minHeight: 54,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle,
+    backgroundColor: colors.panel,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  adminCardTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "900"
   },
   roleShell: {
     flex: 1
@@ -278,8 +342,8 @@ export const styles = StyleSheet.create({
     gap: 12
   },
   smallIcon: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     borderRadius: radius.capsule,
     alignItems: "center",
     justifyContent: "center",
@@ -299,6 +363,13 @@ export const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     marginTop: 3
+  },
+  providerStatContent: {
+    flex: 1,
+    gap: 6
+  },
+  providerStatSub: {
+    marginTop: 0
   },
   listAmount: {
     color: colors.soft,
@@ -538,9 +609,9 @@ export const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.text,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    overflow: "hidden"
   },
   loginTitle: {
     color: colors.text,
@@ -628,33 +699,127 @@ export const styles = StyleSheet.create({
   catalogSummary: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    padding: 16
+    gap: 10,
+    padding: 12
   },
   catalogSummaryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,88,188,0.1)"
   },
   catalogProviderCard: {
-    padding: 16,
-    gap: 12,
+    padding: 12,
+    gap: 8,
     borderWidth: 0.8,
     borderColor: colors.glassEdge,
     backgroundColor: colors.glass
   },
+  catalogProviderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    borderRadius: radius.compact,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
+  },
+  catalogManageBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(0,88,188,0.1)",
+    borderWidth: 0.8,
+    borderColor: "rgba(0,88,188,0.2)"
+  },
+  catalogManageBtnText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  catalogCategoryCounts: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  catalogCategoryCountChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(0,0,0,0.04)",
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle
+  },
+  catalogCategoryCountText: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  activityStatusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.capsule,
+    borderWidth: 0.5
+  },
+  activityStatusSettled: {
+    backgroundColor: "rgba(76,175,80,0.12)",
+    borderColor: "rgba(76,175,80,0.35)"
+  },
+  activityStatusPending: {
+    backgroundColor: "rgba(255,152,0,0.12)",
+    borderColor: "rgba(255,152,0,0.35)"
+  },
+  activityStatusFailed: {
+    backgroundColor: "rgba(244,67,54,0.1)",
+    borderColor: "rgba(244,67,54,0.3)"
+  },
+  activityStatusRefunded: {
+    backgroundColor: "rgba(158,158,158,0.12)",
+    borderColor: "rgba(158,158,158,0.35)"
+  },
+  activityStatusText: {
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  activityEmptyActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8
+  },
+  teamBalanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    borderRadius: radius.compact,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
+  },
+  teamBalanceRowPoints: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  modalScrollContent: {
+    gap: 14,
+    paddingTop: 12,
+    paddingBottom: 32
+  },
   catalogProviderHead: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 12
   },
   catalogProviderLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 14
+    width: 40,
+    height: 40,
+    borderRadius: 12
   },
   catalogProviderLogoFallback: {
     alignItems: "center",
@@ -848,8 +1013,8 @@ export const styles = StyleSheet.create({
     gap: 12
   },
   recordAvatar: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     borderRadius: radius.capsule,
     backgroundColor: colors.surfaceContainerHigh,
     alignItems: "center",
@@ -857,7 +1022,7 @@ export const styles = StyleSheet.create({
   },
   recordAvatarText: {
     color: colors.primary,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "900"
   },
   statusBadge: {
@@ -1007,7 +1172,8 @@ export const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.06)"
   },
   businessContent: {
-    paddingBottom: 132
+    paddingBottom: 112,
+    gap: 12
   },
   businessNav: {
     position: "absolute",
@@ -1278,19 +1444,19 @@ export const styles = StyleSheet.create({
   },
   detailStatCard: {
     flex: 1,
-    padding: 14,
-    gap: 4
+    padding: 10,
+    gap: 2
   },
   detailStatLabel: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.4
   },
   detailStatValue: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "900"
   },
   detailBody: {
@@ -2300,13 +2466,13 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.secondary
   },
   filterRow: {
-    gap: 10,
-    paddingVertical: 6,
+    gap: 8,
+    paddingVertical: 2,
     paddingRight: 8
   },
   filterChip: {
-    minHeight: 38,
-    paddingHorizontal: 16,
+    minHeight: 34,
+    paddingHorizontal: 14,
     borderRadius: radius.capsule,
     alignItems: "center",
     justifyContent: "center",
@@ -2481,8 +2647,8 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: radius.capsule,
     backgroundColor: colors.primary
   },
@@ -2492,13 +2658,188 @@ export const styles = StyleSheet.create({
     fontWeight: "800"
   },
   employeeRow: {
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    padding: 10,
+    gap: 8,
     borderWidth: 0.8,
     borderColor: colors.glassEdge,
     backgroundColor: colors.glass
+  },
+  employeeRowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  employeeRowSelected: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(0,88,188,0.06)"
+  },
+  employeeUsageTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    overflow: "hidden"
+  },
+  employeeUsageFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: colors.primary
+  },
+  employeeUsageFillHigh: {
+    backgroundColor: "#E65100"
+  },
+  employeeUsageMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  employeeUsageMetaActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0
+  },
+  employeeUsageSub: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "600",
+    flex: 1
+  },
+  employeeUsageChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(0,88,188,0.1)"
+  },
+  employeeUsageChipHigh: {
+    backgroundColor: "rgba(230, 81, 0, 0.12)"
+  },
+  employeeUsageChipText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  employeeUsageChipTextHigh: {
+    color: "#E65100"
+  },
+  employeeNoBudgetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  employeeAssignBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.primary
+  },
+  employeeAssignBtnText: {
+    color: colors.onPrimary,
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  employeeSearchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
+  },
+  employeeSearchInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+    paddingVertical: 0
+  },
+  employeeBulkBar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingTop: 4
+  },
+  employeeBulkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
+  },
+  employeeBulkBtnDanger: {
+    backgroundColor: "rgba(244, 67, 54, 0.08)",
+    borderColor: "rgba(244, 67, 54, 0.25)"
+  },
+  employeeBulkBtnText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  employeeBulkBtnTextDanger: {
+    color: "#C62828"
+  },
+  employeeSelectMark: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.strokeSubtle,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  employeeSelectMarkActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary
+  },
+  employeeSuspendedBadge: {
+    alignSelf: "flex-start",
+    marginTop: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(158, 158, 158, 0.15)"
+  },
+  employeeSuspendedBadgeText: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  employeeDetailActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8
+  },
+  employeeDetailActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
+  },
+  employeeDetailActionBtnDanger: {
+    backgroundColor: "rgba(244, 67, 54, 0.08)",
+    borderColor: "rgba(244, 67, 54, 0.25)"
+  },
+  employeeDetailActionText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  employeeDetailActionTextDanger: {
+    color: "#C62828"
   },
   inviteSuccess: {
     alignItems: "center",
@@ -2541,8 +2882,202 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.panelStrong
   },
   challengeCard: {
-    padding: 16,
+    padding: 12,
+    gap: 8
+  },
+  challengeCardFlat: {
+    padding: 12,
+    gap: 8,
+    borderRadius: radius.compact,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
+  },
+  challengeSubTabRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  challengeMetricGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  challengeMetricCard: {
+    width: "48%",
+    flexGrow: 1,
+    flexBasis: "46%",
+    padding: 10,
+    gap: 2,
+    borderRadius: radius.compact,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass
+  },
+  challengeMetricValue: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  challengeMetricLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  challengeCardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: 10
+  },
+  challengeProgressTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    overflow: "hidden"
+  },
+  challengeProgressFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: colors.primary
+  },
+  challengeStatRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12
+  },
+  challengeStatItem: {
+    gap: 1
+  },
+  challengeStatValue: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  challengeStatLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "600"
+  },
+  challengeReviewBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(255,152,0,0.15)",
+    borderWidth: 0.5,
+    borderColor: "rgba(255,152,0,0.35)"
+  },
+  challengeReviewBadgeText: {
+    color: "#E65100",
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  challengeEmployerCapsuleList: {
+    gap: 8
+  },
+  challengeEmployerCapsule: {
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    backgroundColor: colors.glass,
+    overflow: "hidden"
+  },
+  challengeEmployerCapsuleCollapsed: {
+    borderRadius: radius.capsule
+  },
+  challengeEmployerCapsuleExpanded: {
+    borderRadius: radius.compact,
+    paddingBottom: 10
+  },
+  challengeEmployerCapsuleBody: {
+    paddingHorizontal: 14,
+    gap: 8
+  },
+  challengeEmployerCapsuleHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  challengeEmployerCapsuleActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    marginTop: 8
+  },
+  challengeAwardHint: {
+    color: "#C62828",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2
+  },
+  challengeEnabledLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 2
+  },
+  challengeBudgetWarn: {
+    padding: 10,
+    borderRadius: radius.compact,
+    backgroundColor: "rgba(244,67,54,0.08)",
+    borderWidth: 0.8,
+    borderColor: "rgba(244,67,54,0.25)"
+  },
+  challengeBudgetWarnText: {
+    color: "#C62828",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  spotStackField: {
+    gap: 6
+  },
+  spotPresetRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  spotBudgetPreview: {
+    padding: 10,
+    borderRadius: radius.compact,
+    backgroundColor: "rgba(0,88,188,0.06)",
+    gap: 2
+  },
+  spotAllChip: {
+    borderWidth: 1.5,
+    borderColor: colors.primary
+  },
+  automationStatusOn: {
+    color: "#2E7D32",
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  automationStatusOff: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  challengeAdvancedToggle: {
+    paddingVertical: 8
+  },
+  challengeAdvancedToggleText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  challengePresetRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 4
+  },
+  challengeFieldHint: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: -4,
+    marginBottom: 4
   },
   challengeMeta: {
     flexDirection: "row",
@@ -2996,8 +3531,7 @@ export const styles = StyleSheet.create({
     color: colors.onPrimary
   },
   activityPageHeader: {
-    gap: 4,
-    marginBottom: 4
+    marginBottom: 0
   },
   redemptionPagerRow: {
     flexDirection: "row",
@@ -3029,18 +3563,198 @@ export const styles = StyleSheet.create({
     gap: 6
   },
   employerAlertCard: {
-    padding: 14,
+    padding: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12
+    gap: 10
   },
   employerAlertIcon: {
-    width: 40,
-    height: 40,
+    width: 34,
+    height: 34,
     borderRadius: radius.capsule,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255, 152, 0, 0.14)"
+  },
+  employerAlertIconWarn: {
+    backgroundColor: "rgba(244, 67, 54, 0.12)"
+  },
+  employerAlertIconInfo: {
+    backgroundColor: "rgba(33, 150, 243, 0.12)"
+  },
+  employerAlertStack: {
+    gap: 8
+  },
+  employerHeaderAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.capsule,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
+  },
+  employerHeaderActionText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  employerPrimaryStatRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  employerPrimaryStatCard: {
+    flex: 1,
+    alignItems: "flex-start",
+    gap: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: radius.compact,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
+  },
+  employerPrimaryStatValue: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3
+  },
+  employerPrimaryStatLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  employerBudgetCard: {
+    padding: 12,
+    gap: 8
+  },
+  employerBudgetRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  employerBudgetCell: {
+    flex: 1,
+    gap: 3
+  },
+  employerBudgetValue: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  employerBudgetLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  employerBudgetBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    overflow: "hidden"
+  },
+  employerBudgetBarFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: colors.primary
+  },
+  employerSecondaryStatRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  employerSecondaryStatCapsule: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.capsule,
+    backgroundColor: "rgba(0,0,0,0.03)",
+    borderWidth: 0.5,
+    borderColor: colors.strokeSubtle
+  },
+  employerSecondaryStatValue: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  employerSecondaryStatLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  employerQuickActionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  employerQuickActionTile: {
+    width: "48%",
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: radius.compact,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge
+  },
+  employerQuickActionTileText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "800",
+    flexShrink: 1
+  },
+  employerRecordAmount: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: -0.2
+  },
+  employerRecordAmountLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 1
+  },
+  employerRecordMeta: {
+    alignItems: "flex-end",
+    minWidth: 72
+  },
+  providerStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.capsule,
+    borderWidth: 0.8
+  },
+  providerStatusEnabled: {
+    backgroundColor: "rgba(76, 175, 80, 0.12)",
+    borderColor: "rgba(76, 175, 80, 0.35)"
+  },
+  providerStatusDisabled: {
+    backgroundColor: "rgba(158, 158, 158, 0.12)",
+    borderColor: "rgba(158, 158, 158, 0.35)"
+  },
+  providerStatusPillText: {
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  providerStatusEnabledText: {
+    color: "#2E7D32"
+  },
+  providerStatusDisabledText: {
+    color: colors.muted
+  },
+  employerActivityTime: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 2
   },
   employerStatGrid: {
     flexDirection: "row",
@@ -3052,13 +3766,18 @@ export const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: "30%",
     alignItems: "center",
-    gap: 3,
-    paddingVertical: 10,
+    gap: 2,
+    paddingVertical: 8,
     paddingHorizontal: 6,
     borderRadius: radius.compact,
     backgroundColor: colors.glass,
     borderWidth: 0.8,
     borderColor: colors.glassEdge
+  },
+  employerStatCapsuleCarousel: {
+    width: undefined,
+    flexGrow: 0,
+    flexBasis: undefined
   },
   employerStatPressable: {
     alignItems: "center",
@@ -3067,7 +3786,7 @@ export const styles = StyleSheet.create({
   },
   employerStatValue: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "900"
   },
   employerStatLabel: {
@@ -3099,8 +3818,8 @@ export const styles = StyleSheet.create({
   employerActivityRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 8,
+    gap: 8,
+    paddingVertical: 6,
     borderBottomWidth: 0.5,
     borderBottomColor: colors.strokeSubtle
   },
@@ -3135,8 +3854,157 @@ export const styles = StyleSheet.create({
     fontWeight: "700"
   },
   compactPanel: {
-    padding: 14,
-    gap: 10
+    padding: 10,
+    gap: 0
+  },
+  providerHomeLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceContainerHigh
+  },
+  providerHomeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8
+  },
+  providerHomeRowDivider: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.strokeSubtle
+  },
+  providerHomeAmount: {
+    color: colors.secondary,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  providerHomeSeeAll: {
+    paddingTop: 8,
+    alignItems: "center"
+  },
+  providerChartWrap: {
+    gap: 8
+  },
+  providerChartBars: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 6,
+    minHeight: 120,
+    paddingTop: 4
+  },
+  providerChartBarCol: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4
+  },
+  providerChartBarTrack: {
+    width: "100%",
+    height: 88,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,88,188,0.08)",
+    justifyContent: "flex-end",
+    overflow: "hidden"
+  },
+  providerChartBarFill: {
+    width: "100%",
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    minHeight: 6
+  },
+  providerChartBarLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  providerChartBarValue: {
+    color: colors.soft,
+    fontSize: 9,
+    fontWeight: "600",
+    textAlign: "center"
+  },
+  providerChartCaption: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "600"
+  },
+  providerMetricRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  providerMetricChip: {
+    flexGrow: 1,
+    flexBasis: "47%",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: colors.glass,
+    borderWidth: 0.8,
+    borderColor: colors.glassEdge,
+    gap: 2
+  },
+  providerMetricChipCarousel: {
+    flexGrow: 0,
+    flexBasis: "auto",
+    minHeight: 72,
+    paddingVertical: 10,
+    paddingHorizontal: 10
+  },
+  providerMetricCarouselContent: {
+    gap: 8,
+    paddingVertical: 2,
+    paddingRight: 8
+  },
+  providerMetricCarouselWrap: {
+    gap: 6
+  },
+  providerMetricCarouselFooter: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2
+  },
+  providerMetricCarouselDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4
+  },
+  providerMetricCarouselDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,88,188,0.18)"
+  },
+  providerMetricCarouselDotActive: {
+    width: 14,
+    backgroundColor: colors.primary
+  },
+  providerMetricChipLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  providerMetricChipValue: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  providerMetricChipHint: {
+    color: colors.soft,
+    fontSize: 10,
+    fontWeight: "600"
+  },
+  providerProgressTrack: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,88,188,0.1)",
+    overflow: "hidden",
+    marginTop: 2
+  },
+  providerProgressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: colors.secondary
   },
   compactInputRow: {
     flexDirection: "row",
@@ -3158,13 +4026,13 @@ export const styles = StyleSheet.create({
     minWidth: "30%",
     flexGrow: 1,
     flexBasis: "30%",
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderRadius: radius.compact,
     backgroundColor: colors.surfaceContainerHigh,
     borderWidth: 0.5,
     borderColor: colors.strokeSubtle,
-    gap: 2
+    gap: 1
   },
   teamBalanceName: {
     color: colors.text,
@@ -3181,9 +4049,9 @@ export const styles = StyleSheet.create({
     paddingVertical: 2
   },
   redemptionPreviewCard: {
-    width: 148,
-    padding: 12,
-    gap: 4
+    width: 136,
+    padding: 10,
+    gap: 3
   },
   redemptionPreviewTop: {
     flexDirection: "row",
@@ -3359,11 +4227,18 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 24
   },
+  duelRoundMain: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14
+  },
   duelTopBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 8,
     paddingHorizontal: 4
   },
   duelProgress: {
@@ -3385,21 +4260,30 @@ export const styles = StyleSheet.create({
     color: colors.muted
   },
   duelPickPrompt: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     color: colors.text,
     textAlign: "center",
-    marginBottom: 20,
-    letterSpacing: -0.3
+    letterSpacing: -0.3,
+    paddingHorizontal: 12
   },
   duelCards: {
-    flexDirection: "row",
-    gap: 10,
-    flex: 1,
-    maxHeight: 440
+    flexDirection: "column",
+    alignItems: "stretch",
+    justifyContent: "center",
+    width: "100%",
+    maxWidth: 340,
+    gap: 10
+  },
+  duelCardSlotTop: {
+    width: "94%",
+    alignSelf: "flex-start"
+  },
+  duelCardSlotLower: {
+    width: "94%",
+    alignSelf: "flex-end"
   },
   duelCard: {
-    flex: 1,
     borderRadius: radius.card,
     overflow: "hidden",
     backgroundColor: colors.panelStrong,
@@ -3407,7 +4291,7 @@ export const styles = StyleSheet.create({
   },
   duelCardImg: {
     width: "100%",
-    height: 180
+    height: 132
   },
   duelWinBadge: {
     position: "absolute",
@@ -3421,8 +4305,9 @@ export const styles = StyleSheet.create({
     justifyContent: "center"
   },
   duelCardBody: {
-    padding: 12,
-    flex: 1
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3
   },
   duelCardBodyWin: {
     backgroundColor: "rgba(111,251,133,0.12)"
@@ -3436,26 +4321,26 @@ export const styles = StyleSheet.create({
     marginBottom: 4
   },
   duelCardTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: colors.text,
-    lineHeight: 18,
-    marginBottom: 4
+    lineHeight: 18
   },
   duelCardProvider: {
     fontSize: 11,
-    color: colors.muted,
-    marginBottom: 6
+    color: colors.muted
   },
   duelCardPrice: {
     fontSize: 13,
     fontWeight: "800",
-    color: colors.tertiary
+    color: colors.tertiary,
+    marginTop: 2
   },
   duelVsWrap: {
     alignItems: "center",
     justifyContent: "center",
-    width: 30
+    width: "100%",
+    paddingVertical: 2
   },
   duelVs: {
     fontSize: 15,
@@ -3466,8 +4351,7 @@ export const styles = StyleSheet.create({
   duelHint: {
     textAlign: "center",
     color: colors.soft,
-    fontSize: 12,
-    marginTop: 16
+    fontSize: 12
   },
   // Results
   duelResults: {

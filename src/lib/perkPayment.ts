@@ -1,3 +1,4 @@
+import { pointsToAll } from "./pointsConversion";
 import { Benefit, SelectionRequest, User } from "../types";
 
 export function perkPointsCost(benefit: Benefit): number {
@@ -9,7 +10,7 @@ export function canAffordPerk(pointsBalance: number, benefit: Benefit): boolean 
 }
 
 export function employerPayoutAmount(benefit: Benefit): number {
-  return Math.max(0, benefit.price);
+  return pointsToAll(benefit.pointsPrice);
 }
 
 export type PointsHealth = {
@@ -57,7 +58,7 @@ export function employerSettlementStats(
   return {
     redemptionCount: approved.length,
     pointsRedeemed: approved.reduce((sum, request) => sum + request.totalPoints, 0),
-    paidToProviders: approved.reduce((sum, request) => sum + request.total, 0)
+    paidToProviders: approved.reduce((sum, request) => sum + pointsToAll(request.totalPoints), 0)
   };
 }
 

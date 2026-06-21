@@ -13,57 +13,151 @@ const client = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
-const PASSWORD = "PerxStart2026!";
+const PASSWORD = "perx123";
 
 const providers = [
-  { name: "Mon Cheri", email: "moncheri@perx.ai" },
-  { name: "Raiffeisen Bank", email: "raiffeisen@perx.ai" },
-  { name: "Infinity Gym", email: "infinitygym@perx.ai" },
-  { name: "Neptune", email: "neptune@perx.ai" }
+  { name: "MonCheri", email: "moncheri@perx.ai", category: "Food" },
+  { name: "Albsig", email: "albsig@perx.ai", category: "Health" },
+  { name: "Burger King", email: "burgerking@perx.ai", category: "Food" },
+  { name: "FireHouse Subs", email: "firehousesubs@perx.ai", category: "Food" },
+  { name: "Neptun", email: "neptun@perx.ai", category: "Learning" },
+  { name: "Cineplexx", email: "cineplexx@perx.ai", category: "Family" }
 ];
 
-async function main() {
-  for (const provider of providers) {
-    const { data: existing } = await client
-      .from("users")
-      .select("id")
-      .eq("email", provider.email)
-      .maybeSingle();
+async function listAllAuthUsers() {
+  const users = [];
+  let page = 1;
+  while (true) {
+    const result = await client.auth.admin.listUsers({ page, perPage: 1000 });
+    if (result.error) throw new Error(result.error.message);
+    users.push(...result.data.users);
+    if (result.data.users.length < 1000) break;
+    page += 1;
+  }
+  return users;
+}
 
-    if (existing) {
-      console.log(`${provider.name} already exists — skipping.`);
-      continue;
+async function deleteExistingProviders() {
+  const { data: businessUsers, error: usersError } = await client
+    .from("users")
+    .select("id, auth_user_id, email, name")
+    .eq("role", "business");
+
+  if (usersError) throw usersError;
+
+  const businessIds = (businessUsers ?? []).map((user) => user.id);
+  if (!businessIds.length) {
+    console.log("No existing provider accounts to remove.");
+    return;
+  }
+
+  const { data: profiles } = await client
+    .from("provider_profiles")
+    .select("id")
+    .in("user_id", businessIds);
+
+  const profileIds = (profiles ?? []).map((profile) => profile.id);
+  const { data: benefitsByBusiness } = await client
+    .from("benefits")
+    .select("id")
+    .in("business_id", businessIds);
+  const { data: benefitsByProfile } = profileIds.length
+    ? await client.from("benefits").select("id").in("provider_id", profileIds)
+    : { data: [] };
+
+  const benefitIds = [
+    ...new Set([...(benefitsByBusiness ?? []), ...(benefitsByProfile ?? [])].map((row) => row.id))
+  ];
+
+  if (benefitIds.length) {
+    await client.from("redemptions").delete().in("benefit_id", benefitIds);
+    await client.from("selection_items").delete().in("benefit_id", benefitIds);
+    await client.from("employer_enabled_benefits").delete().in("benefit_id", benefitIds);
+    await client.from("benefits").delete().in("id", benefitIds);
+  }
+
+  await client.from("provider_profiles").delete().in("user_id", businessIds);
+  await client.from("users").delete().in("id", businessIds);
+
+  const authUsers = await listAllAuthUsers();
+  const authIds = new Set(
+    (businessUsers ?? [])
+      .map((user) => user.auth_user_id)
+      .filter(Boolean)
+  );
+
+  for (const authUser of authUsers) {
+    if (!authIds.has(authUser.id)) continue;
+    const { error } = await client.auth.admin.deleteUser(authUser.id);
+    if (error) throw new Error(`delete auth ${authUser.email}: ${error.message}`);
+    console.log(`Removed auth user: ${authUser.email}`);
+  }
+
+  for (const user of businessUsers ?? []) {
+    console.log(`Removed provider account: ${user.name} (${user.email})`);
+  }
+}
+
+async function createProvider(provider) {
+  const { data: authData, error: authErr } = await client.auth.admin.createUser({
+    email: provider.email,
+    password: PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: provider.name,
+      role: "business"
     }
+  });
 
-    const { data: authData, error: authErr } = await client.auth.admin.createUser({
-      email: provider.email,
-      password: PASSWORD,
-      email_confirm: true
-    });
+  if (authErr) {
+    throw new Error(`auth ${provider.email}: ${authErr.message}`);
+  }
 
-    if (authErr) {
-      console.error(`Failed to create auth for ${provider.name}:`, authErr.message);
-      continue;
-    }
-
-    const { error: insertErr } = await client.from("users").insert({
+  const { data: userRow, error: userErr } = await client
+    .from("users")
+    .insert({
       auth_user_id: authData.user.id,
       name: provider.name,
       email: provider.email,
       role: "business",
       points_balance: 0
-    });
+    })
+    .select("id")
+    .single();
 
-    if (insertErr) {
-      console.error(`Failed to insert ${provider.name}:`, insertErr.message);
-    } else {
-      console.log(`Created ${provider.name} (${provider.email})`);
-    }
+  if (userErr) {
+    throw new Error(`user ${provider.email}: ${userErr.message}`);
   }
 
-  console.log("\nDone. Credentials:");
-  for (const p of providers) {
-    console.log(`  ${p.email} / ${PASSWORD}`);
+  const { error: profileErr } = await client.from("provider_profiles").insert({
+    user_id: userRow.id,
+    business_name: provider.name,
+    logo_url: "",
+    description: `${provider.name} partner on PerX.`,
+    category: provider.category,
+    city: "Tirana",
+    is_approved: true
+  });
+
+  if (profileErr) {
+    throw new Error(`profile ${provider.name}: ${profileErr.message}`);
+  }
+
+  console.log(`Created ${provider.name} (${provider.email})`);
+}
+
+async function main() {
+  console.log("Removing existing provider profiles...");
+  await deleteExistingProviders();
+
+  console.log("\nCreating provider profiles...");
+  for (const provider of providers) {
+    await createProvider(provider);
+  }
+
+  console.log("\nProvider credentials (password for all: perx123):");
+  for (const provider of providers) {
+    console.log(`  ${provider.email}`);
   }
 }
 

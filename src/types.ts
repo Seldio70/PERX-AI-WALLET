@@ -13,6 +13,7 @@ export type User = {
   birthDate?: string;
   startDate?: string;
   pointsBalance?: number;
+  monthlyBudgetAll?: number;
 };
 
 export type Company = {
@@ -63,7 +64,6 @@ export type OfferDraft = {
   title: string;
   description: string;
   discount: string;
-  price: string;
   pointsPrice: string;
   imageUrl: string;
   redemptionType: "QR" | "NFC";

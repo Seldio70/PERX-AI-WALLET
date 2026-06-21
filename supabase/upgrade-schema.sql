@@ -340,6 +340,9 @@ begin
   end if;
 end $$;
 
+-- Per-employee monthly perk budget (ALL), set by employer
+alter table public.users add column if not exists monthly_budget_all numeric check (monthly_budget_all is null or monthly_budget_all >= 0);
+
 -- Challenge definition extensions (start date, award budget)
 alter table public.challenge_definitions add column if not exists start_date date;
 alter table public.challenge_definitions add column if not exists max_awards int check (max_awards is null or max_awards > 0);

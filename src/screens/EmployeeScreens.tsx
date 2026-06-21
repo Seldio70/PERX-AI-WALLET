@@ -61,6 +61,7 @@ import {
   redeemedWalletBenefits
 } from "../lib/perkPayment";
 import { PerxLiveData } from "../lib/perxRepository";
+import { offerImageSource } from "../lib/offerImages";
 import { styles } from "../styles/appStyles";
 import { colors } from "../theme";
 import { Benefit, BenefitCategory, ChallengeDefinition, ChallengeProgress, ChallengeView, RewardEvent, SelectionRequest, User } from "../types";
@@ -417,17 +418,11 @@ function EmployeeChallenges({
 }) {
   const active = openChallengeViews(challengeViews);
   const completed = completedChallengeViews(challengeViews);
-  const availablePoints = active.reduce((sum, challenge) => sum + challenge.rewardPoints, 0);
 
   return (
     <>
       <View style={styles.greeting}>
         <Text style={styles.greetingText}>Challenges</Text>
-        <Text style={styles.greetingSub}>
-          {active.length
-            ? `${active.length} active · ${availablePoints.toLocaleString()} pts to earn`
-            : "Complete platform and employer challenges to earn PerX Points."}
-        </Text>
       </View>
 
       <GlassPanel style={styles.pointsHero} intensity={32}>
@@ -694,51 +689,71 @@ function PerkDuelModal({
               <Text style={styles.duelRoundLabel}>{round + 1}/{DUEL_ROUNDS}</Text>
             </View>
 
-            <Text style={styles.duelPickPrompt}>Which perk would you choose?</Text>
+            <View style={styles.duelRoundMain}>
+              <Text style={styles.duelPickPrompt}>Which perk would you choose?</Text>
 
-            <View style={styles.duelCards}>
-              {/* LEFT */}
-              <Animated.View style={{ flex: 1, transform: [{ scale: leftScale }], opacity: leftOpacity }}>
-                <Pressable onPress={() => pickCard("left")} style={styles.duelCard}>
-                  <Image source={{ uri: currentPair[0].imageUrl }} style={styles.duelCardImg} />
-                  {picked === "left" && (
-                    <View style={styles.duelWinBadge}>
-                      <Check size={18} color="#fff" />
+              <View style={styles.duelCards}>
+                {/* LEFT */}
+                <Animated.View
+                  style={[
+                    styles.duelCardSlotTop,
+                    { transform: [{ scale: leftScale }], opacity: leftOpacity }
+                  ]}
+                >
+                  <Pressable onPress={() => pickCard("left")} style={styles.duelCard}>
+                    <Image source={offerImageSource(currentPair[0].imageUrl, "card")} style={styles.duelCardImg} />
+                    {picked === "left" && (
+                      <View style={styles.duelWinBadge}>
+                        <Check size={18} color="#fff" />
+                      </View>
+                    )}
+                    <View style={[styles.duelCardBody, picked === "left" && styles.duelCardBodyWin]}>
+                      <Text style={styles.duelCardCat}>{currentPair[0].category}</Text>
+                      <Text style={styles.duelCardTitle} numberOfLines={2}>
+                        {currentPair[0].title}
+                      </Text>
+                      <Text style={styles.duelCardProvider} numberOfLines={1}>
+                        {currentPair[0].providerName}
+                      </Text>
+                      <Text style={styles.duelCardPrice}>{currentPair[0].pointsPrice} pts</Text>
                     </View>
-                  )}
-                  <View style={[styles.duelCardBody, picked === "left" && styles.duelCardBodyWin]}>
-                    <Text style={styles.duelCardCat}>{currentPair[0].category}</Text>
-                    <Text style={styles.duelCardTitle} numberOfLines={2}>{currentPair[0].title}</Text>
-                    <Text style={styles.duelCardProvider} numberOfLines={1}>{currentPair[0].providerName}</Text>
-                    <Text style={styles.duelCardPrice}>{currentPair[0].pointsPrice} pts</Text>
-                  </View>
-                </Pressable>
-              </Animated.View>
+                  </Pressable>
+                </Animated.View>
 
-              <View style={styles.duelVsWrap}>
-                <Text style={styles.duelVs}>VS</Text>
+                <View style={styles.duelVsWrap}>
+                  <Text style={styles.duelVs}>VS</Text>
+                </View>
+
+                {/* RIGHT */}
+                <Animated.View
+                  style={[
+                    styles.duelCardSlotLower,
+                    { transform: [{ scale: rightScale }], opacity: rightOpacity }
+                  ]}
+                >
+                  <Pressable onPress={() => pickCard("right")} style={styles.duelCard}>
+                    <Image source={offerImageSource(currentPair[1].imageUrl, "card")} style={styles.duelCardImg} />
+                    {picked === "right" && (
+                      <View style={styles.duelWinBadge}>
+                        <Check size={18} color="#fff" />
+                      </View>
+                    )}
+                    <View style={[styles.duelCardBody, picked === "right" && styles.duelCardBodyWin]}>
+                      <Text style={styles.duelCardCat}>{currentPair[1].category}</Text>
+                      <Text style={styles.duelCardTitle} numberOfLines={2}>
+                        {currentPair[1].title}
+                      </Text>
+                      <Text style={styles.duelCardProvider} numberOfLines={1}>
+                        {currentPair[1].providerName}
+                      </Text>
+                      <Text style={styles.duelCardPrice}>{currentPair[1].pointsPrice} pts</Text>
+                    </View>
+                  </Pressable>
+                </Animated.View>
               </View>
 
-              {/* RIGHT */}
-              <Animated.View style={{ flex: 1, transform: [{ scale: rightScale }], opacity: rightOpacity }}>
-                <Pressable onPress={() => pickCard("right")} style={styles.duelCard}>
-                  <Image source={{ uri: currentPair[1].imageUrl }} style={styles.duelCardImg} />
-                  {picked === "right" && (
-                    <View style={styles.duelWinBadge}>
-                      <Check size={18} color="#fff" />
-                    </View>
-                  )}
-                  <View style={[styles.duelCardBody, picked === "right" && styles.duelCardBodyWin]}>
-                    <Text style={styles.duelCardCat}>{currentPair[1].category}</Text>
-                    <Text style={styles.duelCardTitle} numberOfLines={2}>{currentPair[1].title}</Text>
-                    <Text style={styles.duelCardProvider} numberOfLines={1}>{currentPair[1].providerName}</Text>
-                    <Text style={styles.duelCardPrice}>{currentPair[1].pointsPrice} pts</Text>
-                  </View>
-                </Pressable>
-              </Animated.View>
+              <Text style={styles.duelHint}>Tap a card to choose</Text>
             </View>
-
-            <Text style={styles.duelHint}>Tap a card to choose</Text>
           </Animated.View>
         )}
 
@@ -805,7 +820,7 @@ function PerkDuelModal({
                   const affordable = canAffordPerk(pointsBalance, benefit);
                   return (
                     <View key={benefit.id} style={styles.duelPickRow}>
-                      <Image source={{ uri: benefit.imageUrl }} style={styles.duelPickThumb} />
+                      <Image source={offerImageSource(benefit.imageUrl, "thumb")} style={styles.duelPickThumb} />
                       <View style={styles.listText}>
                         <Text style={styles.listTitle} numberOfLines={1}>{benefit.title}</Text>
                         <Text style={styles.listSub}>{benefit.providerName} · {benefit.pointsPrice} pts</Text>
@@ -940,7 +955,6 @@ function EmployeeHome({
     <>
       <View style={styles.greeting}>
         <Text style={styles.greetingText}>Hi, {user.name.split(" ")[0]}</Text>
-        <Text style={styles.greetingSub}>{companyName}</Text>
       </View>
 
       {planItems.length ? (
@@ -950,7 +964,7 @@ function EmployeeHome({
               {planItems.slice(0, 3).map((benefit, index) => (
                 <Image
                   key={benefit.id}
-                  source={{ uri: benefit.imageUrl }}
+                  source={offerImageSource(benefit.imageUrl, "card")}
                   style={[styles.packageCapsuleThumb, index > 0 && { marginLeft: -10 }]}
                 />
               ))}
@@ -978,13 +992,12 @@ function EmployeeHome({
             <Sparkles size={14} color={colors.onPrimary} />
             <Text style={styles.aiBadgeText}>PerX AI</Text>
           </View>
-          <Text style={styles.aiHeadTitle}>AI picked your best use this week</Text>
         </View>
 
         {primary ? (
           <>
             <Pressable onPress={() => setAiOfferDetail(primary)} style={styles.aiPrimary}>
-              <Image source={{ uri: primary.imageUrl }} style={styles.aiThumb} resizeMode="cover" />
+              <Image source={offerImageSource(primary.imageUrl, "thumb")} style={styles.aiThumb} resizeMode="cover" />
               <View style={styles.aiPrimaryInfo}>
                 <Text style={styles.aiName} numberOfLines={1}>
                   {primary.title}
@@ -1078,7 +1091,7 @@ function EmployeeHome({
             {nearby.map(({ benefit, reason }) => (
               <Pressable key={benefit.id} onPress={() => onAddToPackage(benefit, { openModal: true })}>
                 <GlassPanel style={styles.nearbyCard} intensity={20}>
-                  <Image source={{ uri: benefit.imageUrl }} style={styles.nearbyThumb} resizeMode="cover" />
+                  <Image source={offerImageSource(benefit.imageUrl, "card")} style={styles.nearbyThumb} resizeMode="cover" />
                   <Text style={styles.nearbyName} numberOfLines={1}>
                     {benefit.title}
                   </Text>
@@ -1461,7 +1474,7 @@ function EmployeeOffers({
           {heroBenefits.length ? (
             heroBenefits.map((benefit) => (
               <View key={benefit.id} style={[styles.offersShopHeroSlide, { width: heroSlideWidth }]}>
-                <Image source={{ uri: benefit.imageUrl }} style={styles.offersShopHeroImage} resizeMode="cover" />
+                <Image source={offerImageSource(benefit.imageUrl, "hero")} style={styles.offersShopHeroImage} resizeMode="cover" />
                 <View style={styles.offersShopHeroShade} />
                 <View style={styles.offersShopHeroContent}>
                   <Text style={styles.offersShopKicker}>Promoted</Text>
@@ -1601,7 +1614,7 @@ function EmployeeOffers({
                 onPress={() => setSelectedOffer(benefit)}
                 style={styles.marketCard}
               >
-                <Image source={{ uri: benefit.imageUrl }} style={styles.marketCardImg} resizeMode="cover" />
+                <Image source={offerImageSource(benefit.imageUrl, "card")} style={styles.marketCardImg} resizeMode="cover" />
                 <View style={styles.marketCardBody}>
                   <View style={styles.marketCardTop}>
                     <View style={[styles.marketCatDot, { backgroundColor: tint }]} />
@@ -1724,7 +1737,7 @@ function PackageModal({
             {planItems.length ? (
               planItems.map((benefit) => (
                 <View key={benefit.id} style={styles.packageModalItem}>
-                  <Image source={{ uri: benefit.imageUrl }} style={styles.packageModalThumb} resizeMode="cover" />
+                  <Image source={offerImageSource(benefit.imageUrl, "thumb")} style={styles.packageModalThumb} resizeMode="cover" />
                   <View style={styles.packageModalBody}>
                     <Text style={styles.packageModalName} numberOfLines={1}>
                       {benefit.title}
@@ -1818,7 +1831,7 @@ function OfferDetailModal({
           </View>
 
           <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <Image source={{ uri: benefit.imageUrl }} style={styles.detailHeroImage} resizeMode="cover" />
+            <Image source={offerImageSource(benefit.imageUrl, "detail")} style={styles.detailHeroImage} resizeMode="cover" />
             <View style={[styles.offerV2Cat, { backgroundColor: tint, alignSelf: "flex-start" }]}>
               <Text style={styles.offerV2CatText}>{benefit.category}</Text>
             </View>

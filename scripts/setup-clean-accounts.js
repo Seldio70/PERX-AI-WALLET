@@ -2,7 +2,7 @@ require("dotenv").config({ path: ".env" });
 
 const { createClient } = require("@supabase/supabase-js");
 
-const password = "PerxStart2026!";
+const password = "perx2026";
 const accounts = [
   {
     name: "PerX Employee",
@@ -15,13 +15,6 @@ const accounts = [
     name: "PerX Employer",
     email: "employer@perx.ai",
     role: "employer",
-    years_employed: 0,
-    points_balance: 0
-  },
-  {
-    name: "PerX Provider",
-    email: "provider@perx.ai",
-    role: "business",
     years_employed: 0,
     points_balance: 0
   }
@@ -83,18 +76,47 @@ async function deleteDemoAuthUsers(client) {
   }
 }
 
+async function deleteAllRows(client, table) {
+  const result = await client.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+  if (result.error) {
+    const message = result.error.message ?? "";
+    if (result.error.code === "42P01" || message.includes("does not exist")) {
+      console.log(`Skip ${table} (table missing)`);
+      return;
+    }
+    throw new Error(`delete ${table}: ${result.error.code || "unknown"} ${message}`);
+  }
+}
+
+async function deleteAllRowsCompositeKey(client, table, keyColumn) {
+  const result = await client.from(table).delete().neq(keyColumn, "00000000-0000-0000-0000-000000000000");
+  if (result.error) {
+    const message = result.error.message ?? "";
+    if (result.error.code === "42P01" || message.includes("does not exist")) {
+      console.log(`Skip ${table} (table missing)`);
+      return;
+    }
+    throw new Error(`delete ${table}: ${result.error.code || "unknown"} ${message}`);
+  }
+}
+
 async function clearAppRows(client) {
-  await assertNoError("delete redemptions", await client.from("redemptions").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete points ledger", await client.from("points_ledger").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete selection items", await client.from("selection_items").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete selection requests", await client.from("selection_requests").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete challenges", await client.from("challenges").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete wallet cards", await client.from("employer_wallet_cards").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete invites", await client.from("employer_invites").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete benefits", await client.from("benefits").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete provider profiles", await client.from("provider_profiles").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete users", await client.from("users").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
-  await assertNoError("delete companies", await client.from("companies").delete().neq("id", "00000000-0000-0000-0000-000000000000"));
+  await deleteAllRows(client, "redemptions");
+  await deleteAllRows(client, "points_ledger");
+  await deleteAllRows(client, "selection_items");
+  await deleteAllRows(client, "challenge_progress");
+  await deleteAllRowsCompositeKey(client, "employee_login_days", "employee_id");
+  await deleteAllRowsCompositeKey(client, "employer_disabled_challenge_templates", "employer_id");
+  await deleteAllRows(client, "selection_requests");
+  await deleteAllRows(client, "challenges");
+  await deleteAllRows(client, "challenge_definitions");
+  await deleteAllRowsCompositeKey(client, "employer_enabled_benefits", "employer_id");
+  await deleteAllRows(client, "employer_wallet_cards");
+  await deleteAllRows(client, "employer_invites");
+  await deleteAllRows(client, "benefits");
+  await deleteAllRows(client, "provider_profiles");
+  await deleteAllRows(client, "users");
+  await deleteAllRows(client, "companies");
 }
 
 async function createAuthUser(client, account) {
@@ -122,7 +144,7 @@ async function main() {
   console.log("Clearing demo auth users...");
   await deleteDemoAuthUsers(client);
 
-  console.log("Creating three accounts...");
+  console.log("Creating accounts...");
   const authByEmail = {};
   for (const account of accounts) {
     const authUser = await createAuthUser(client, account);
@@ -176,19 +198,6 @@ async function main() {
         role: "employee",
         company_id: company.id,
         years_employed: 0,
-        points_balance: 0
-      })
-  );
-
-  await assertNoError(
-    "insert provider",
-    await client
-      .from("users")
-      .insert({
-        auth_user_id: authByEmail["provider@perx.ai"],
-        name: "PerX Provider",
-        email: "provider@perx.ai",
-        role: "business",
         points_balance: 0
       })
   );
