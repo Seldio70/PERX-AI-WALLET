@@ -1568,6 +1568,14 @@ export const styles = StyleSheet.create({
   },
   walletHero: {
     marginTop: 4,
+    marginBottom: 8,
+    gap: 6
+  },
+  walletFilterRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingVertical: 8,
+    paddingRight: 8,
     marginBottom: 8
   },
   walletCardList: {

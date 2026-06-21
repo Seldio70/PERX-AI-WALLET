@@ -914,7 +914,13 @@ export async function createChallengeDefinition(input: {
     .select(CHALLENGE_DEFINITION_SELECT)
     .single();
 
-  if (result.error || !result.data) return definition;
+  if (result.error || !result.data) {
+    console.warn(
+      "[createChallengeDefinition] Supabase insert failed:",
+      result.error?.message ?? "no row returned"
+    );
+    return definition;
+  }
   return mapChallengeDefinition(result.data as DbChallengeDefinition);
 }
 
@@ -999,7 +1005,11 @@ export async function ensureChallengeProgressRows(input: {
       status: "open"
     };
 
-    if (!client) {
+    const persistedDefinitionId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      input.definition.id
+    );
+
+    if (!client || !persistedDefinitionId) {
       rows.push(local);
       continue;
     }

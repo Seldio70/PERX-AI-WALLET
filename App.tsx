@@ -9,7 +9,8 @@ import {
   ScrollView,
   Text,
   TextInput,
-  View
+  View,
+  Alert
 } from "react-native";
 import { AppIcon } from "./src/components/AppIcon";
 import { CapsuleButton } from "./src/components/CapsuleButton";
@@ -40,7 +41,10 @@ import {
 import {
   employeesForEmployer,
   collectEmployerIds,
+  canonicalEmployerId,
+  employeesForEmployerUser,
   ensureProgressForDefinitions,
+  isPersistedChallengeId,
   evaluateAndCompleteChallenges,
   resolveEmployerIdForUser,
   targetEmployeeIdsForDefinition
@@ -454,37 +458,30 @@ export default function App() {
     maxAwards?: number;
     pointCap?: number;
   }): Promise<boolean> => {
-    const definition = await createChallengeDefinition(input);
+    const employerId = canonicalEmployerId(appData.companies, mergedUsers, input.employerId);
+    const definition = await createChallengeDefinition({ ...input, employerId });
     if (!definition) return false;
 
     setChallengeDefinitions((current) => [definition, ...current]);
 
-    const company = appData.companies.find((item) => item.employerId === input.employerId);
-    const employees = employeesForEmployer(
-      mergedUsers,
-      company?.id ?? "",
-      input.employerId
-    );
+    const employees = employeesForEmployerUser(mergedUsers, appData.companies, input.employerId);
     const employeeIds = targetEmployeeIdsForDefinition(definition, employees);
-    const progress = await ensureProgressForDefinitions({
+    const nextProgress = await ensureProgressForDefinitions({
       definitions: [definition],
       employees: employees.filter((employee) => employeeIds.includes(employee.id)),
       existingProgress: challengeProgress
     });
-    setChallengeProgress((current) => {
-      const merged = [...current];
-      for (const row of progress) {
-        const idx = merged.findIndex(
-          (item) => item.definitionId === row.definitionId && item.employeeId === row.employeeId
-        );
-        if (idx >= 0) merged[idx] = row;
-        else merged.push(row);
-      }
-      return merged;
-    });
+    setChallengeProgress(nextProgress);
 
     for (const employee of employees) {
       void notify.challengeCreated(definition.title);
+    }
+
+    if (!isPersistedChallengeId(definition.id)) {
+      Alert.alert(
+        "Challenge created (this session)",
+        "Challenge database tables are not set up in Supabase yet. Run npm run setup:challenges, then reload the app so challenges persist and sync to all employees."
+      );
     }
 
     return true;
@@ -837,6 +834,7 @@ export default function App() {
                 }}
                 employeeHealthMetrics={employeeHealthMetrics}
                 onConnectAppleHealth={handleConnectAppleHealth}
+                onSubmitChallenge={handleSubmitChallenge}
               />
             ) : (
               <LoginScreen
@@ -1247,7 +1245,8 @@ function RoleRouter({
   onPayForPerk,
   onPayForPerks,
   employeeHealthMetrics = {},
-  onConnectAppleHealth
+  onConnectAppleHealth,
+  onSubmitChallenge
 }: {
   session: Session;
   appData: AppData;
@@ -1296,6 +1295,7 @@ function RoleRouter({
   onPayForPerks: (benefits: Benefit[]) => boolean;
   employeeHealthMetrics?: Record<string, EmployeeHealthSnapshot>;
   onConnectAppleHealth?: (employeeId: string) => void | Promise<void>;
+  onSubmitChallenge?: (definitionId: string, employee: User) => void | Promise<void>;
 }) {
   if (session.user.role === "employer") {
     return (
@@ -1351,7 +1351,9 @@ function RoleRouter({
       onConnectAppleHealth={
         onConnectAppleHealth ? () => onConnectAppleHealth(session.user.id) : undefined
       }
-      onSubmitChallenge={(definitionId) => handleSubmitChallenge(definitionId, session.user)}
+      onSubmitChallenge={
+        onSubmitChallenge ? (definitionId) => onSubmitChallenge(definitionId, session.user) : undefined
+      }
       onPayForPerk={onPayForPerk}
       onPayForPerks={onPayForPerks}
     />

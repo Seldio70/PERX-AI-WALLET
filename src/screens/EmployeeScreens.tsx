@@ -497,7 +497,16 @@ function EmployeeHome({
   onConnectAppleHealth,
   onSubmitChallenge,
   onGoToChallenges,
-  milestoneMessage
+  milestoneMessage,
+  planItems,
+  planTotal,
+  packageOpen,
+  sent,
+  onPackageOpenChange,
+  onAddToPackage,
+  onRemoveFromPackage,
+  onSendToEmployer,
+  onShufflePackage
 }: {
   user: User;
   companyName: string;
@@ -739,6 +748,8 @@ function EmployeeWallet({
   companyName: string;
   appData: AppData;
 }) {
+  type CardFilter = "all" | "ready" | "used";
+
   const redeemedBenefits = useMemo(
     () => redeemedWalletBenefits(user.id, appData.selectionRequests, appData.benefits),
     [user.id, appData.selectionRequests, appData.benefits]
@@ -747,10 +758,36 @@ function EmployeeWallet({
   const [accepted, setAccepted] = useState(false);
   const [celebrateKey, setCelebrateKey] = useState(0);
   const [usedIds, setUsedIds] = useState<Set<string>>(new Set());
+  const [cardFilter, setCardFilter] = useState<CardFilter>("all");
 
-  const focusIndex = redeemedBenefits.findIndex((benefit) => benefit.id === focusId);
-  const focused = focusIndex >= 0 ? redeemedBenefits[focusIndex] : null;
+  const readyCount = redeemedBenefits.filter((benefit) => !usedIds.has(benefit.id)).length;
+  const usedCount = redeemedBenefits.filter((benefit) => usedIds.has(benefit.id)).length;
+
+  const filteredBenefits = useMemo(() => {
+    if (cardFilter === "ready") {
+      return redeemedBenefits.filter((benefit) => !usedIds.has(benefit.id));
+    }
+    if (cardFilter === "used") {
+      return redeemedBenefits.filter((benefit) => usedIds.has(benefit.id));
+    }
+    return redeemedBenefits;
+  }, [cardFilter, redeemedBenefits, usedIds]);
+
+  const focusIndex = filteredBenefits.findIndex((benefit) => benefit.id === focusId);
+  const focused =
+    focusIndex >= 0
+      ? filteredBenefits[focusIndex]
+      : redeemedBenefits.find((benefit) => benefit.id === focusId) ?? null;
   const focusedUsed = focused ? usedIds.has(focused.id) : false;
+  const focusedVariant = focused
+    ? Math.max(0, redeemedBenefits.findIndex((benefit) => benefit.id === focused.id))
+    : 0;
+
+  const filterOptions: Array<{ id: CardFilter; label: string; count: number }> = [
+    { id: "all", label: "All", count: redeemedBenefits.length },
+    { id: "ready", label: "Ready", count: readyCount },
+    { id: "used", label: "Used", count: usedCount }
+  ];
 
   return (
     <>
@@ -758,35 +795,76 @@ function EmployeeWallet({
         <Text style={styles.greetingText}>My Cards</Text>
         <Text style={styles.greetingSub}>
           {redeemedBenefits.length
-            ? `${redeemedBenefits.length} perk${redeemedBenefits.length === 1 ? "" : "s"} ready · tap a card to use at the provider.`
+            ? `${readyCount} ready · ${usedCount} used · tap a card to redeem at the provider`
             : "Perks you redeem from Offers will appear here."}
         </Text>
       </View>
 
       {redeemedBenefits.length ? (
-        <View style={styles.cardStack}>
-          {redeemedBenefits.map((benefit, index) => (
-            <Pressable
-              key={benefit.id}
-              onPress={() => {
-                setFocusId(benefit.id);
-                setAccepted(false);
-              }}
-              style={[styles.stackItem, index > 0 && styles.stackItemCollapsed]}
-            >
-              <WalletCard
-                user={user}
-                companyName={companyName}
-                benefit={benefit}
-                pointsBalance={perkPointsCost(benefit)}
-                redeemed
-                used={usedIds.has(benefit.id)}
-                variant={index}
-                compact
-              />
-            </Pressable>
-          ))}
-        </View>
+        <>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.walletFilterRow}
+          >
+            {filterOptions.map((option) => {
+              const selected = cardFilter === option.id;
+              return (
+                <Pressable
+                  key={option.id}
+                  onPress={() => setCardFilter(option.id)}
+                  style={[styles.filterChip, selected && styles.filterChipActive]}
+                >
+                  <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>
+                    {option.label} · {option.count}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {filteredBenefits.length ? (
+            <View style={styles.cardStack}>
+              {filteredBenefits.map((benefit, index) => (
+                <Pressable
+                  key={benefit.id}
+                  onPress={() => {
+                    setFocusId(benefit.id);
+                    setAccepted(false);
+                  }}
+                  style={[styles.stackItem, index > 0 && styles.stackItemCollapsed]}
+                >
+                  <WalletCard
+                    user={user}
+                    companyName={companyName}
+                    benefit={benefit}
+                    pointsBalance={perkPointsCost(benefit)}
+                    redeemed
+                    used={usedIds.has(benefit.id)}
+                    variant={redeemedBenefits.findIndex((item) => item.id === benefit.id)}
+                    compact
+                  />
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.listRow}>
+              <View style={styles.smallIcon}>
+                <WalletCards size={18} color={colors.text} />
+              </View>
+              <View style={styles.listText}>
+                <Text style={styles.listTitle}>
+                  {cardFilter === "used" ? "No used cards" : "No ready cards"}
+                </Text>
+                <Text style={styles.listSub}>
+                  {cardFilter === "used"
+                    ? "Cards move here after you simulate NFC at the provider."
+                    : "All your cards have been used. Redeem more perks from Offers."}
+                </Text>
+              </View>
+            </View>
+          )}
+        </>
       ) : (
         <View style={styles.listRow}>
           <View style={styles.smallIcon}>
@@ -805,13 +883,13 @@ function EmployeeWallet({
         user={user}
         companyName={companyName}
         pointsBalance={focused ? perkPointsCost(focused) : 0}
-        variant={focusIndex < 0 ? 0 : focusIndex}
+        variant={focusedVariant}
         accepted={accepted}
         celebrateKey={celebrateKey}
         redeemed
         used={focusedUsed}
         onTap={() => {
-          if (focused) {
+          if (focused && !usedIds.has(focused.id)) {
             setUsedIds((current) => new Set([...current, focused.id]));
           }
           setAccepted(true);

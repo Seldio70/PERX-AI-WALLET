@@ -63,6 +63,40 @@ export function employeesForEmployer(users: User[], companyId: string, employerI
   return users.filter((user) => user.role === "employee" && user.companyId === companyId);
 }
 
+export function resolveCompanyForEmployer(
+  companies: Array<{ id: string; employerId: string }>,
+  users: User[],
+  employerUserId: string
+) {
+  return (
+    companies.find((company) => company.employerId === employerUserId) ??
+    companies.find((company) => company.id === users.find((user) => user.id === employerUserId)?.companyId) ??
+    null
+  );
+}
+
+export function canonicalEmployerId(
+  companies: Array<{ id: string; employerId: string }>,
+  users: User[],
+  employerUserId: string
+): string {
+  return resolveCompanyForEmployer(companies, users, employerUserId)?.employerId ?? employerUserId;
+}
+
+export function employeesForEmployerUser(
+  users: User[],
+  companies: Array<{ id: string; employerId: string }>,
+  employerUserId: string
+): User[] {
+  const company = resolveCompanyForEmployer(companies, users, employerUserId);
+  if (!company) return [];
+  return users.filter((user) => user.role === "employee" && user.companyId === company.id);
+}
+
+export function isPersistedChallengeId(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
 export function targetEmployeeIdsForDefinition(
   definition: ChallengeDefinition,
   employees: User[]

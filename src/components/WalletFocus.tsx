@@ -1,6 +1,6 @@
 import { Nfc, X } from "lucide-react-native";
 import { useEffect, useRef } from "react";
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { canAffordPerk, perkPointsCost } from "../lib/perkPayment";
 import { Benefit, User } from "../types";
 import { colors } from "../theme";
@@ -38,6 +38,7 @@ export function WalletFocus({
   onClose
 }: Props) {
   const anim = useRef(new Animated.Value(0)).current;
+  const closeTop = Platform.OS === "ios" ? 54 : 14;
 
   useEffect(() => {
     if (visible) {
@@ -60,8 +61,8 @@ export function WalletFocus({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.scrim} />
+      <View style={styles.overlay} pointerEvents="box-none">
+        <View style={styles.scrim} pointerEvents="none" />
 
         <View style={styles.content} pointerEvents="box-none">
           <Animated.View style={[styles.cardWrap, { opacity: anim, transform: [{ translateY }, { scale }] }]}>
@@ -102,11 +103,17 @@ export function WalletFocus({
           />
         </View>
 
-        <Pressable style={styles.closeBtn} onPress={onClose}>
+        {accepted ? <ConfettiBurst key={celebrateKey} /> : null}
+
+        <Pressable
+          style={[styles.closeBtn, { top: closeTop }]}
+          onPress={onClose}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
           <X size={18} color={colors.text} />
         </Pressable>
-
-        {accepted ? <ConfettiBurst key={celebrateKey} /> : null}
       </View>
     </Modal>
   );
@@ -174,15 +181,16 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     position: "absolute",
-    top: 14,
     right: 18,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: colors.surfaceContainerHigh
+    borderColor: colors.surfaceContainerHigh,
+    zIndex: 20,
+    elevation: 20
   }
 });

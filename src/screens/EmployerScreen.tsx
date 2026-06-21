@@ -138,6 +138,7 @@ export function EmployerExperience({
       employerId: user.id,
       monthlyBudgetPerEmployee: 0
     };
+  const employerScopeId = company.employerId ?? user.id;
   const employees = useMemo(
     () => appData.users.filter((item) => item.role === "employee" && item.companyId === company.id),
     [appData.users, company.id]
@@ -171,9 +172,11 @@ export function EmployerExperience({
   const employerDefinitions = useMemo(
     () =>
       appData.challengeDefinitions.filter(
-        (definition) => definition.active && definition.employerId === user.id
+        (definition) =>
+          definition.active &&
+          (definition.employerId === employerScopeId || definition.employerId === user.id)
       ),
-    [appData.challengeDefinitions, user.id]
+    [appData.challengeDefinitions, employerScopeId, user.id]
   );
   const openChallengeCount = useMemo(() => {
     const openIds = new Set(
@@ -362,10 +365,10 @@ export function EmployerExperience({
       </View>
 
       <ChallengesPage
-        employerId={user.id}
+        employerId={employerScopeId}
         definitions={employerDefinitions}
         progressRows={appData.challengeProgress}
-        disabledTemplateKeys={appData.disabledChallengeTemplates[user.id] ?? []}
+        disabledTemplateKeys={appData.disabledChallengeTemplates[employerScopeId] ?? []}
         employees={employees}
         rewardEvents={rewardEvents}
         employeePoints={employeePoints}
@@ -421,14 +424,14 @@ export function EmployerExperience({
 
       <CreateChallengeModal
         visible={challengeModalOpen}
-        employerId={user.id}
+        employerId={employerScopeId}
         onClose={() => setChallengeModalOpen(false)}
-        onCreate={(input) => {
+        onCreate={async (input) => {
           if (!onCreateChallenge) {
             Alert.alert("Unavailable", "Challenge creation is not available right now.");
-            return Promise.resolve(false);
+            return false;
           }
-          return onCreateChallenge(input);
+          return Boolean(await onCreateChallenge(input));
         }}
       />
 
@@ -1070,15 +1073,19 @@ function ChallengesPage({
   });
 
   const filteredEmployerChallenges = employerCreated.filter((definition) => {
-    const hasOpen = progressRows.some(
-      (row) => row.definitionId === definition.id && row.status === "open"
-    );
-    return employerFilter === "active" ? definition.active && hasOpen : !hasOpen || !definition.active;
+    const rows = progressRows.filter((row) => row.definitionId === definition.id);
+    const hasOpen = rows.some((row) => row.status === "open");
+    const allCompleted = rows.length > 0 && rows.every((row) => row.status === "completed");
+    if (employerFilter === "active") {
+      return definition.active && (hasOpen || rows.length === 0);
+    }
+    return !definition.active || allCompleted;
   });
 
-  const openEmployerChallenges = employerCreated.filter((definition) =>
-    progressRows.some((row) => row.definitionId === definition.id && row.status === "open")
-  );
+  const openEmployerChallenges = employerCreated.filter((definition) => {
+    const rows = progressRows.filter((row) => row.definitionId === definition.id);
+    return definition.active && (rows.some((row) => row.status === "open") || rows.length === 0);
+  });
 
   const confirmAwardAll = (definition: ChallengeDefinition) => {
     if (!onCompleteChallenge) return;
@@ -1579,8 +1586,8 @@ function CreateChallengeModal({
       rewardPoints: points,
       criterion: { kind: "manual" },
       target: "everyone",
-      dueDate: parsedDue,
-      startDate: parsedStart,
+      dueDate: parsedDue ?? undefined,
+      startDate: parsedStart ?? undefined,
       maxAwards: parsedMaxAwards,
       pointCap: points
     });

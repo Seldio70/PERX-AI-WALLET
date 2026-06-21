@@ -13,6 +13,7 @@
     "setup:accounts": "node scripts/setup-clean-accounts.js",
     "setup:storage": "node scripts/setup-storage.js",
     "verify:supabase": "node scripts/verify-supabase.js",
+    "setup:challenges": "node scripts/setup-challenge-schema.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
